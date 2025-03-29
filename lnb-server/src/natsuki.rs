@@ -1,5 +1,5 @@
 mod inner;
-mod storage;
+pub mod storage;
 
 use crate::natsuki::inner::NatsukiInner;
 

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use futures::{FutureExt, future::BoxFuture};
+use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use lnb_core::{
     config::AppConfigStorageSqlite, error::StorageError, interface::storage::ConversationStorage,
     model::conversation::Conversation,
@@ -13,7 +13,9 @@ pub struct SqliteConversationStorage(Arc<SqliteConversationStorageInner>);
 
 impl SqliteConversationStorage {
     pub async fn new(config: &AppConfigStorageSqlite) -> Result<SqliteConversationStorage, StorageError> {
-        let pool = SqlitePool::connect(&config.filepath.to_string_lossy()).await?;
+        let pool = SqlitePool::connect(&config.filepath.to_string_lossy())
+            .map_err(StorageError::by_backend)
+            .await?;
         Ok(SqliteConversationStorage(Arc::new(SqliteConversationStorageInner {
             pool,
         })))
@@ -54,9 +56,13 @@ impl SqliteConversationStorageInner {
             sqlx::query_as(r#"SELECT id, conversation_blob FROM conversations WHERE id = ?"#)
                 .bind(id)
                 .fetch_optional(&self.pool)
+                .map_err(StorageError::by_backend)
                 .await?;
 
-        let conversation = row.map(|r| rmp_serde::from_slice(&r.conversation_blob)).transpose()?;
+        let conversation = row
+            .map(|r| rmp_serde::from_slice(&r.conversation_blob))
+            .transpose()
+            .map_err(StorageError::by_serialization)?;
         Ok(conversation)
     }
 
@@ -71,6 +77,7 @@ impl SqliteConversationStorageInner {
         .bind(platform)
         .bind(context)
         .fetch_optional(&self.pool)
+        .map_err(StorageError::by_backend)
         .await?;
         let Some(SqliteRowPlatformContext { conversation_id, .. }) = platform_context_row else {
             return Ok(None);
@@ -80,18 +87,20 @@ impl SqliteConversationStorageInner {
     }
 
     async fn upsert(&self, conversation: &Conversation, platform: &str, new_context: &str) -> Result<(), StorageError> {
-        let blob = rmp_serde::to_vec(conversation)?;
+        let blob = rmp_serde::to_vec(conversation).map_err(StorageError::by_serialization)?;
 
         sqlx::query(r#"INSERT INTO conversations (id, conversation_blob) VALUES (?, ?) ON CONFLICT DO UPDATE SET conversation_blob = excluded.conversation_blob;"#)
             .bind(conversation.id())
             .bind(blob)
             .execute(&self.pool)
+            .map_err(StorageError::by_backend)
             .await?;
         sqlx::query(r#"INSERT INTO platform_contexts (conversation_id, platform, context) VALUES (?, ?, ?) ON CONFLICT DO UPDATE SET context = excluded.context;"#)
             .bind(conversation.id())
             .bind(platform)
             .bind(new_context)
             .execute(&self.pool)
+            .map_err(StorageError::by_backend)
             .await?;
 
         Ok(())
