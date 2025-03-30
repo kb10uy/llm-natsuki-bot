@@ -5,6 +5,6 @@ COPY . /build
 RUN cargo build --release
 
 FROM gcr.io/distroless/cc-debian12
-COPY --from=builder /build/target/release/llm-natsuki-bot /
+COPY --from=builder /build/target/release/lnb-server /
 USER nonroot
 CMD [ "/lnb-server", "-c", "/data/config.toml" ]
