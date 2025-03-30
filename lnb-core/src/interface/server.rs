@@ -11,7 +11,7 @@ use crate::{
 /// 旧 Assistant
 pub trait LnbServer: Send + Sync + 'static {
     /// 新しい会話ツリーを開始する。
-    fn new_conversation(&self) -> Result<ConversationId, ServerError>;
+    fn new_conversation(&self) -> BoxFuture<'_, Result<ConversationId, ServerError>>;
 
     /// 会話ツリーを復元する。
     fn restore_conversation<'a>(

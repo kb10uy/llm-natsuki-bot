@@ -9,7 +9,7 @@ use lnb_core::{
     error::ServerError,
     interface::{function::simple::SimpleFunction, llm::Llm, server::LnbServer, storage::ConversationStorage},
     model::{
-        conversation::{Conversation, ConversationUpdate},
+        conversation::{ConversationId, ConversationUpdate},
         message::UserMessage,
     },
 };
@@ -32,7 +32,36 @@ impl Natsuki {
     }
 }
 
-impl LnbServer for Natsuki {}
+impl LnbServer for Natsuki {
+    fn new_conversation(&self) -> BoxFuture<'_, Result<ConversationId, ServerError>> {
+        todo!()
+    }
+
+    fn restore_conversation<'a>(
+        &'a self,
+        platform: &'a str,
+        context: &'a str,
+    ) -> BoxFuture<'a, Result<Option<ConversationId>, ServerError>> {
+        todo!()
+    }
+
+    fn save_conversation<'a>(
+        &'a self,
+        update: ConversationUpdate,
+        platform: &'a str,
+        context: &'a str,
+    ) -> BoxFuture<'a, Result<(), ServerError>> {
+        todo!()
+    }
+
+    fn process_conversation(
+        &self,
+        conversation: ConversationId,
+        user_message: UserMessage,
+    ) -> BoxFuture<'_, Result<ConversationUpdate, ServerError>> {
+        todo!()
+    }
+}
 
 /*
 impl LnbServer for Natsuki {

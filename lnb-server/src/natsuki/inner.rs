@@ -119,7 +119,7 @@ impl NatsukiInner {
         Ok((responses, attachments))
     }
 
-    pub fn new_conversation(&self) -> Conversation {
+    pub fn new_conversation(&self) -> Result<ConversationId, ServerError> {
         let system_message = Message::new_system(self.system_role.clone());
         Conversation::new_now(Some(system_message))
     }
