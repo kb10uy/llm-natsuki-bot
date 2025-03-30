@@ -15,6 +15,8 @@ use lnb_core::{
 use tokio::sync::Mutex;
 use tracing::{info, warn};
 
+const MAX_TOOL_CALLING_LOOP: usize = 5;
+
 #[derive(Debug)]
 pub struct NatsukiInner {
     llm: Box<dyn Llm + 'static>,
@@ -60,21 +62,26 @@ impl NatsukiInner {
             .ok_or_else(|| ServerError::ConversationNotFound(conversation_id))?;
         let mut incomplete_conversation = IncompleteConversation::start(conversation, user_message);
 
-        let first_update = self.llm.send_conversation(&incomplete_conversation).await?;
-        let (assistant_update, attachments) = if let Some(tool_callings) = first_update.tool_callings {
+        let mut last_update = self.llm.send_conversation(&incomplete_conversation).await?;
+        let mut attachments = vec![];
+        let mut tool_called = 0;
+        while let Some(tool_callings) = last_update.tool_callings {
+            tool_called += 1;
+            if tool_called > MAX_TOOL_CALLING_LOOP {
+                break;
+            }
+
             let call_message = Message::new_function_calls(tool_callings.clone());
-            let (response_messages, attachments) = self.process_tool_callings(tool_callings).await?;
+            let (response_messages, called_attachments) = self.process_tool_callings(tool_callings).await?;
 
             let extending_messages = once(call_message).chain(response_messages.into_iter().map(|m| m.into()));
             incomplete_conversation.extend_message(extending_messages);
+            attachments.extend(called_attachments);
 
-            let second_update = self.llm.send_conversation(&incomplete_conversation).await?;
-            (second_update, attachments)
-        } else {
-            (first_update, vec![])
-        };
+            last_update = self.llm.send_conversation(&incomplete_conversation).await?;
+        }
 
-        let Some(response) = assistant_update.response else {
+        let Some(response) = last_update.response else {
             return Err(ServerError::ChatResponseExpected);
         };
 

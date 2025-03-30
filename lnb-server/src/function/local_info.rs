@@ -1,11 +1,12 @@
 use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
+    RFC3339_NUMOFFSET,
     error::FunctionError,
     interface::function::simple::{SimpleFunction, SimpleFunctionDescriptor, SimpleFunctionResponse},
     model::schema::DescribedSchema,
 };
 use serde_json::{Value, json};
-use time::{OffsetDateTime, format_description::well_known::Rfc3339};
+use time::OffsetDateTime;
 
 #[derive(Debug)]
 pub struct LocalInfo {
@@ -42,8 +43,8 @@ impl LocalInfo {
         let now = OffsetDateTime::now_local().map_err(FunctionError::by_external)?;
         Ok(SimpleFunctionResponse {
             result: json!({
-                "time_now": now.format(&Rfc3339).map_err(FunctionError::by_serialization)?,
-                "bot_started_at": self.started_at.format(&Rfc3339).map_err(FunctionError::by_serialization)?,
+                "time_now": now.format(RFC3339_NUMOFFSET).map_err(FunctionError::by_serialization)?,
+                "bot_started_at": self.started_at.format(RFC3339_NUMOFFSET).map_err(FunctionError::by_serialization)?,
             }),
             ..Default::default()
         })

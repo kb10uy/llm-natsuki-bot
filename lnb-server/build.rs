@@ -1,6 +1,7 @@
 use std::{env::var, process::Command};
 
-use time::{OffsetDateTime, format_description::well_known::Rfc3339};
+use lnb_core::RFC3339_NUMOFFSET;
+use time::OffsetDateTime;
 
 fn main() {
     export_git_commit_hash();
@@ -9,7 +10,7 @@ fn main() {
 
 fn export_built_at_datetime() {
     let now = OffsetDateTime::now_local().expect("failed to fetch time");
-    let formatted = now.format(&Rfc3339).expect("failed to format time");
+    let formatted = now.format(RFC3339_NUMOFFSET).expect("failed to format time");
     println!("cargo:rustc-env=BUILT_AT_DATETIME={formatted}");
 }
 
