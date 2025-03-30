@@ -31,3 +31,4 @@ uuid = { workspace = true }
 
 [build-dependencies]
 time = { workspace = true }
+lnb-core = { workspace = true }
