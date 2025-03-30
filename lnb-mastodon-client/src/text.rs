@@ -33,13 +33,13 @@ fn walk_mastodon(writer: &mut impl Write, children: Vec<Node>) -> FmtResult {
         match child {
             Node::Root(root) => walk_mastodon(writer, root.children)?,
 
-            Node::Text(text) => write!(writer, "{}", text.value)?,
+            Node::Text(text) => write_text_element(writer, &text.value)?,
             Node::Break(_) => writeln!(writer)?,
             Node::Strong(strong) => walk_mastodon(writer, strong.children)?,
             Node::Emphasis(emphasis) => walk_mastodon(writer, emphasis.children)?,
             Node::Delete(delete) => walk_mastodon(writer, delete.children)?,
-            Node::InlineCode(inline_code) => write!(writer, "{}", inline_code.value)?,
-            Node::InlineMath(inline_math) => write!(writer, "{}", inline_math.value)?,
+            Node::InlineCode(inline_code) => write_text_element(writer, &inline_code.value)?,
+            Node::InlineMath(inline_math) => write_text_element(writer, &inline_math.value)?,
             Node::Link(link) => write!(writer, "{}", strip_utm_source(&link.url))?,
 
             Node::Paragraph(paragraph) => {
@@ -63,11 +63,13 @@ fn walk_mastodon(writer: &mut impl Write, children: Vec<Node>) -> FmtResult {
                 let mut quoted = String::new();
                 walk_mastodon(&mut quoted, blockquote.children)?;
                 for line in quoted.lines() {
-                    writeln!(writer, "> {line}")?;
+                    writeln!(writer, "> ")?;
+                    write_text_element(writer, line)?;
+                    writeln!(writer)?;
                 }
             }
-            Node::Code(code) => write!(writer, "{}", code.value)?,
-            Node::Math(math) => write!(writer, "{}", math.value)?,
+            Node::Code(code) => write_text_element(writer, &code.value)?,
+            Node::Math(math) => write_text_element(writer, &math.value)?,
 
             Node::Table(_) => {
                 writeln!(writer, "(table omitted)")?;
@@ -76,6 +78,12 @@ fn walk_mastodon(writer: &mut impl Write, children: Vec<Node>) -> FmtResult {
             _ => (),
         }
     }
+    Ok(())
+}
+
+fn write_text_element(writer: &mut impl Write, original: &str) -> FmtResult {
+    let escaped = original.replace("@", "(at)");
+    write!(writer, "{escaped}")?;
     Ok(())
 }
 
