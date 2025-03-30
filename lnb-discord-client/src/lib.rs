@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use futures::{future::BoxFuture, prelude::*};
 use lnb_core::{
-    config::AppConfigPlatformDiscord,
+    config::AppConfigClientDiscord,
     error::ClientError,
     interface::{client::LnbClient, server::LnbServer},
 };
@@ -18,7 +18,7 @@ pub struct DiscordLnbClient(Arc<Mutex<SerenityClient>>);
 
 impl DiscordLnbClient {
     pub async fn new(
-        config_discord: &AppConfigPlatformDiscord,
+        config_discord: &AppConfigClientDiscord,
         assistant: impl LnbServer,
     ) -> Result<DiscordLnbClient, ClientError> {
         let inner_discord = DiscordLnbClientInner::new_as_serenity_client(config_discord, assistant).await?;

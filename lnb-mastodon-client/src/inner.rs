@@ -5,7 +5,7 @@ use std::sync::Arc;
 use futures::prelude::*;
 use lnb_core::{
     APP_USER_AGENT,
-    config::AppConfigPlatformMastodon,
+    config::AppConfigClientMastodon,
     error::ClientError,
     interface::server::LnbServer,
     model::{
@@ -39,7 +39,7 @@ pub struct MastodonLnbClientInner<S> {
 
 impl<S: LnbServer> MastodonLnbClientInner<S> {
     pub async fn new(
-        config_mastodon: &AppConfigPlatformMastodon,
+        config_mastodon: &AppConfigClientMastodon,
         assistant: S,
     ) -> Result<MastodonLnbClientInner<S>, ClientError> {
         // Mastodon クライアントと自己アカウント情報

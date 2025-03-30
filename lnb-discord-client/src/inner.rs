@@ -2,7 +2,7 @@ use crate::text::{sanitize_discord_message, sanitize_markdown_for_discord};
 
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use lnb_core::{
-    config::AppConfigPlatformDiscord,
+    config::AppConfigClientDiscord,
     error::ClientError,
     interface::server::LnbServer,
     model::message::{UserMessage, UserMessageContent},
@@ -43,7 +43,7 @@ impl<S: LnbServer> EventHandler for DiscordLnbClientInner<S> {
 
 impl<S: LnbServer> DiscordLnbClientInner<S> {
     pub async fn new_as_serenity_client(
-        config_discord: &AppConfigPlatformDiscord,
+        config_discord: &AppConfigClientDiscord,
         assistant: S,
     ) -> Result<SerenityClient, ClientError> {
         let inner = DiscordLnbClientInner {
@@ -61,7 +61,7 @@ impl<S: LnbServer> DiscordLnbClientInner<S> {
     }
 
     async fn on_ready(&self, _ctx: Context, ready: Ready) -> Result<(), ClientError> {
-        info!("Discord platform got ready: [{}] {}", ready.user.id, ready.user.name);
+        info!("Discord client got ready: [{}] {}", ready.user.id, ready.user.name);
 
         let mut bot_user = self.bot_user.write().await;
         *bot_user = Some(ready.user.into());

@@ -5,35 +5,26 @@ use serde::Deserialize;
 /// config.toml
 #[derive(Debug, Clone, Deserialize)]
 pub struct AppConfig {
-    pub platform: AppConfigPlatform,
+    pub client: AppConfigClient,
     pub tool: AppConfigTool,
     pub llm: AppConfigLlm,
     pub storage: AppConfigStorage,
     pub assistant: AppConfigAssistant,
 }
 
-/// [platform]
+/// [client]
 #[derive(Debug, Clone, Default, Deserialize)]
-pub struct AppConfigPlatform {
+pub struct AppConfigClient {
     #[serde(default = "Default::default")]
-    pub cli: AppConfigPlatformCli,
+    pub mastodon: AppConfigClientMastodon,
 
     #[serde(default = "Default::default")]
-    pub mastodon: AppConfigPlatformMastodon,
-
-    #[serde(default = "Default::default")]
-    pub discord: AppConfigPlatformDiscord,
+    pub discord: AppConfigClientDiscord,
 }
 
-/// [platform.cli]
+/// [client.mastodon]
 #[derive(Debug, Clone, Default, Deserialize)]
-pub struct AppConfigPlatformCli {
-    pub enabled: bool,
-}
-
-/// [platform.mastodon]
-#[derive(Debug, Clone, Default, Deserialize)]
-pub struct AppConfigPlatformMastodon {
+pub struct AppConfigClientMastodon {
     pub enabled: bool,
     pub server_url: String,
     pub token: String,
@@ -41,9 +32,9 @@ pub struct AppConfigPlatformMastodon {
     pub max_length: usize,
 }
 
-/// [platform.discord]
+/// [client.discord]
 #[derive(Debug, Clone, Default, Deserialize)]
-pub struct AppConfigPlatformDiscord {
+pub struct AppConfigClientDiscord {
     pub enabled: bool,
     pub token: String,
     pub max_length: usize,

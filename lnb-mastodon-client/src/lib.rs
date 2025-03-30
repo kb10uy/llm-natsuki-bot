@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use futures::{future::BoxFuture, prelude::*};
 use lnb_core::{
-    config::AppConfigPlatformMastodon,
+    config::AppConfigClientMastodon,
     error::ClientError,
     interface::{client::LnbClient, server::LnbServer},
 };
@@ -17,7 +17,7 @@ pub struct MastodonLnbClient<S>(Arc<MastodonLnbClientInner<S>>);
 
 impl<S: LnbServer> MastodonLnbClient<S> {
     pub async fn new(
-        config_mastodon: &AppConfigPlatformMastodon,
+        config_mastodon: &AppConfigClientMastodon,
         assistant: S,
     ) -> Result<MastodonLnbClient<S>, ClientError> {
         let inner = MastodonLnbClientInner::new(config_mastodon, assistant).await?;

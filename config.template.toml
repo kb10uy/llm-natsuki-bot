@@ -3,10 +3,10 @@ engine = "sqlite"
 database = "conversations.sqlite3"
 
 
-[platform.cli]
+[client.cli]
 enabled = false
 
-[platform.mastodon]
+[client.mastodon]
 enabled = true
 sensitive_spoiler = "そぎぎ"
 server_url = ""

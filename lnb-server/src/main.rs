@@ -5,7 +5,6 @@ use crate::natsuki::{
     Natsuki,
     function::{GetIllustUrl, ImageGenerator, LocalInfo, SelfInfo},
     llm::create_llm,
-    platform::{CliPlatform, DiscordPlatform, MastodonPlatform},
     storage::create_storage,
 };
 
@@ -14,7 +13,9 @@ use std::path::Path;
 use anyhow::{Context as _, Result, bail};
 use clap::Parser;
 use futures::future::join_all;
-use lnb_core::config::AppConfig;
+use lnb_core::{config::AppConfig, interface::client::LnbClient};
+use lnb_discord_client::DiscordLnbClient;
+use lnb_mastodon_client::MastodonLnbClient;
 use tokio::{fs::read_to_string, spawn};
 use tracing::info;
 
@@ -45,33 +46,25 @@ async fn main() -> Result<()> {
             .await;
     }
 
-    let mut platform_tasks = vec![];
-
-    // CLI
-    if config.platform.cli.enabled {
-        info!("starting CLI platform");
-        let cli_platform = CliPlatform::new(natsuki.clone());
-        let cli_task = spawn(cli_platform.execute());
-        platform_tasks.push(Box::new(cli_task));
-    }
+    let mut client_tasks = vec![];
 
     // Mastodon
-    if config.platform.mastodon.enabled {
-        info!("starting Mastodon platform");
-        let mastodon_platform = MastodonPlatform::new(&config.platform.mastodon, natsuki.clone()).await?;
-        let mastodon_task = spawn(mastodon_platform.execute());
-        platform_tasks.push(Box::new(mastodon_task));
+    if config.client.mastodon.enabled {
+        info!("starting Mastodon client");
+        let mastodon_client = MastodonLnbClient::new(&config.client.mastodon, natsuki.clone()).await?;
+        let mastodon_task = spawn(mastodon_client.execute());
+        client_tasks.push(Box::new(mastodon_task));
     }
 
     // Discord
-    if config.platform.discord.enabled {
-        info!("starting Discord platform");
-        let discord_platform = DiscordPlatform::new(&config.platform.discord, natsuki.clone()).await?;
-        let discord_task = spawn(discord_platform.execute());
-        platform_tasks.push(Box::new(discord_task));
+    if config.client.discord.enabled {
+        info!("starting Discord client");
+        let discord_client = DiscordLnbClient::new(&config.client.discord, natsuki.clone()).await?;
+        let discord_task = spawn(discord_client.execute());
+        client_tasks.push(Box::new(discord_task));
     }
 
-    join_all(platform_tasks).await;
+    join_all(client_tasks).await;
     Ok(())
 }
 
