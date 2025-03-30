@@ -35,3 +35,4 @@ pub struct LlmAssistantResponse {
     pub language: Option<String>,
     pub sensitive: Option<bool>,
 }
+

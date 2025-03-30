@@ -9,7 +9,7 @@ use lnb_core::{
     error::ServerError,
     interface::{function::simple::SimpleFunction, llm::Llm, server::LnbServer, storage::ConversationStorage},
     model::{
-        conversation::{Conversation, ConversationUpdate},
+        conversation::{ConversationId, ConversationUpdate},
         message::UserMessage,
     },
 };
@@ -33,32 +33,30 @@ impl Natsuki {
 }
 
 impl LnbServer for Natsuki {
-    fn new_conversation(&self) -> Conversation {
-        self.0.new_conversation()
+    fn new_conversation(&self) -> BoxFuture<'_, Result<ConversationId, ServerError>> {
+        async move { self.0.new_conversation().await }.boxed()
     }
 
     fn restore_conversation<'a>(
         &'a self,
-        platform: &'a str,
-        context: &'a str,
-    ) -> BoxFuture<'a, Result<Option<Conversation>, ServerError>> {
-        async move { self.0.restore_conversation(platform, context).await }.boxed()
+        context_key: &'a str,
+    ) -> BoxFuture<'a, Result<Option<ConversationId>, ServerError>> {
+        async move { self.0.restore_conversation(context_key).await }.boxed()
     }
 
     fn save_conversation<'a>(
         &'a self,
-        conversation: &'a Conversation,
-        platform: &'a str,
-        context: &'a str,
+        update: ConversationUpdate,
+        context_key: &'a str,
     ) -> BoxFuture<'a, Result<(), ServerError>> {
-        async move { self.0.save_conversation(conversation, platform, context).await }.boxed()
+        async move { self.0.save_conversation(update, context_key).await }.boxed()
     }
 
     fn process_conversation(
         &self,
-        conversation: Conversation,
+        conversation_id: ConversationId,
         user_message: UserMessage,
     ) -> BoxFuture<'_, Result<ConversationUpdate, ServerError>> {
-        async move { self.0.process_conversation(conversation, user_message).await }.boxed()
+        async move { self.0.process_conversation(conversation_id, user_message).await }.boxed()
     }
 }

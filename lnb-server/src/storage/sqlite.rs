@@ -3,7 +3,11 @@ use crate::config::AppConfigStorageSqlite;
 use std::sync::Arc;
 
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
-use lnb_core::{error::StorageError, interface::storage::ConversationStorage, model::conversation::Conversation};
+use lnb_core::{
+    error::StorageError,
+    interface::storage::ConversationStorage,
+    model::conversation::{Conversation, ConversationId},
+};
 use sqlx::{SqlitePool, prelude::FromRow};
 use uuid::Uuid;
 
@@ -22,25 +26,30 @@ impl SqliteConversationStorage {
 }
 
 impl ConversationStorage for SqliteConversationStorage {
-    fn find_by_id<'a>(&'a self, id: &'a Uuid) -> BoxFuture<'a, Result<Option<Conversation>, StorageError>> {
-        async move { self.0.find_by_id(id).await }.boxed()
+    fn fetch_content_by_id(&self, id: ConversationId) -> BoxFuture<'_, Result<Option<Conversation>, StorageError>> {
+        async move { self.0.fetch_content_by_id(id).await }.boxed()
     }
 
-    fn find_by_platform_context<'a>(
+    fn fetch_content_by_context_key<'a>(
         &'a self,
-        platform: &'a str,
-        context: &'a str,
+        context_key: &'a str,
     ) -> BoxFuture<'a, Result<Option<Conversation>, StorageError>> {
-        async move { self.0.find_by_platform_context(platform, context).await }.boxed()
+        async move { self.0.fetch_content_by_context_key(context_key).await }.boxed()
+    }
+
+    fn fetch_id_by_context_key<'a>(
+        &'a self,
+        context_key: &'a str,
+    ) -> BoxFuture<'a, Result<Option<ConversationId>, StorageError>> {
+        async move { self.0.fetch_id_by_context_key(context_key).await }.boxed()
     }
 
     fn upsert<'a>(
         &'a self,
         conversation: &'a Conversation,
-        platform: &'a str,
-        new_context: &'a str,
+        context_key: Option<&'a str>,
     ) -> BoxFuture<'a, Result<(), StorageError>> {
-        async move { self.0.upsert(conversation, platform, new_context).await }.boxed()
+        async move { self.0.upsert(conversation, context_key).await }.boxed()
     }
 }
 
@@ -50,58 +59,72 @@ struct SqliteConversationStorageInner {
 }
 
 impl SqliteConversationStorageInner {
-    async fn find_by_id(&self, id: &Uuid) -> Result<Option<Conversation>, StorageError> {
+    async fn fetch_content_by_id(&self, id: ConversationId) -> Result<Option<Conversation>, StorageError> {
         let row: Option<SqliteRowConversation> =
-            sqlx::query_as(r#"SELECT id, conversation_blob FROM conversations WHERE id = ?"#)
-                .bind(id)
+            sqlx::query_as(r#"SELECT id, context_key, content FROM conversations WHERE id = ?;"#)
+                .bind(id.0)
                 .fetch_optional(&self.pool)
                 .map_err(StorageError::by_backend)
                 .await?;
 
         let conversation = row
-            .map(|r| rmp_serde::from_slice(&r.conversation_blob))
+            .map(|r| rmp_serde::from_slice(&r.content))
             .transpose()
             .map_err(StorageError::by_serialization)?;
         Ok(conversation)
     }
 
-    async fn find_by_platform_context(
-        &self,
-        platform: &str,
-        context: &str,
+    async fn fetch_content_by_context_key<'a>(
+        &'a self,
+        context_key: &'a str,
     ) -> Result<Option<Conversation>, StorageError> {
-        let platform_context_row = sqlx::query_as(
-            r#"SELECT conversation_id, platform, context FROM platform_contexts WHERE platform = ? AND context = ?"#,
-        )
-        .bind(platform)
-        .bind(context)
-        .fetch_optional(&self.pool)
-        .map_err(StorageError::by_backend)
-        .await?;
-        let Some(SqliteRowPlatformContext { conversation_id, .. }) = platform_context_row else {
-            return Ok(None);
-        };
+        let row: Option<SqliteRowConversation> =
+            sqlx::query_as(r#"SELECT id, context_key, content FROM conversations WHERE context_key = ?;"#)
+                .bind(context_key)
+                .fetch_optional(&self.pool)
+                .map_err(StorageError::by_backend)
+                .await?;
 
-        self.find_by_id(&conversation_id).await
+        let conversation = row
+            .map(|r| rmp_serde::from_slice(&r.content))
+            .transpose()
+            .map_err(StorageError::by_serialization)?;
+        Ok(conversation)
     }
 
-    async fn upsert(&self, conversation: &Conversation, platform: &str, new_context: &str) -> Result<(), StorageError> {
+    async fn fetch_id_by_context_key<'a>(
+        &'a self,
+        context_key: &'a str,
+    ) -> Result<Option<ConversationId>, StorageError> {
+        let row: Option<(Uuid,)> = sqlx::query_as(r#"SELECT id FROM conversations WHERE context_key = ?;"#)
+            .bind(context_key)
+            .fetch_optional(&self.pool)
+            .map_err(StorageError::by_backend)
+            .await?;
+
+        Ok(row.map(|r| ConversationId(r.0)))
+    }
+
+    async fn upsert<'a>(
+        &'a self,
+        conversation: &'a Conversation,
+        context_key: Option<&'a str>,
+    ) -> Result<(), StorageError> {
+        let id = conversation.id().0;
         let blob = rmp_serde::to_vec(conversation).map_err(StorageError::by_serialization)?;
 
-        sqlx::query(r#"INSERT INTO conversations (id, conversation_blob) VALUES (?, ?) ON CONFLICT DO UPDATE SET conversation_blob = excluded.conversation_blob;"#)
-            .bind(conversation.id())
-            .bind(blob)
-            .execute(&self.pool)
-            .map_err(StorageError::by_backend)
-            .await?;
-        sqlx::query(r#"INSERT INTO platform_contexts (conversation_id, platform, context) VALUES (?, ?, ?) ON CONFLICT DO UPDATE SET context = excluded.context;"#)
-            .bind(conversation.id())
-            .bind(platform)
-            .bind(new_context)
-            .execute(&self.pool)
-            .map_err(StorageError::by_backend)
-            .await?;
-
+        sqlx::query(
+            r#"
+            INSERT INTO conversations (id, context_key, content) VALUES (?, ?, ?)
+            ON CONFLICT DO UPDATE SET content = excluded.content, context_key = excluded.context_key;
+        "#,
+        )
+        .bind(id)
+        .bind(context_key)
+        .bind(blob)
+        .execute(&self.pool)
+        .map_err(StorageError::by_backend)
+        .await?;
         Ok(())
     }
 }
@@ -110,13 +133,6 @@ impl SqliteConversationStorageInner {
 #[allow(dead_code)]
 struct SqliteRowConversation {
     id: Uuid,
-    conversation_blob: Vec<u8>,
-}
-
-#[derive(Debug, Clone, FromRow)]
-#[allow(dead_code)]
-struct SqliteRowPlatformContext {
-    conversation_id: Uuid,
-    platform: String,
-    context: String,
+    context_key: Option<String>,
+    content: Vec<u8>,
 }

@@ -88,20 +88,21 @@ impl<S: LnbServer> DiscordLnbClientInner<S> {
     async fn on_mentioned_message(&self, ctx: Context, message: SerenityMessage) -> Result<(), ClientError> {
         // Conversation の検索
         let context_key = message.referenced_message.as_ref().map(|rm| rm.id.to_string());
-        let conversation = match context_key {
-            None => {
-                info!("creating new conversation");
-                self.assistant.new_conversation()
-            }
+        let conversation_id = match context_key {
             Some(context) => {
                 info!("restoring conversation with last referenced message ID {context}");
-                match self.assistant.restore_conversation(PLATFORM_KEY, &context).await? {
+                let context_key = format!("{PLATFORM_KEY}:{context}");
+                match self.assistant.restore_conversation(&context_key).await? {
                     Some(c) => c,
                     None => {
                         info!("conversation has been lost, creating new one");
-                        self.assistant.new_conversation()
+                        self.assistant.new_conversation().await?
                     }
                 }
+            }
+            None => {
+                info!("creating new conversation");
+                self.assistant.new_conversation().await?
             }
         };
 
@@ -118,8 +119,11 @@ impl<S: LnbServer> DiscordLnbClientInner<S> {
             language: message.author.locale.clone(),
             ..Default::default()
         };
-        let conversation_update = self.assistant.process_conversation(conversation, user_message).await?;
-        let assistant_message = conversation_update.assistant_message();
+        let conversation_update = self
+            .assistant
+            .process_conversation(conversation_id, user_message)
+            .await?;
+        let assistant_message = conversation_update.assistant_response();
         let attachments = conversation_update.attachments();
         info!(
             "夏稀[{}]: {:?} ({} attachment(s))",
@@ -147,10 +151,9 @@ impl<S: LnbServer> DiscordLnbClientInner<S> {
             .await?;
 
         // Conversation/history の更新
-        let updated_conversation = conversation_update.finish();
-        let new_history_id = replied_message.id.to_string();
+        let new_history_id = format!("{PLATFORM_KEY}:{}", replied_message.id);
         self.assistant
-            .save_conversation(&updated_conversation, PLATFORM_KEY, &new_history_id)
+            .save_conversation(conversation_update, &new_history_id)
             .await?;
 
         Ok(())
