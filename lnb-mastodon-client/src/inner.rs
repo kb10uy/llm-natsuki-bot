@@ -108,20 +108,20 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
 
         // Conversation の検索
         let context_key = status.in_reply_to_id.map(|si| si.to_string());
-        let conversation = match context_key {
-            None => {
-                info!("creating new conversation");
-                self.assistant.new_conversation()
-            }
+        let conversation_id = match context_key {
             Some(context) => {
                 info!("restoring conversation with last status ID {context}");
                 match self.assistant.restore_conversation(PLATFORM_KEY, &context).await? {
                     Some(c) => c,
                     None => {
                         info!("conversation has been lost, creating new one");
-                        self.assistant.new_conversation()
+                        self.assistant.new_conversation().await?
                     }
                 }
+            }
+            None => {
+                info!("creating new conversation");
+                self.assistant.new_conversation().await?
             }
         };
 
@@ -150,7 +150,10 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
             language: status.language.and_then(|l| l.to_639_1()).map(|l| l.to_string()),
             ..Default::default()
         };
-        let conversation_update = self.assistant.process_conversation(conversation, user_message).await?;
+        let conversation_update = self
+            .assistant
+            .process_conversation(conversation_id, user_message)
+            .await?;
         let assistant_message = conversation_update.assistant_message();
         let attachments = conversation_update.attachments();
         info!(
@@ -203,10 +206,10 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
             .await?;
 
         // Conversation/history の更新
-        let updated_conversation = conversation_update.finish();
+        // let updated_conversation = conversation_update.finish();
         let new_history_id = replied_status.id.as_ref();
         self.assistant
-            .save_conversation(&updated_conversation, PLATFORM_KEY, new_history_id)
+            .save_conversation(conversation_update, PLATFORM_KEY, new_history_id)
             .await?;
 
         Ok(())
