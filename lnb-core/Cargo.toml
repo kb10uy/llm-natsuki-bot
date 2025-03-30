@@ -1,0 +1,14 @@
+[package]
+name = "lnb-core"
+version.workspace = true
+description.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[dependencies]
+futures = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+url = { workspace = true }
+uuid = { workspace = true }

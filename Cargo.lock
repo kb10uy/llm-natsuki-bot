@@ -423,15 +423,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
 
 [[package]]
-name = "colored"
-version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fde0e0ec90c9dfb3b4b1a0891a7dcd0e2bffde2f7efed5fe7c9bb00e5bfb915e"
-dependencies = [
- "windows-sys 0.59.0",
-]
-
-[[package]]
 name = "combine"
 version = "4.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -562,9 +553,9 @@ dependencies = [
 
 [[package]]
 name = "darling"
-version = "0.20.10"
+version = "0.20.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f63b86c8a8826a49b8c21f08a2d07338eec8d900540f8630dc76284be802989"
+checksum = "fc7f46116c46ff9ab3eb1597a45688b6715c6e628b5c133e288e709a29bcb4ee"
 dependencies = [
  "darling_core",
  "darling_macro",
@@ -572,9 +563,9 @@ dependencies = [
 
 [[package]]
 name = "darling_core"
-version = "0.20.10"
+version = "0.20.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95133861a8032aaea082871032f5815eb9e98cef03fa916ab4500513994df9e5"
+checksum = "0d00b9596d185e565c2207a0b01f8bd1a135483d02d9b7b0a54b11da8d53412e"
 dependencies = [
  "fnv",
  "ident_case",
@@ -586,9 +577,9 @@ dependencies = [
 
 [[package]]
 name = "darling_macro"
-version = "0.20.10"
+version = "0.20.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d336a2a514f6ccccaa3e09b02d41d35330c07ddf03a62165fcec10bb561c7806"
+checksum = "fc34b93ccb385b40dc71c6fceac4b2ad23662c7eeb248cf10d529b7e055b6ead"
 dependencies = [
  "darling_core",
  "quote 1.0.40",
@@ -1678,34 +1669,83 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23fb14cb19457329c82206317a5663005a4d404783dc74f4252769b0d5f42856"
 
 [[package]]
-name = "llm-natsuki-bot"
-version = "0.3.0"
+name = "lnb-core"
+version = "0.4.0"
+dependencies = [
+ "futures",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.12",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "lnb-discord-client"
+version = "0.4.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "futures",
+ "infer",
+ "lnb-core",
+ "markdown",
+ "regex",
+ "reqwest 0.12.15",
+ "serde",
+ "serenity",
+ "tempfile",
+ "thiserror 2.0.12",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+]
+
+[[package]]
+name = "lnb-mastodon-client"
+version = "0.4.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "futures",
+ "html2md",
+ "infer",
+ "lnb-core",
+ "markdown",
+ "mastodon-async",
+ "mastodon-async-entities",
+ "regex",
+ "reqwest 0.12.15",
+ "serde",
+ "tempfile",
+ "thiserror 2.0.12",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+]
+
+[[package]]
+name = "lnb-server"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "async-openai",
  "bimap",
  "clap",
- "colored",
  "futures",
- "html2md",
- "infer",
- "markdown",
- "mastodon-async",
- "mastodon-async-entities",
- "pin-project",
+ "lnb-core",
+ "lnb-discord-client",
+ "lnb-mastodon-client",
  "rand 0.9.0",
- "regex",
  "reqwest 0.12.15",
  "rmp-serde",
  "serde",
  "serde_json",
- "serenity",
  "sqlx",
- "tempfile",
- "thiserror 2.0.12",
  "time",
  "tokio",
- "tokio-stream",
  "toml",
  "tracing",
  "tracing-subscriber",
@@ -2010,9 +2050,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.21.2"
+version = "1.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2806eaa3524762875e21c3dcd057bc4b7bfa01ce4da8d46be1cd43649e1cc6b"
+checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
 
 [[package]]
 name = "openssl"
@@ -2162,26 +2202,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67eabc2ef2a60eb7faa00097bd1ffdb5bd28e62bf39990626a582201b7a754e5"
 dependencies = [
  "siphasher",
-]
-
-[[package]]
-name = "pin-project"
-version = "1.1.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "677f1add503faace112b9f1373e43e9e054bfdd22ff1a63c1bc485eaec6a6a8a"
-dependencies = [
- "pin-project-internal",
-]
-
-[[package]]
-name = "pin-project-internal"
-version = "1.1.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e918e4ff8c4549eb882f14b3a4bc8c8bc93de829416eacf579f1207a8fbf861"
-dependencies = [
- "proc-macro2",
- "quote 1.0.40",
- "syn 2.0.100",
 ]
 
 [[package]]

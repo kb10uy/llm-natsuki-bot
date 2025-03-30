@@ -1,0 +1,31 @@
+[package]
+name = "lnb-mastodon-client"
+version.workspace = true
+description.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[dependencies]
+lnb-core = { workspace = true }
+
+anyhow = { workspace = true }
+clap = { workspace = true }
+futures = { workspace = true }
+html2md = { workspace = true }
+infer = { workspace = true }
+markdown = { workspace = true }
+regex = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+tempfile = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+url = { workspace = true }
+
+mastodon-async = { git = "https://github.com/dscottboggs/mastodon-async", branch = "comb", version = "1.3.2", features = [
+  "json",
+  "mt",
+] }
+mastodon-async-entities = { git = "https://github.com/dscottboggs/mastodon-async", branch = "comb", version = "1.3.2" }
