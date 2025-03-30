@@ -1716,6 +1716,7 @@ dependencies = [
  "mastodon-async-entities",
  "regex",
  "reqwest 0.12.15",
+ "serde",
  "tempfile",
  "thiserror 2.0.12",
  "tokio",

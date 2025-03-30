@@ -7,20 +7,26 @@ use std::sync::Arc;
 
 use futures::{future::BoxFuture, prelude::*};
 use lnb_core::{
-    config::AppConfigClientMastodon,
     error::ClientError,
     interface::{client::LnbClient, server::LnbServer},
 };
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MastodonLnbClientConfig {
+    pub enabled: bool,
+    pub server_url: String,
+    pub token: String,
+    pub sensitive_spoiler: String,
+    pub max_length: usize,
+}
 
 #[derive(Debug)]
 pub struct MastodonLnbClient<S>(Arc<MastodonLnbClientInner<S>>);
 
 impl<S: LnbServer> MastodonLnbClient<S> {
-    pub async fn new(
-        config_mastodon: &AppConfigClientMastodon,
-        assistant: S,
-    ) -> Result<MastodonLnbClient<S>, ClientError> {
-        let inner = MastodonLnbClientInner::new(config_mastodon, assistant).await?;
+    pub async fn new(config: &MastodonLnbClientConfig, assistant: S) -> Result<MastodonLnbClient<S>, ClientError> {
+        let inner = MastodonLnbClientInner::new(config, assistant).await?;
         Ok(MastodonLnbClient(Arc::new(inner)))
     }
 }

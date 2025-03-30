@@ -1,11 +1,13 @@
-use crate::text::{sanitize_markdown_for_mastodon, sanitize_mention_html_from_mastodon};
+use crate::{
+    MastodonLnbClientConfig,
+    text::{sanitize_markdown_for_mastodon, sanitize_mention_html_from_mastodon},
+};
 
 use std::sync::Arc;
 
 use futures::prelude::*;
 use lnb_core::{
     APP_USER_AGENT,
-    config::AppConfigClientMastodon,
     error::ClientError,
     interface::server::LnbServer,
     model::{
@@ -39,7 +41,7 @@ pub struct MastodonLnbClientInner<S> {
 
 impl<S: LnbServer> MastodonLnbClientInner<S> {
     pub async fn new(
-        config_mastodon: &AppConfigClientMastodon,
+        config_mastodon: &MastodonLnbClientConfig,
         assistant: S,
     ) -> Result<MastodonLnbClientInner<S>, ClientError> {
         // Mastodon クライアントと自己アカウント情報
