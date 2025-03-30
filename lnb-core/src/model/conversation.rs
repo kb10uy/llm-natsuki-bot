@@ -4,28 +4,37 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 use uuid::Uuid;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConversationId(pub Uuid);
+
+impl ConversationId {
+    pub fn new_now() -> ConversationId {
+        ConversationId(Uuid::now_v7())
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Conversation {
-    id: Uuid,
+    id: ConversationId,
     messages: Vec<Message>,
 }
 
 impl Conversation {
     pub fn new_now(system: Option<Message>) -> Conversation {
         Conversation {
-            id: Uuid::now_v7(),
+            id: ConversationId::new_now(),
             messages: system.into_iter().collect(),
         }
     }
 
-    pub fn id(&self) -> Uuid {
+    pub fn id(&self) -> ConversationId {
         self.id
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct IncompleteConversation {
-    pub id: Uuid,
+    pub id: ConversationId,
     pub latest_messages: Vec<Message>,
 }
 

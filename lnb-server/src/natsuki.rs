@@ -32,6 +32,9 @@ impl Natsuki {
     }
 }
 
+impl LnbServer for Natsuki {}
+
+/*
 impl LnbServer for Natsuki {
     fn new_conversation(&self) -> Conversation {
         self.0.new_conversation()
@@ -62,3 +65,4 @@ impl LnbServer for Natsuki {
         async move { self.0.process_conversation(conversation, user_message).await }.boxed()
     }
 }
+*/
