@@ -1,5 +1,7 @@
 use std::{collections::HashMap, path::PathBuf};
 
+use lnb_discord_client::DiscordLnbClientConfig;
+use lnb_mastodon_client::MastodonLnbClientConfig;
 use serde::Deserialize;
 
 /// config.toml
@@ -16,28 +18,10 @@ pub struct AppConfig {
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct AppConfigClient {
     #[serde(default = "Default::default")]
-    pub mastodon: AppConfigClientMastodon,
+    pub mastodon: Option<MastodonLnbClientConfig>,
 
     #[serde(default = "Default::default")]
-    pub discord: AppConfigClientDiscord,
-}
-
-/// [client.mastodon]
-#[derive(Debug, Clone, Default, Deserialize)]
-pub struct AppConfigClientMastodon {
-    pub enabled: bool,
-    pub server_url: String,
-    pub token: String,
-    pub sensitive_spoiler: String,
-    pub max_length: usize,
-}
-
-/// [client.discord]
-#[derive(Debug, Clone, Default, Deserialize)]
-pub struct AppConfigClientDiscord {
-    pub enabled: bool,
-    pub token: String,
-    pub max_length: usize,
+    pub discord: Option<DiscordLnbClientConfig>,
 }
 
 /// [tool]

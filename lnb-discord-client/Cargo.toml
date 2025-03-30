@@ -9,11 +9,11 @@ lnb-core = { workspace = true }
 anyhow = { workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }
-# html2md = { workspace = true }
 infer = { workspace = true }
 markdown = { workspace = true }
 regex = { workspace = true }
 reqwest = { workspace = true }
+serde = { workspace = true }
 tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }

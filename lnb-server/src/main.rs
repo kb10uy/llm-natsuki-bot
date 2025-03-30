@@ -1,10 +1,12 @@
 mod cli;
+mod config;
 mod function;
 mod llm;
 mod natsuki;
 mod storage;
 
 use crate::{
+    config::AppConfig,
     function::{GetIllustUrl, ImageGenerator, LocalInfo, SelfInfo},
     llm::create_llm,
     natsuki::Natsuki,
@@ -16,7 +18,7 @@ use std::path::Path;
 use anyhow::{Context as _, Result, bail};
 use clap::Parser;
 use futures::future::join_all;
-use lnb_core::{config::AppConfig, interface::client::LnbClient};
+use lnb_core::interface::client::LnbClient;
 use lnb_discord_client::DiscordLnbClient;
 use lnb_mastodon_client::MastodonLnbClient;
 use tokio::{fs::read_to_string, spawn};
@@ -52,17 +54,17 @@ async fn main() -> Result<()> {
     let mut client_tasks = vec![];
 
     // Mastodon
-    if config.client.mastodon.enabled {
+    if let Some(mastodon_config) = &config.client.mastodon {
         info!("starting Mastodon client");
-        let mastodon_client = MastodonLnbClient::new(&config.client.mastodon, natsuki.clone()).await?;
+        let mastodon_client = MastodonLnbClient::new(mastodon_config, natsuki.clone()).await?;
         let mastodon_task = spawn(mastodon_client.execute());
         client_tasks.push(Box::new(mastodon_task));
     }
 
     // Discord
-    if config.client.discord.enabled {
+    if let Some(dicsord_config) = &config.client.discord {
         info!("starting Discord client");
-        let discord_client = DiscordLnbClient::new(&config.client.discord, natsuki.clone()).await?;
+        let discord_client = DiscordLnbClient::new(&dicsord_config, natsuki.clone()).await?;
         let discord_task = spawn(discord_client.execute());
         client_tasks.push(Box::new(discord_task));
     }

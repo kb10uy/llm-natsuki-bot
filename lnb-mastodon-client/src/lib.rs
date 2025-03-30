@@ -10,11 +10,10 @@ use lnb_core::{
     error::ClientError,
     interface::{client::LnbClient, server::LnbServer},
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct MastodonLnbClientConfig {
-    pub enabled: bool,
     pub server_url: String,
     pub token: String,
     pub sensitive_spoiler: String,

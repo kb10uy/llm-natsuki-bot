@@ -1692,6 +1692,7 @@ dependencies = [
  "markdown",
  "regex",
  "reqwest 0.12.15",
+ "serde",
  "serenity",
  "tempfile",
  "thiserror 2.0.12",

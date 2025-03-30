@@ -1,8 +1,10 @@
-use crate::text::{sanitize_discord_message, sanitize_markdown_for_discord};
+use crate::{
+    DiscordLnbClientConfig,
+    text::{sanitize_discord_message, sanitize_markdown_for_discord},
+};
 
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use lnb_core::{
-    config::AppConfigClientDiscord,
     error::ClientError,
     interface::server::LnbServer,
     model::message::{UserMessage, UserMessageContent},
@@ -43,17 +45,17 @@ impl<S: LnbServer> EventHandler for DiscordLnbClientInner<S> {
 
 impl<S: LnbServer> DiscordLnbClientInner<S> {
     pub async fn new_as_serenity_client(
-        config_discord: &AppConfigClientDiscord,
+        config: &DiscordLnbClientConfig,
         assistant: S,
     ) -> Result<SerenityClient, ClientError> {
         let inner = DiscordLnbClientInner {
             bot_user: RwLock::new(None),
-            max_length: config_discord.max_length,
+            max_length: config.max_length,
             assistant,
         };
 
         let intents = GatewayIntents::GUILDS | GatewayIntents::GUILD_MESSAGES | GatewayIntents::MESSAGE_CONTENT;
-        let discord = SerenityClient::builder(&config_discord.token, intents)
+        let discord = SerenityClient::builder(&config.token, intents)
             .event_handler(inner)
             .await
             .map_err(ClientError::by_external)?;

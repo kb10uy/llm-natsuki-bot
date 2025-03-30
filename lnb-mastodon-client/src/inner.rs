@@ -40,18 +40,15 @@ pub struct MastodonLnbClientInner<S> {
 }
 
 impl<S: LnbServer> MastodonLnbClientInner<S> {
-    pub async fn new(
-        config_mastodon: &MastodonLnbClientConfig,
-        assistant: S,
-    ) -> Result<MastodonLnbClientInner<S>, ClientError> {
+    pub async fn new(config: &MastodonLnbClientConfig, assistant: S) -> Result<MastodonLnbClientInner<S>, ClientError> {
         // Mastodon クライアントと自己アカウント情報
         let http_client = reqwest::ClientBuilder::new()
             .user_agent(APP_USER_AGENT)
             .build()
             .map_err(ClientError::by_communication)?;
         let mastodon_data = mastodon_async::Data {
-            base: config_mastodon.server_url.clone().into(),
-            token: config_mastodon.token.clone().into(),
+            base: config.server_url.clone().into(),
+            token: config.token.clone().into(),
             ..Default::default()
         };
         let mastodon = Mastodon::new(http_client.clone(), mastodon_data);
@@ -62,8 +59,8 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
             http_client,
             mastodon,
             self_account,
-            sensitive_spoiler: config_mastodon.sensitive_spoiler.clone(),
-            max_length: config_mastodon.max_length,
+            sensitive_spoiler: config.sensitive_spoiler.clone(),
+            max_length: config.max_length,
         })
     }
 
