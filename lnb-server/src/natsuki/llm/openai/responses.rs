@@ -1,17 +1,18 @@
-use crate::{
-    error::LlmError,
-    impls::llm::openai::create_openai_client,
-    model::{config::AppConfigLlmOpenai, conversation::IncompleteConversation},
-    specs::{
-        function::simple::SimpleFunctionDescriptor,
-        llm::{Llm, LlmUpdate},
-    },
-};
+use crate::natsuki::llm::openai::create_openai_client;
 
 use std::sync::Arc;
 
 use async_openai::{Client, config::OpenAIConfig};
 use futures::{FutureExt, future::BoxFuture};
+use lnb_core::{
+    config::AppConfigLlmOpenai,
+    error::LlmError,
+    interface::{
+        function::simple::SimpleFunctionDescriptor,
+        llm::{Llm, LlmUpdate},
+    },
+    model::conversation::IncompleteConversation,
+};
 
 /// OpenAI Responses API を利用したバックエンド。
 #[derive(Debug, Clone)]

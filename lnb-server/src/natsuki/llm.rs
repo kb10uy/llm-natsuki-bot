@@ -2,20 +2,16 @@ mod claude;
 mod openai;
 
 use self::openai::{ChatCompletionBackend, ResponsesBackend};
-use crate::{
-    error::LlmError,
-    model::{
-        config::{AppConfigLlm, AppConfigLlmBackend, AppConfigLlmOpenaiApi},
-        schema::{DescribedSchema, DescribedSchemaType},
-    },
-    specs::llm::Llm,
-};
 
 use std::{collections::HashMap, sync::LazyLock};
 
-use async_openai::error::OpenAIError;
-use reqwest::Error as ReqwestError;
-use serde_json::{Error as SerdeJsonError, Value, json};
+use lnb_core::{
+    config::{AppConfigLlm, AppConfigLlmBackend, AppConfigLlmOpenaiApi},
+    error::LlmError,
+    interface::llm::Llm,
+    model::schema::{DescribedSchema, DescribedSchemaType},
+};
+use serde_json::{Value, json};
 
 // MEMO: proc macro で serde のついでに作った方が面白い
 pub static ASSISTANT_RESPONSE_SCHEMA: LazyLock<DescribedSchema> = LazyLock::new(|| {
@@ -73,23 +69,5 @@ fn convert_json_schema(schema: &DescribedSchema) -> Value {
                 "additionalProperties": false,
             })
         }
-    }
-}
-
-impl From<OpenAIError> for LlmError {
-    fn from(value: OpenAIError) -> Self {
-        LlmError::Backend(value.into())
-    }
-}
-
-impl From<ReqwestError> for LlmError {
-    fn from(value: ReqwestError) -> Self {
-        LlmError::Communication(value.into())
-    }
-}
-
-impl From<SerdeJsonError> for LlmError {
-    fn from(value: SerdeJsonError) -> Self {
-        LlmError::ResponseFormat(value.into())
     }
 }

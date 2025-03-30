@@ -1,18 +1,6 @@
-use crate::{
-    error::LlmError,
-    impls::llm::{
-        convert_json_schema,
-        openai::{RESPONSE_JSON_SCHEMA, create_openai_client},
-    },
-    model::{
-        config::AppConfigLlmOpenai,
-        conversation::IncompleteConversation,
-        message::{Message, MessageFunctionCall, UserMessageContent},
-    },
-    specs::{
-        function::simple::SimpleFunctionDescriptor,
-        llm::{Llm, LlmAssistantResponse, LlmUpdate},
-    },
+use crate::natsuki::llm::{
+    convert_json_schema,
+    openai::{RESPONSE_JSON_SCHEMA, create_openai_client},
 };
 
 use std::sync::Arc;
@@ -28,7 +16,19 @@ use async_openai::{
         ChatCompletionToolType, CreateChatCompletionRequest, FunctionCall, FunctionObject, ImageUrl, ResponseFormat,
     },
 };
-use futures::{FutureExt, future::BoxFuture};
+use futures::{FutureExt, TryFutureExt, future::BoxFuture};
+use lnb_core::{
+    config::AppConfigLlmOpenai,
+    error::LlmError,
+    interface::{
+        function::simple::SimpleFunctionDescriptor,
+        llm::{Llm, LlmAssistantResponse, LlmUpdate},
+    },
+    model::{
+        conversation::IncompleteConversation,
+        message::{Message, MessageFunctionCall, UserMessageContent},
+    },
+};
 use tokio::sync::Mutex;
 
 /// OpenAI Chat Completion API を利用したバックエンド。
@@ -110,7 +110,7 @@ impl ChatCompletionBackendInner {
             ..Default::default()
         };
 
-        let openai_response = self.client.chat().create(request).await?;
+        let openai_response = self.client.chat().create(request).map_err(LlmError::by_backend).await?;
         let Some(first_choice) = openai_response.choices.into_iter().next() else {
             return Err(LlmError::NoChoice);
         };
@@ -127,7 +127,7 @@ impl ChatCompletionBackendInner {
                         })
                     })
                     .collect();
-                Some(converted_calls?)
+                Some(converted_calls.map_err(LlmError::by_format)?)
             }
             None => None,
         };
@@ -158,7 +158,7 @@ impl ChatCompletionBackendInner {
             ..Default::default()
         };
 
-        let openai_response = self.client.chat().create(request).await?;
+        let openai_response = self.client.chat().create(request).map_err(LlmError::by_backend).await?;
         let Some(first_choice) = openai_response.choices.into_iter().next() else {
             return Err(LlmError::NoChoice);
         };
@@ -175,7 +175,7 @@ impl ChatCompletionBackendInner {
                         })
                     })
                     .collect();
-                Some(converted_calls?)
+                Some(converted_calls.map_err(LlmError::by_format)?)
             }
             None => None,
         };
@@ -241,16 +241,15 @@ fn transform_message(message: &Message) -> Result<ChatCompletionRequestMessage, 
                 })
                 .collect();
             ChatCompletionRequestMessage::Assistant(ChatCompletionRequestAssistantMessage {
-                tool_calls: Some(tool_calls?),
+                tool_calls: Some(tool_calls.map_err(LlmError::by_format)?),
                 ..Default::default()
             })
         }
         Message::FunctionResponse(function_response_message) => {
+            let json = serde_json::to_string(&function_response_message.result).map_err(LlmError::by_format)?;
             ChatCompletionRequestMessage::Tool(ChatCompletionRequestToolMessage {
                 tool_call_id: function_response_message.id.clone(),
-                content: ChatCompletionRequestToolMessageContent::Text(serde_json::to_string(
-                    &function_response_message.result,
-                )?),
+                content: ChatCompletionRequestToolMessageContent::Text(json),
             })
         }
     };

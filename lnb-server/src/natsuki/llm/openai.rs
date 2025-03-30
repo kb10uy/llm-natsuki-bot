@@ -1,19 +1,15 @@
 mod chat_completion;
 mod responses;
 
-use std::sync::LazyLock;
-
 pub use chat_completion::ChatCompletionBackend;
 pub use responses::ResponsesBackend;
 
-use crate::{
-    USER_AGENT,
-    error::LlmError,
-    impls::llm::{ASSISTANT_RESPONSE_SCHEMA, convert_json_schema},
-    model::config::AppConfigLlmOpenai,
-};
+use crate::natsuki::llm::{ASSISTANT_RESPONSE_SCHEMA, convert_json_schema};
+
+use std::sync::LazyLock;
 
 use async_openai::{Client, config::OpenAIConfig, types::ResponseFormatJsonSchema};
+use lnb_core::{APP_USER_AGENT, config::AppConfigLlmOpenai, error::LlmError};
 
 static RESPONSE_JSON_SCHEMA: LazyLock<ResponseFormatJsonSchema> = LazyLock::new(|| ResponseFormatJsonSchema {
     name: "response".into(),
@@ -26,7 +22,10 @@ async fn create_openai_client(openai_config: &AppConfigLlmOpenai) -> Result<Clie
     let config = OpenAIConfig::new()
         .with_api_key(&openai_config.token)
         .with_api_base(&openai_config.endpoint);
-    let http_client = reqwest::ClientBuilder::new().user_agent(USER_AGENT).build()?;
+    let http_client = reqwest::ClientBuilder::new()
+        .user_agent(APP_USER_AGENT)
+        .build()
+        .map_err(LlmError::by_communication)?;
 
     let client = Client::with_config(config).with_http_client(http_client);
     Ok(client)

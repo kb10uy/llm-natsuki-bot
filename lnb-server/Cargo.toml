@@ -9,10 +9,13 @@ lnb-mastodon-client = { workspace = true }
 lnb-discord-client = { workspace = true }
 
 anyhow = { workspace = true }
+async-openai = { workspace = true }
 bimap = { workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }
+reqwest = { workspace = true }
 rmp-serde = { workspace = true }
+serde_json = { workspace = true }
 sqlx = { workspace = true }
 tokio = { workspace = true }
 toml = { workspace = true }
