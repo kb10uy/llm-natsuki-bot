@@ -4,7 +4,7 @@ mod responses;
 pub use chat_completion::ChatCompletionBackend;
 pub use responses::ResponsesBackend;
 
-use crate::natsuki::llm::{ASSISTANT_RESPONSE_SCHEMA, convert_json_schema};
+use crate::llm::{ASSISTANT_RESPONSE_SCHEMA, convert_json_schema};
 
 use std::sync::LazyLock;
 

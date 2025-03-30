@@ -1,4 +1,4 @@
-use crate::natsuki::llm::{
+use crate::llm::{
     convert_json_schema,
     openai::{RESPONSE_JSON_SCHEMA, create_openai_client},
 };

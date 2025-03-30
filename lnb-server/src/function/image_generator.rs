@@ -1,16 +1,16 @@
-use crate::{
-    USER_AGENT,
-    error::FunctionError,
-    model::{config::AppConfigToolImageGenerator, conversation::ConversationAttachment, schema::DescribedSchema},
-    specs::function::simple::{SimpleFunction, SimpleFunctionDescriptor, SimpleFunctionResponse},
-};
-
 use async_openai::{
     Client,
     config::OpenAIConfig,
     types::{CreateImageRequest, Image, ImageModel},
 };
 use futures::{FutureExt, future::BoxFuture};
+use lnb_core::{
+    APP_USER_AGENT,
+    config::AppConfigToolImageGenerator,
+    error::FunctionError,
+    interface::function::simple::{SimpleFunction, SimpleFunctionDescriptor, SimpleFunctionResponse},
+    model::{conversation::ConversationAttachment, schema::DescribedSchema},
+};
 use serde::Serialize;
 use serde_json::Value;
 use tracing::info;
@@ -54,7 +54,7 @@ impl ImageGenerator {
             .with_api_key(&config.token)
             .with_api_base(&config.endpoint);
         let http_client = reqwest::ClientBuilder::new()
-            .user_agent(USER_AGENT)
+            .user_agent(APP_USER_AGENT)
             .build()
             .map_err(|e| FunctionError::External(e.into()))?;
 
@@ -87,7 +87,7 @@ impl ImageGenerator {
             return make_error_value("invalid response generated");
         };
 
-        let image_url = Url::parse(url)?;
+        let image_url = Url::parse(url).map_err(FunctionError::by_external)?;
         let revised_prompt = revised_prompt.as_ref().unwrap_or(&prompt).to_string();
         let function_response = GenerationResponse {
             image_url: image_url.clone(),
@@ -98,7 +98,7 @@ impl ImageGenerator {
             description: Some(revised_prompt),
         };
         Ok(SimpleFunctionResponse {
-            result: serde_json::to_value(function_response)?,
+            result: serde_json::to_value(function_response).map_err(FunctionError::by_serialization)?,
             attachments: vec![attachment],
         })
     }
@@ -108,7 +108,8 @@ fn make_error_value(message: &str) -> Result<SimpleFunctionResponse, FunctionErr
     Ok(SimpleFunctionResponse {
         result: serde_json::to_value(GenerationError {
             error: message.to_string(),
-        })?,
+        })
+        .map_err(FunctionError::by_serialization)?,
         ..Default::default()
     })
 }

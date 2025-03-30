@@ -1,4 +1,4 @@
-use crate::natsuki::llm::openai::create_openai_client;
+use crate::llm::openai::create_openai_client;
 
 use std::sync::Arc;
 

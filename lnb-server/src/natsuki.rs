@@ -1,6 +1,4 @@
 mod inner;
-pub mod llm;
-pub mod storage;
 
 use crate::natsuki::inner::NatsukiInner;
 

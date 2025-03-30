@@ -1,10 +1,13 @@
 mod cli;
+mod function;
+mod llm;
 mod natsuki;
+mod storage;
 
-use crate::natsuki::{
-    Natsuki,
+use crate::{
     function::{GetIllustUrl, ImageGenerator, LocalInfo, SelfInfo},
     llm::create_llm,
+    natsuki::Natsuki,
     storage::create_storage,
 };
 

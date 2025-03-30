@@ -1,16 +1,11 @@
-use crate::{
-    error::FunctionError,
-    model::schema::DescribedSchema,
-    specs::function::simple::{SimpleFunction, SimpleFunctionDescriptor, SimpleFunctionResponse},
-};
-
 use futures::{FutureExt, future::BoxFuture};
-use serde_json::{Value, json};
-use time::{
-    OffsetDateTime,
-    error::{Format, IndeterminateOffset},
-    format_description::well_known::Rfc3339,
+use lnb_core::{
+    error::FunctionError,
+    interface::function::simple::{SimpleFunction, SimpleFunctionDescriptor, SimpleFunctionResponse},
+    model::schema::DescribedSchema,
 };
+use serde_json::{Value, json};
+use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
 #[derive(Debug)]
 pub struct LocalInfo {
@@ -39,30 +34,18 @@ impl SimpleFunction for LocalInfo {
 impl LocalInfo {
     pub fn new() -> Result<LocalInfo, FunctionError> {
         Ok(LocalInfo {
-            started_at: OffsetDateTime::now_local()?,
+            started_at: OffsetDateTime::now_local().map_err(FunctionError::by_external)?,
         })
     }
 
     fn get_info(&self) -> Result<SimpleFunctionResponse, FunctionError> {
-        let now = OffsetDateTime::now_local()?;
+        let now = OffsetDateTime::now_local().map_err(FunctionError::by_external)?;
         Ok(SimpleFunctionResponse {
             result: json!({
-                "time_now": now.format(&Rfc3339)?,
-                "bot_started_at": self.started_at.format(&Rfc3339)?,
+                "time_now": now.format(&Rfc3339).map_err(FunctionError::by_serialization)?,
+                "bot_started_at": self.started_at.format(&Rfc3339).map_err(FunctionError::by_serialization)?,
             }),
             ..Default::default()
         })
-    }
-}
-
-impl From<IndeterminateOffset> for FunctionError {
-    fn from(value: IndeterminateOffset) -> Self {
-        FunctionError::External(value.into())
-    }
-}
-
-impl From<Format> for FunctionError {
-    fn from(value: Format) -> Self {
-        FunctionError::External(value.into())
     }
 }

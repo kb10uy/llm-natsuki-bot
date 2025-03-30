@@ -1,10 +1,9 @@
-use crate::{
-    error::FunctionError,
-    model::schema::DescribedSchema,
-    specs::function::simple::{SimpleFunction, SimpleFunctionDescriptor, SimpleFunctionResponse},
-};
-
 use futures::{FutureExt, future::BoxFuture};
+use lnb_core::{
+    error::FunctionError,
+    interface::function::simple::{SimpleFunction, SimpleFunctionDescriptor, SimpleFunctionResponse},
+    model::schema::DescribedSchema,
+};
 use serde_json::{Value, json};
 
 #[derive(Debug)]

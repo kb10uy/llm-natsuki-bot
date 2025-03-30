@@ -1,10 +1,10 @@
-use crate::{
+use futures::{FutureExt, TryFutureExt, future::BoxFuture};
+use lnb_core::{
+    config::AppConfigToolGetIllustUrl,
     error::FunctionError,
-    model::{config::AppConfigToolGetIllustUrl, schema::DescribedSchema},
-    specs::function::simple::{SimpleFunction, SimpleFunctionDescriptor, SimpleFunctionResponse},
+    interface::function::simple::{SimpleFunction, SimpleFunctionDescriptor, SimpleFunctionResponse},
+    model::schema::DescribedSchema,
 };
-
-use futures::{FutureExt, future::BoxFuture};
 use rand::{rng, seq::IndexedRandom};
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -40,13 +40,16 @@ impl SimpleFunction for GetIllustUrl {
 
 impl GetIllustUrl {
     pub async fn new(config: &AppConfigToolGetIllustUrl) -> Result<GetIllustUrl, FunctionError> {
-        let pool = SqlitePool::connect(&config.database_filepath).await?;
+        let pool = SqlitePool::connect(&config.database_filepath)
+            .map_err(FunctionError::by_external)
+            .await?;
         Ok(GetIllustUrl { pool })
     }
 
     async fn get_illust_infos(&self, count: usize) -> Result<SimpleFunctionResponse, FunctionError> {
         let all_illusts: Vec<IllustInfo> = sqlx::query_as(r#"SELECT url, creator_name, comment FROM skeb_illusts;"#)
             .fetch_all(&self.pool)
+            .map_err(FunctionError::by_external)
             .await?;
 
         let limited_count = count.min(4).min(all_illusts.len());
