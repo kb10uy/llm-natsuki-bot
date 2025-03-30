@@ -7,8 +7,12 @@ use serde::Deserialize;
 /// config.toml
 #[derive(Debug, Clone, Deserialize)]
 pub struct AppConfig {
+    #[serde(default = "Default::default")]
     pub client: AppConfigClient,
+
+    #[serde(default = "Default::default")]
     pub tool: AppConfigTool,
+
     pub llm: AppConfigLlm,
     pub storage: AppConfigStorage,
     pub assistant: AppConfigAssistant,
