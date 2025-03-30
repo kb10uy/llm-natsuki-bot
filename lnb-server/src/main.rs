@@ -7,7 +7,7 @@ mod storage;
 
 use crate::{
     config::AppConfig,
-    function::{GetIllustUrl, ImageGenerator, LocalInfo, SelfInfo},
+    function::{ExchangeRate, GetIllustUrl, ImageGenerator, LocalInfo, SelfInfo},
     llm::create_llm,
     natsuki::Natsuki,
     storage::create_storage,
@@ -40,14 +40,19 @@ async fn main() -> Result<()> {
 
     natsuki.add_simple_function(SelfInfo::new()).await;
     natsuki.add_simple_function(LocalInfo::new()?).await;
-    if config.tool.image_generator.enabled {
+    if let Some(image_generator_config) = &config.tool.image_generator {
         natsuki
-            .add_simple_function(ImageGenerator::new(&config.tool.image_generator)?)
+            .add_simple_function(ImageGenerator::new(image_generator_config)?)
             .await;
     }
-    if config.tool.get_illust_url.enabled {
+    if let Some(get_illust_url_config) = &config.tool.get_illust_url {
         natsuki
-            .add_simple_function(GetIllustUrl::new(&config.tool.get_illust_url).await?)
+            .add_simple_function(GetIllustUrl::new(get_illust_url_config).await?)
+            .await;
+    }
+    if let Some(exchange_rate_config) = &config.tool.exchange_rate {
+        natsuki
+            .add_simple_function(ExchangeRate::new(exchange_rate_config).await?)
             .await;
     }
 

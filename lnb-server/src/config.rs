@@ -21,37 +21,36 @@ pub struct AppConfig {
 /// [client]
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct AppConfigClient {
-    #[serde(default = "Default::default")]
     pub mastodon: Option<MastodonLnbClientConfig>,
-
-    #[serde(default = "Default::default")]
     pub discord: Option<DiscordLnbClientConfig>,
 }
 
 /// [tool]
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct AppConfigTool {
-    #[serde(default = "Default::default")]
-    pub image_generator: AppConfigToolImageGenerator,
-
-    #[serde(default = "Default::default")]
-    pub get_illust_url: AppConfigToolGetIllustUrl,
+    pub image_generator: Option<AppConfigToolImageGenerator>,
+    pub get_illust_url: Option<AppConfigToolGetIllustUrl>,
+    pub exchange_rate: Option<AppConfigToolExchangeRate>,
 }
 
 /// [tool.image_generator]
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct AppConfigToolImageGenerator {
-    pub enabled: bool,
     pub endpoint: String,
     pub token: String,
     pub model: String,
 }
 
 /// [tool.get_illust_url]
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct AppConfigToolGetIllustUrl {
-    pub enabled: bool,
     pub database_filepath: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AppConfigToolExchangeRate {
+    pub endpoint: String,
+    pub token: String,
 }
 
 /// [storage]

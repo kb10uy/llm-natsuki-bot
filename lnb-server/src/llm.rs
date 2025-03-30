@@ -56,6 +56,11 @@ fn convert_json_schema(schema: &DescribedSchema) -> Value {
             "type": "string",
             "description": schema.description,
         }),
+        DescribedSchemaType::Array(item_type) => json!({
+            "type": "array",
+            "description": schema.description,
+            "items": convert_json_schema(item_type),
+        }),
         DescribedSchemaType::Object(fields) => {
             let properties: HashMap<_, _> = fields
                 .iter()

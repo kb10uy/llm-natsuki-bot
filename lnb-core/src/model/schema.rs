@@ -6,6 +6,7 @@ pub enum DescribedSchemaType {
     Float,
     Boolean,
     String,
+    Array(Box<DescribedSchema>),
     Object(Vec<DescribedSchema>),
 }
 
@@ -39,6 +40,18 @@ impl DescribedSchema {
             name: name.into(),
             description: description.into(),
             field_type: DescribedSchemaType::Boolean,
+        }
+    }
+
+    pub fn array(
+        name: impl Into<String>,
+        description: impl Into<String>,
+        item_schema: DescribedSchema,
+    ) -> DescribedSchema {
+        DescribedSchema {
+            name: name.into(),
+            description: description.into(),
+            field_type: DescribedSchemaType::Array(Box::new(item_schema)),
         }
     }
 
