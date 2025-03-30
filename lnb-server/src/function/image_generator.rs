@@ -1,3 +1,5 @@
+use crate::config::AppConfigToolImageGenerator;
+
 use async_openai::{
     Client,
     config::OpenAIConfig,
@@ -6,7 +8,6 @@ use async_openai::{
 use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
     APP_USER_AGENT,
-    config::AppConfigToolImageGenerator,
     error::FunctionError,
     interface::function::simple::{SimpleFunction, SimpleFunctionDescriptor, SimpleFunctionResponse},
     model::{conversation::ConversationAttachment, schema::DescribedSchema},

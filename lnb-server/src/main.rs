@@ -64,7 +64,7 @@ async fn main() -> Result<()> {
     // Discord
     if let Some(dicsord_config) = &config.client.discord {
         info!("starting Discord client");
-        let discord_client = DiscordLnbClient::new(&dicsord_config, natsuki.clone()).await?;
+        let discord_client = DiscordLnbClient::new(dicsord_config, natsuki.clone()).await?;
         let discord_task = spawn(discord_client.execute());
         client_tasks.push(Box::new(discord_task));
     }

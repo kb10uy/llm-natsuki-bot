@@ -1,12 +1,11 @@
 mod inner;
 
-use crate::natsuki::inner::NatsukiInner;
+use crate::{config::AppConfigAssistantIdentity, natsuki::inner::NatsukiInner};
 
 use std::sync::Arc;
 
 use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
-    config::AppConfigAssistantIdentity,
     error::ServerError,
     interface::{function::simple::SimpleFunction, llm::Llm, server::LnbServer, storage::ConversationStorage},
     model::{

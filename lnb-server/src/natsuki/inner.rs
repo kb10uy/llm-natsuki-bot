@@ -1,7 +1,8 @@
+use crate::config::AppConfigAssistantIdentity;
+
 use std::collections::HashMap;
 
 use lnb_core::{
-    config::AppConfigAssistantIdentity,
     error::ServerError,
     interface::{function::simple::SimpleFunction, llm::Llm, storage::ConversationStorage},
     model::{

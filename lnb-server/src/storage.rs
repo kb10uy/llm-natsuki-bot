@@ -2,12 +2,9 @@ mod memory;
 mod sqlite;
 
 use self::{memory::MemoryConversationStorage, sqlite::SqliteConversationStorage};
+use crate::config::{AppConfigStorage, AppConfigStorageBackend};
 
-use lnb_core::{
-    config::{AppConfigStorage, AppConfigStorageBackend},
-    error::StorageError,
-    interface::storage::ConversationStorage,
-};
+use lnb_core::{error::StorageError, interface::storage::ConversationStorage};
 
 pub async fn create_storage(config: &AppConfigStorage) -> Result<Box<dyn ConversationStorage + 'static>, StorageError> {
     let boxed_storage: Box<dyn ConversationStorage> = match config.backend {

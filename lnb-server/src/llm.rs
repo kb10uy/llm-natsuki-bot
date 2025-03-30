@@ -2,11 +2,11 @@ mod claude;
 mod openai;
 
 use self::openai::{ChatCompletionBackend, ResponsesBackend};
+use crate::config::{AppConfigLlm, AppConfigLlmBackend, AppConfigLlmOpenaiApi};
 
 use std::{collections::HashMap, sync::LazyLock};
 
 use lnb_core::{
-    config::{AppConfigLlm, AppConfigLlmBackend, AppConfigLlmOpenaiApi},
     error::LlmError,
     interface::llm::Llm,
     model::schema::{DescribedSchema, DescribedSchemaType},

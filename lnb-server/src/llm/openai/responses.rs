@@ -1,11 +1,10 @@
-use crate::llm::openai::create_openai_client;
+use crate::{config::AppConfigLlmOpenai, llm::openai::create_openai_client};
 
 use std::sync::Arc;
 
 use async_openai::{Client, config::OpenAIConfig};
 use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
-    config::AppConfigLlmOpenai,
     error::LlmError,
     interface::{
         function::simple::SimpleFunctionDescriptor,

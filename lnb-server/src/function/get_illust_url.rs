@@ -1,6 +1,7 @@
+use crate::config::AppConfigToolGetIllustUrl;
+
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use lnb_core::{
-    config::AppConfigToolGetIllustUrl,
     error::FunctionError,
     interface::function::simple::{SimpleFunction, SimpleFunctionDescriptor, SimpleFunctionResponse},
     model::schema::DescribedSchema,

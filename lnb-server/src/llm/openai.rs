@@ -4,12 +4,15 @@ mod responses;
 pub use chat_completion::ChatCompletionBackend;
 pub use responses::ResponsesBackend;
 
-use crate::llm::{ASSISTANT_RESPONSE_SCHEMA, convert_json_schema};
+use crate::{
+    config::AppConfigLlmOpenai,
+    llm::{ASSISTANT_RESPONSE_SCHEMA, convert_json_schema},
+};
 
 use std::sync::LazyLock;
 
 use async_openai::{Client, config::OpenAIConfig, types::ResponseFormatJsonSchema};
-use lnb_core::{APP_USER_AGENT, config::AppConfigLlmOpenai, error::LlmError};
+use lnb_core::{APP_USER_AGENT, error::LlmError};
 
 static RESPONSE_JSON_SCHEMA: LazyLock<ResponseFormatJsonSchema> = LazyLock::new(|| ResponseFormatJsonSchema {
     name: "response".into(),

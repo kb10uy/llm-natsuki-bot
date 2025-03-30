@@ -1,6 +1,9 @@
-use crate::llm::{
-    convert_json_schema,
-    openai::{RESPONSE_JSON_SCHEMA, create_openai_client},
+use crate::{
+    config::AppConfigLlmOpenai,
+    llm::{
+        convert_json_schema,
+        openai::{RESPONSE_JSON_SCHEMA, create_openai_client},
+    },
 };
 
 use std::sync::Arc;
@@ -18,7 +21,6 @@ use async_openai::{
 };
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use lnb_core::{
-    config::AppConfigLlmOpenai,
     error::LlmError,
     interface::{
         function::simple::SimpleFunctionDescriptor,
