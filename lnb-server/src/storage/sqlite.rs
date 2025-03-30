@@ -37,10 +37,17 @@ impl ConversationStorage for SqliteConversationStorage {
         async move { self.0.fetch_content_by_context_key(context_key).await }.boxed()
     }
 
+    fn fetch_id_by_context_key<'a>(
+        &'a self,
+        context_key: &'a str,
+    ) -> BoxFuture<'a, Result<Option<ConversationId>, StorageError>> {
+        async move { self.0.fetch_id_by_context_key(context_key).await }.boxed()
+    }
+
     fn upsert<'a>(
         &'a self,
         conversation: &'a Conversation,
-        context_key: &'a str,
+        context_key: Option<&'a str>,
     ) -> BoxFuture<'a, Result<(), StorageError>> {
         async move { self.0.upsert(conversation, context_key).await }.boxed()
     }
@@ -85,7 +92,24 @@ impl SqliteConversationStorageInner {
         Ok(conversation)
     }
 
-    async fn upsert<'a>(&'a self, conversation: &'a Conversation, context_key: &'a str) -> Result<(), StorageError> {
+    async fn fetch_id_by_context_key<'a>(
+        &'a self,
+        context_key: &'a str,
+    ) -> Result<Option<ConversationId>, StorageError> {
+        let row: Option<(Uuid,)> = sqlx::query_as(r#"SELECT id FROM conversations WHERE context_key = ?;"#)
+            .bind(context_key)
+            .fetch_optional(&self.pool)
+            .map_err(StorageError::by_backend)
+            .await?;
+
+        Ok(row.map(|r| ConversationId(r.0)))
+    }
+
+    async fn upsert<'a>(
+        &'a self,
+        conversation: &'a Conversation,
+        context_key: Option<&'a str>,
+    ) -> Result<(), StorageError> {
         let id = conversation.id().0;
         let blob = rmp_serde::to_vec(conversation).map_err(StorageError::by_serialization)?;
 
@@ -109,6 +133,6 @@ impl SqliteConversationStorageInner {
 #[allow(dead_code)]
 struct SqliteRowConversation {
     id: Uuid,
-    context_key: String,
+    context_key: Option<String>,
     content: Vec<u8>,
 }

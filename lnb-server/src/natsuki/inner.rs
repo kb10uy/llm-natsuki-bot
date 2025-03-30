@@ -6,7 +6,9 @@ use lnb_core::{
     error::ServerError,
     interface::{function::simple::SimpleFunction, llm::Llm, storage::ConversationStorage},
     model::{
-        conversation::{Conversation, ConversationAttachment, ConversationUpdate, IncompleteConversation},
+        conversation::{
+            Conversation, ConversationAttachment, ConversationId, ConversationUpdate, IncompleteConversation,
+        },
         message::{AssistantMessage, FunctionResponseMessage, Message, MessageFunctionCall, UserMessage},
     },
 };
@@ -119,17 +121,15 @@ impl NatsukiInner {
         Ok((responses, attachments))
     }
 
-    pub fn new_conversation(&self) -> Result<ConversationId, ServerError> {
+    pub async fn new_conversation(&self) -> Result<ConversationId, ServerError> {
         let system_message = Message::new_system(self.system_role.clone());
-        Conversation::new_now(Some(system_message))
+        let conversation = Conversation::new_now(Some(system_message));
+        self.storage.upsert(&conversation, None).await?;
+        Ok(conversation.id())
     }
 
-    pub async fn restore_conversation(
-        &self,
-        platform: &str,
-        context: &str,
-    ) -> Result<Option<Conversation>, ServerError> {
-        let conversation = self.storage.find_by_platform_context(platform, context).await?;
+    pub async fn restore_conversation(&self, context_key: &str) -> Result<Option<Conversation>, ServerError> {
+        let conversation = self.storage.fetch_content_by_context_key(context).await?;
         Ok(conversation)
     }
 

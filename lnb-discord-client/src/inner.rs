@@ -91,7 +91,8 @@ impl<S: LnbServer> DiscordLnbClientInner<S> {
         let conversation_id = match context_key {
             Some(context) => {
                 info!("restoring conversation with last referenced message ID {context}");
-                match self.assistant.restore_conversation(PLATFORM_KEY, &context).await? {
+                let context_key = format!("{PLATFORM_KEY}:{context}");
+                match self.assistant.restore_conversation(&context_key).await? {
                     Some(c) => c,
                     None => {
                         info!("conversation has been lost, creating new one");
@@ -150,9 +151,9 @@ impl<S: LnbServer> DiscordLnbClientInner<S> {
             .await?;
 
         // Conversation/history の更新
-        let new_history_id = replied_message.id.to_string();
+        let new_history_id = format!("{PLATFORM_KEY}:{}", replied_message.id);
         self.assistant
-            .save_conversation(conversation_update, PLATFORM_KEY, &new_history_id)
+            .save_conversation(conversation_update, &new_history_id)
             .await?;
 
         Ok(())

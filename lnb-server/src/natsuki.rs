@@ -34,13 +34,12 @@ impl Natsuki {
 
 impl LnbServer for Natsuki {
     fn new_conversation(&self) -> BoxFuture<'_, Result<ConversationId, ServerError>> {
-        todo!()
+        async move { self.0.new_conversation().await }.boxed()
     }
 
     fn restore_conversation<'a>(
         &'a self,
-        platform: &'a str,
-        context: &'a str,
+        context_key: &'a str,
     ) -> BoxFuture<'a, Result<Option<ConversationId>, ServerError>> {
         todo!()
     }
@@ -48,8 +47,7 @@ impl LnbServer for Natsuki {
     fn save_conversation<'a>(
         &'a self,
         update: ConversationUpdate,
-        platform: &'a str,
-        context: &'a str,
+        context_key: &'a str,
     ) -> BoxFuture<'a, Result<(), ServerError>> {
         todo!()
     }

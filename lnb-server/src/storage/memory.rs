@@ -33,10 +33,17 @@ impl ConversationStorage for MemoryConversationStorage {
         async move { self.0.fetch_content_by_context_key(context_key).await }.boxed()
     }
 
+    fn fetch_id_by_context_key<'a>(
+        &'a self,
+        context_key: &'a str,
+    ) -> BoxFuture<'a, Result<Option<ConversationId>, StorageError>> {
+        async move { self.0.fetch_id_by_context_key(context_key).await }.boxed()
+    }
+
     fn upsert<'a>(
         &'a self,
         conversation: &'a Conversation,
-        context_key: &'a str,
+        context_key: Option<&'a str>,
     ) -> BoxFuture<'a, Result<(), StorageError>> {
         async move { self.0.upsert(conversation, context_key).await }.boxed()
     }
@@ -64,13 +71,22 @@ impl MemoryConversationStorageInner {
         Ok(conversation)
     }
 
-    async fn upsert(&self, conversation: &Conversation, context_key: &str) -> Result<(), StorageError> {
+    async fn fetch_id_by_context_key(&self, context_key: &str) -> Result<Option<ConversationId>, StorageError> {
+        let locked_pc = self.context_keys.lock().await;
+        let conversation_id = locked_pc.get_by_left(context_key).cloned();
+        Ok(conversation_id)
+    }
+
+    async fn upsert(&self, conversation: &Conversation, context_key: Option<&str>) -> Result<(), StorageError> {
         let mut locked_conv = self.conversations.lock().await;
-        let mut locked_pc = self.context_keys.lock().await;
 
         locked_conv.insert(conversation.id(), conversation.clone());
-        locked_pc.remove_by_right(&conversation.id());
-        locked_pc.insert(context_key.to_string(), conversation.id());
+
+        if let Some(ck) = context_key {
+            let mut locked_pc = self.context_keys.lock().await;
+            locked_pc.remove_by_right(&conversation.id());
+            locked_pc.insert(ck.to_string(), conversation.id());
+        }
         Ok(())
     }
 }

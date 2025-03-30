@@ -1,6 +1,6 @@
 CREATE TABLE conversations(
     id TEXT NOT NULL PRIMARY KEY,
-    context_key TEXT NOT NULL UNIQUE,
+    context_key TEXT NULL UNIQUE,
     content BLOB NOT NULL
 );
 

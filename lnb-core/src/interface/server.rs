@@ -16,16 +16,14 @@ pub trait LnbServer: Send + Sync + 'static {
     /// 会話ツリーを復元する。
     fn restore_conversation<'a>(
         &'a self,
-        platform: &'a str,
-        context: &'a str,
+        context_key: &'a str,
     ) -> BoxFuture<'a, Result<Option<ConversationId>, ServerError>>;
 
     /// 会話ツリーを更新する。
     fn save_conversation<'a>(
         &'a self,
         update: ConversationUpdate,
-        platform: &'a str,
-        context: &'a str,
+        context_key: &'a str,
     ) -> BoxFuture<'a, Result<(), ServerError>>;
 
     fn process_conversation(

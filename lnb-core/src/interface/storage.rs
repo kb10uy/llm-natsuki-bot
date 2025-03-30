@@ -20,10 +20,16 @@ pub trait ConversationStorage: Send + Sync + Debug {
         context_key: &'a str,
     ) -> BoxFuture<'a, Result<Option<Conversation>, StorageError>>;
 
+    /// context key から `ConversationId` だけ取得する。
+    fn fetch_id_by_context_key<'a>(
+        &'a self,
+        context_key: &'a str,
+    ) -> BoxFuture<'a, Result<Option<ConversationId>, StorageError>>;
+
     /// `Conversation` を登録・更新する。
     fn upsert<'a>(
         &'a self,
         conversation: &'a Conversation,
-        context_key: &'a str,
+        context_key: Option<&'a str>,
     ) -> BoxFuture<'a, Result<(), StorageError>>;
 }
