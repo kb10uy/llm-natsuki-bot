@@ -4,7 +4,7 @@ CREATE TABLE conversations(
     content BLOB NOT NULL
 );
 
-CREATE TABLE skeb_illusts(
+CREATE TABLE illusts(
     url TEXT NOT NULL PRIMARY KEY,
     creator_name TEXT NOT NULL,
     comment TEXT NOT NULL

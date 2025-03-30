@@ -19,7 +19,7 @@ pub struct GetIllustUrl {
 impl SimpleFunction for GetIllustUrl {
     fn get_descriptor(&self) -> SimpleFunctionDescriptor {
         SimpleFunctionDescriptor {
-            name: "get_skeb_url".to_string(),
+            name: "get_illust_url".to_string(),
             description: r#"
                 この bot 自身をキャラクターとして描写したイラストの URL を取得する。
                 自画像・自撮りを要求された場合もこれを利用する。
@@ -48,7 +48,7 @@ impl GetIllustUrl {
     }
 
     async fn get_illust_infos(&self, count: usize) -> Result<SimpleFunctionResponse, FunctionError> {
-        let all_illusts: Vec<IllustInfo> = sqlx::query_as(r#"SELECT url, creator_name, comment FROM skeb_illusts;"#)
+        let all_illusts: Vec<SqliteRowIllust> = sqlx::query_as(r#"SELECT url, creator_name, comment FROM illusts;"#)
             .fetch_all(&self.pool)
             .map_err(FunctionError::by_external)
             .await?;
@@ -66,7 +66,7 @@ impl GetIllustUrl {
 }
 
 #[derive(Debug, Serialize, FromRow)]
-pub struct IllustInfo {
+pub struct SqliteRowIllust {
     pub url: String,
     pub creator_name: String,
     pub comment: String,
