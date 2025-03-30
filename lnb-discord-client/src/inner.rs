@@ -123,7 +123,7 @@ impl<S: LnbServer> DiscordLnbClientInner<S> {
             .assistant
             .process_conversation(conversation_id, user_message)
             .await?;
-        let assistant_message = conversation_update.assistant_message();
+        let assistant_message = conversation_update.assistant_response();
         let attachments = conversation_update.attachments();
         info!(
             "夏稀[{}]: {:?} ({} attachment(s))",

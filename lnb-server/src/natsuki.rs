@@ -41,7 +41,7 @@ impl LnbServer for Natsuki {
         &'a self,
         context_key: &'a str,
     ) -> BoxFuture<'a, Result<Option<ConversationId>, ServerError>> {
-        todo!()
+        async move { self.0.restore_conversation(context_key).await }.boxed()
     }
 
     fn save_conversation<'a>(
@@ -49,47 +49,14 @@ impl LnbServer for Natsuki {
         update: ConversationUpdate,
         context_key: &'a str,
     ) -> BoxFuture<'a, Result<(), ServerError>> {
-        todo!()
+        async move { self.0.save_conversation(update, context_key).await }.boxed()
     }
 
     fn process_conversation(
         &self,
-        conversation: ConversationId,
+        conversation_id: ConversationId,
         user_message: UserMessage,
     ) -> BoxFuture<'_, Result<ConversationUpdate, ServerError>> {
-        todo!()
+        async move { self.0.process_conversation(conversation_id, user_message).await }.boxed()
     }
 }
-
-/*
-impl LnbServer for Natsuki {
-    fn new_conversation(&self) -> Conversation {
-        self.0.new_conversation()
-    }
-
-    fn restore_conversation<'a>(
-        &'a self,
-        platform: &'a str,
-        context: &'a str,
-    ) -> BoxFuture<'a, Result<Option<Conversation>, ServerError>> {
-        async move { self.0.restore_conversation(platform, context).await }.boxed()
-    }
-
-    fn save_conversation<'a>(
-        &'a self,
-        conversation: &'a Conversation,
-        platform: &'a str,
-        context: &'a str,
-    ) -> BoxFuture<'a, Result<(), ServerError>> {
-        async move { self.0.save_conversation(conversation, platform, context).await }.boxed()
-    }
-
-    fn process_conversation(
-        &self,
-        conversation: Conversation,
-        user_message: UserMessage,
-    ) -> BoxFuture<'_, Result<ConversationUpdate, ServerError>> {
-        async move { self.0.process_conversation(conversation, user_message).await }.boxed()
-    }
-}
-*/

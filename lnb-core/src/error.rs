@@ -1,3 +1,5 @@
+use crate::model::conversation::ConversationId;
+
 use std::error::Error as StdError;
 
 use thiserror::Error as ThisError;
@@ -41,6 +43,10 @@ pub enum ServerError {
 
     #[error("function error: {0}")]
     Function(#[from] FunctionError),
+
+    /// 存在するべき `Conversation` が存在しなかった。
+    #[error("expected conversation {0:?} not found")]
+    ConversationNotFound(ConversationId),
 
     /// 期待されていた応答が存在しなかった。
     #[error("expected chat resnpose not found")]

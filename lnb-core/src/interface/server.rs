@@ -28,7 +28,7 @@ pub trait LnbServer: Send + Sync + 'static {
 
     fn process_conversation(
         &self,
-        conversation: ConversationId,
+        conversation_id: ConversationId,
         user_message: UserMessage,
     ) -> BoxFuture<'_, Result<ConversationUpdate, ServerError>>;
 }

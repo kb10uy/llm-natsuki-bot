@@ -92,7 +92,10 @@ impl ChatCompletionBackendInner {
     }
 
     async fn send_conversation(&self, conversation: &IncompleteConversation) -> Result<LlmUpdate, LlmError> {
-        let messages: Result<_, _> = conversation.latest_messages.iter().map(transform_message).collect();
+        let messages: Result<_, _> = conversation
+            .messages_with_pushed()
+            .map(transform_message)
+            .collect();
         if self.structured_mode {
             self.send_conversation_structured(messages?).await
         } else {

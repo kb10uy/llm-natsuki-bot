@@ -1,6 +1,6 @@
 use crate::config::AppConfigAssistantIdentity;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, iter::once};
 
 use lnb_core::{
     error::ServerError,
@@ -50,9 +50,14 @@ impl NatsukiInner {
 
     pub async fn process_conversation(
         &self,
-        conversation: Conversation,
+        conversation_id: ConversationId,
         user_message: UserMessage,
     ) -> Result<ConversationUpdate, ServerError> {
+        let conversation = self
+            .storage
+            .fetch_content_by_id(conversation_id)
+            .await?
+            .ok_or_else(|| ServerError::ConversationNotFound(conversation_id))?;
         let mut incomplete_conversation = IncompleteConversation::start(conversation, user_message);
 
         let first_update = self.llm.send_conversation(&incomplete_conversation).await?;
@@ -60,10 +65,8 @@ impl NatsukiInner {
             let call_message = Message::new_function_calls(tool_callings.clone());
             let (response_messages, attachments) = self.process_tool_callings(tool_callings).await?;
 
-            incomplete_conversation.latest_messages.push(call_message);
-            incomplete_conversation
-                .latest_messages
-                .extend(response_messages.into_iter().map(|m| m.into()));
+            let extending_messages = once(call_message).chain(response_messages.into_iter().map(|m| m.into()));
+            incomplete_conversation.extend_message(extending_messages);
 
             let second_update = self.llm.send_conversation(&incomplete_conversation).await?;
             (second_update, attachments)
@@ -128,18 +131,21 @@ impl NatsukiInner {
         Ok(conversation.id())
     }
 
-    pub async fn restore_conversation(&self, context_key: &str) -> Result<Option<Conversation>, ServerError> {
-        let conversation = self.storage.fetch_content_by_context_key(context).await?;
-        Ok(conversation)
+    pub async fn restore_conversation(&self, context_key: &str) -> Result<Option<ConversationId>, ServerError> {
+        let conversation_id = self.storage.fetch_id_by_context_key(context_key).await?;
+        Ok(conversation_id)
     }
 
-    pub async fn save_conversation(
-        &self,
-        conversation: &Conversation,
-        platform: &str,
-        context: &str,
-    ) -> Result<(), ServerError> {
-        self.storage.upsert(conversation, platform, context).await?;
+    pub async fn save_conversation(&self, update: ConversationUpdate, context_key: &str) -> Result<(), ServerError> {
+        let current_conversation = self
+            .storage
+            .fetch_content_by_id(update.id())
+            .await?
+            .ok_or_else(|| ServerError::ConversationNotFound(update.id()))?;
+        let completing_messages = update.into_completing_messages();
+
+        let updated_conversation = current_conversation.push_messages(completing_messages);
+        self.storage.upsert(&updated_conversation, Some(context_key)).await?;
         Ok(())
     }
 }
