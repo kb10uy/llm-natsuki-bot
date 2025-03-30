@@ -116,7 +116,7 @@ impl SqliteConversationStorageInner {
         sqlx::query(
             r#"
             INSERT INTO conversations (id, context_key, content) VALUES (?, ?, ?)
-            ON CONFLICT DO UPDATE SET conversation_blob = excluded.conversation_blob;
+            ON CONFLICT DO UPDATE SET content = excluded.content, context_key = excluded.context_key;
         "#,
         )
         .bind(id)
