@@ -16,7 +16,7 @@ use serenity::{
 use tokio::sync::RwLock;
 use tracing::{error, info};
 
-const PLATFORM_KEY: &str = "discord";
+const CONTEXT_KEY_PREFIX: &str = "discord";
 
 #[derive(Debug)]
 pub struct DiscordLnbClientInner<S> {
@@ -91,7 +91,7 @@ impl<S: LnbServer> DiscordLnbClientInner<S> {
         let conversation_id = match context_key {
             Some(context) => {
                 info!("restoring conversation with last referenced message ID {context}");
-                let context_key = format!("{PLATFORM_KEY}:{context}");
+                let context_key = format!("{CONTEXT_KEY_PREFIX}:{context}");
                 match self.assistant.restore_conversation(&context_key).await? {
                     Some(c) => c,
                     None => {
@@ -151,7 +151,7 @@ impl<S: LnbServer> DiscordLnbClientInner<S> {
             .await?;
 
         // Conversation/history の更新
-        let new_history_id = format!("{PLATFORM_KEY}:{}", replied_message.id);
+        let new_history_id = format!("{CONTEXT_KEY_PREFIX}:{}", replied_message.id);
         self.assistant
             .save_conversation(conversation_update, &new_history_id)
             .await?;

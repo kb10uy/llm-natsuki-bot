@@ -27,7 +27,7 @@ use tokio::{fs::File, io::AsyncWriteExt, spawn};
 use tracing::{debug, error, info};
 use url::Url;
 
-const PLATFORM_KEY: &str = "mastodon";
+const CONTEXT_KEY_PREFIX: &str = "mastodon";
 
 #[derive(Debug)]
 pub struct MastodonLnbClientInner<S> {
@@ -111,7 +111,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         let conversation_id = match context_key {
             Some(context) => {
                 info!("restoring conversation with last status ID {context}");
-                let context_key = format!("{PLATFORM_KEY}:{context}");
+                let context_key = format!("{CONTEXT_KEY_PREFIX}:{context}");
                 match self.assistant.restore_conversation(&context_key).await? {
                     Some(c) => c,
                     None => {
@@ -208,7 +208,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
 
         // Conversation/history の更新
         // let updated_conversation = conversation_update.finish();
-        let new_history_id = format!("{PLATFORM_KEY}:{}", replied_status.id);
+        let new_history_id = format!("{CONTEXT_KEY_PREFIX}:{}", replied_status.id);
         self.assistant
             .save_conversation(conversation_update, &new_history_id)
             .await?;
