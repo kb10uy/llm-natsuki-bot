@@ -7,6 +7,12 @@ members = [
   "lnb-discord-client",
 ]
 
+[workspace.package]
+version = "0.4.0"
+description = "LLM-based chatbot with various functions"
+authors = ["kb10uy <kb10uy@kb10uy.org>"]
+edition = "2024"
+
 [workspace.dependencies]
 lnb-core = { path = "./lnb-core" }
 lnb-mastodon-client = { path = "./lnb-mastodon-client" }

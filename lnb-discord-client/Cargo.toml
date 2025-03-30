@@ -1,7 +1,9 @@
 [package]
 name = "lnb-discord-client"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+description.workspace = true
+authors.workspace = true
+edition.workspace = true
 
 [dependencies]
 lnb-core = { workspace = true }
