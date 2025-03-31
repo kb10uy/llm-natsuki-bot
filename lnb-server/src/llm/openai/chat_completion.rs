@@ -12,11 +12,12 @@ use async_openai::{
     Client,
     config::OpenAIConfig,
     types::{
-        ChatCompletionMessageToolCall, ChatCompletionRequestAssistantMessage, ChatCompletionRequestMessage,
+        ChatChoice, ChatCompletionMessageToolCall, ChatCompletionRequestAssistantMessage, ChatCompletionRequestMessage,
         ChatCompletionRequestMessageContentPartImage, ChatCompletionRequestMessageContentPartText,
         ChatCompletionRequestToolMessage, ChatCompletionRequestToolMessageContent, ChatCompletionRequestUserMessage,
         ChatCompletionRequestUserMessageContent, ChatCompletionRequestUserMessageContentPart, ChatCompletionTool,
-        ChatCompletionToolType, CreateChatCompletionRequest, FunctionCall, FunctionObject, ImageUrl, ResponseFormat,
+        ChatCompletionToolType, CreateChatCompletionRequest, FinishReason, FunctionCall, FunctionObject, ImageUrl,
+        ResponseFormat,
     },
 };
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
@@ -28,7 +29,7 @@ use lnb_core::{
     },
     model::{
         conversation::IncompleteConversation,
-        message::{Message, MessageFunctionCall, UserMessageContent},
+        message::{Message, MessageToolCalling, UserMessageContent},
     },
 };
 use tokio::sync::Mutex;
@@ -92,10 +93,7 @@ impl ChatCompletionBackendInner {
     }
 
     async fn send_conversation(&self, conversation: &IncompleteConversation) -> Result<LlmUpdate, LlmError> {
-        let messages: Result<_, _> = conversation
-            .messages_with_pushed()
-            .map(transform_message)
-            .collect();
+        let messages: Result<_, _> = conversation.messages_with_pushed().map(transform_message).collect();
         if self.structured_mode {
             self.send_conversation_structured(messages?).await
         } else {
@@ -120,32 +118,7 @@ impl ChatCompletionBackendInner {
             return Err(LlmError::NoChoice);
         };
 
-        let tool_callings = match first_choice.message.tool_calls {
-            Some(calls) => {
-                let converted_calls: Result<Vec<_>, _> = calls
-                    .into_iter()
-                    .map(|c| {
-                        serde_json::from_str(&c.function.arguments).map(|args| MessageFunctionCall {
-                            id: c.id,
-                            name: c.function.name,
-                            arguments: args,
-                        })
-                    })
-                    .collect();
-                Some(converted_calls.map_err(LlmError::by_format)?)
-            }
-            None => None,
-        };
-
-        let update = LlmUpdate {
-            response: first_choice.message.content.map(|text| LlmAssistantResponse {
-                text,
-                language: None,
-                sensitive: None,
-            }),
-            tool_callings,
-        };
-        Ok(update)
+        transform_choice(first_choice)
     }
 
     async fn send_conversation_structured(
@@ -168,35 +141,63 @@ impl ChatCompletionBackendInner {
             return Err(LlmError::NoChoice);
         };
 
-        let tool_callings = match first_choice.message.tool_calls {
-            Some(calls) => {
-                let converted_calls: Result<Vec<_>, _> = calls
-                    .into_iter()
-                    .map(|c| {
-                        serde_json::from_str(&c.function.arguments).map(|args| MessageFunctionCall {
-                            id: c.id,
-                            name: c.function.name,
-                            arguments: args,
-                        })
+        transform_choice(first_choice)
+    }
+}
+
+fn transform_choice(choice: ChatChoice) -> Result<LlmUpdate, LlmError> {
+    match choice.finish_reason {
+        // stop
+        Some(FinishReason::Stop) => {
+            let Some(text) = choice.message.content else {
+                return Err(LlmError::ExpectationMismatch("no content value".to_string()));
+            };
+            Ok(LlmUpdate::Finished(LlmAssistantResponse {
+                text,
+                language: None,
+                sensitive: None,
+            }))
+        }
+
+        // max_length
+        Some(FinishReason::Length) => {
+            let Some(text) = choice.message.content else {
+                return Err(LlmError::ExpectationMismatch("no content value".to_string()));
+            };
+            Ok(LlmUpdate::LengthCut(LlmAssistantResponse {
+                text,
+                language: None,
+                sensitive: None,
+            }))
+        }
+
+        // tool_calls
+        Some(FinishReason::ToolCalls) => {
+            let Some(tool_calls) = choice.message.tool_calls else {
+                return Err(LlmError::ExpectationMismatch("no tool_calls value".to_string()));
+            };
+            let converted_calls: Result<_, _> = tool_calls
+                .into_iter()
+                .map(|c| {
+                    let arguments = serde_json::from_str(&c.function.arguments).map_err(LlmError::by_format)?;
+                    Ok(MessageToolCalling {
+                        id: c.id,
+                        name: c.function.name,
+                        arguments,
                     })
-                    .collect();
-                Some(converted_calls.map_err(LlmError::by_format)?)
-            }
-            None => None,
-        };
+                })
+                .collect();
+            Ok(LlmUpdate::ToolCalling(converted_calls?))
+        }
 
-        let response = first_choice
-            .message
-            .content
-            .map(|s| serde_json::from_str(&s))
-            .transpose()
-            .map_err(|e| LlmError::ResponseFormat(e.into()))?;
+        // content_filter
+        Some(FinishReason::ContentFilter) => Ok(LlmUpdate::Filtered),
 
-        let update = LlmUpdate {
-            response,
-            tool_callings,
-        };
-        Ok(update)
+        // other invalid values
+        Some(FinishReason::FunctionCall) => {
+            Err(LlmError::ExpectationMismatch("function call not expected".to_string()))
+        }
+        None => Err(LlmError::NoChoice),
     }
 }
 
