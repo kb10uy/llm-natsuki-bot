@@ -69,6 +69,10 @@ pub enum LlmError {
     /// JSON の復元ができない。
     #[error("invalid response format: {0}")]
     ResponseFormat(#[source] ErasedError),
+
+    /// 想定されている値がない。
+    #[error("expectation mismatch: {0}")]
+    ExpectationMismatch(String),
 }
 
 impl LlmError {

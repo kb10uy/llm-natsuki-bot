@@ -30,7 +30,7 @@ impl Message {
         })
     }
 
-    pub fn new_function_calls(calls: impl IntoIterator<Item = MessageFunctionCall>) -> Message {
+    pub fn new_function_calls(calls: impl IntoIterator<Item = MessageToolCalling>) -> Message {
         Message::FunctionCalls(FunctionCallsMessage(calls.into_iter().collect()))
     }
 
@@ -80,10 +80,10 @@ impl From<SystemMessage> for Message {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
-pub struct FunctionCallsMessage(pub Vec<MessageFunctionCall>);
+pub struct FunctionCallsMessage(pub Vec<MessageToolCalling>);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
-pub struct MessageFunctionCall {
+pub struct MessageToolCalling {
     pub id: String,
     pub name: String,
     pub arguments: Value,
