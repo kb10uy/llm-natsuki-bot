@@ -1,7 +1,7 @@
 use crate::{
     error::LlmError,
     interface::function::simple::SimpleFunctionDescriptor,
-    model::{conversation::IncompleteConversation, message::MessageFunctionCall},
+    model::{conversation::IncompleteConversation, message::MessageToolCalling},
 };
 
 use std::fmt::Debug;
@@ -21,11 +21,12 @@ pub trait Llm: Send + Sync + Debug {
     ) -> BoxFuture<'a, Result<LlmUpdate, LlmError>>;
 }
 
-/// Conversation を送信した結果生成された内容。
 #[derive(Debug, Clone)]
-pub struct LlmUpdate {
-    pub response: Option<LlmAssistantResponse>,
-    pub tool_callings: Option<Vec<MessageFunctionCall>>,
+pub enum LlmUpdate {
+    Finished(LlmAssistantResponse),
+    LengthCut(LlmAssistantResponse),
+    ToolCalling(Vec<MessageToolCalling>),
+    Filtered,
 }
 
 /// assistant role としての応答内容。
@@ -35,4 +36,3 @@ pub struct LlmAssistantResponse {
     pub language: Option<String>,
     pub sensitive: Option<bool>,
 }
-

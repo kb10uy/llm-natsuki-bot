@@ -4,18 +4,22 @@ use std::{collections::HashMap, iter::once};
 
 use lnb_core::{
     error::ServerError,
-    interface::{function::simple::SimpleFunction, llm::Llm, storage::ConversationStorage},
+    interface::{
+        function::simple::SimpleFunction,
+        llm::{Llm, LlmUpdate},
+        storage::ConversationStorage,
+    },
     model::{
         conversation::{
             Conversation, ConversationAttachment, ConversationId, ConversationUpdate, IncompleteConversation,
         },
-        message::{AssistantMessage, FunctionResponseMessage, Message, MessageFunctionCall, UserMessage},
+        message::{AssistantMessage, FunctionResponseMessage, Message, MessageToolCalling, UserMessage},
     },
 };
 use tokio::sync::Mutex;
 use tracing::{info, warn};
 
-const MAX_TOOL_CALLING_LOOP: usize = 5;
+const MAX_CONVERSATION_LOOP: usize = 8;
 
 #[derive(Debug)]
 pub struct NatsukiInner {
@@ -62,51 +66,80 @@ impl NatsukiInner {
             .ok_or_else(|| ServerError::ConversationNotFound(conversation_id))?;
         let mut incomplete_conversation = IncompleteConversation::start(conversation, user_message);
 
-        let mut last_update = self.llm.send_conversation(&incomplete_conversation).await?;
         let mut attachments = vec![];
-        let mut tool_called = 0;
-        while let Some(tool_callings) = last_update.tool_callings {
-            tool_called += 1;
-            if tool_called > MAX_TOOL_CALLING_LOOP {
-                break;
+        let mut sent_count = 0;
+        loop {
+            // 超過したらエラー
+            if sent_count >= MAX_CONVERSATION_LOOP {
+                return Err(ServerError::TooMuchConversationCall);
             }
 
-            let call_message = Message::new_function_calls(tool_callings.clone());
-            let (response_messages, called_attachments) = self.process_tool_callings(tool_callings).await?;
+            let update = self.llm.send_conversation(&incomplete_conversation).await?;
+            sent_count += 1;
 
-            let extending_messages = once(call_message).chain(response_messages.into_iter().map(|m| m.into()));
-            incomplete_conversation.extend_message(extending_messages);
-            attachments.extend(called_attachments);
+            match update {
+                // 正常終了
+                LlmUpdate::Finished(finished) => {
+                    let (text, is_sensitive) = self.strip_sensitive_text(finished.text, finished.sensitive);
+                    return Ok(incomplete_conversation.finish(
+                        AssistantMessage {
+                            text,
+                            is_sensitive,
+                            language: finished.language,
+                        },
+                        attachments,
+                    ));
+                }
 
-            last_update = self.llm.send_conversation(&incomplete_conversation).await?;
+                // 続行
+                LlmUpdate::LengthCut(cut) => {
+                    let (text, is_sensitive) = self.strip_sensitive_text(cut.text, cut.sensitive);
+                    incomplete_conversation.push_assistant(AssistantMessage {
+                        text,
+                        is_sensitive,
+                        language: cut.language,
+                    });
+                }
+
+                // Tool Calling
+                LlmUpdate::ToolCalling(tool_callings) => {
+                    let call_message = Message::new_function_calls(tool_callings.clone());
+                    let (response_messages, called_attachments) = self.process_tool_callings(tool_callings).await?;
+
+                    let extending_messages = once(call_message).chain(response_messages.into_iter().map(|m| m.into()));
+                    incomplete_conversation.extend_message(extending_messages);
+                    attachments.extend(called_attachments);
+                }
+
+                // 強制終了
+                LlmUpdate::Filtered => {
+                    return Ok(incomplete_conversation.finish(
+                        AssistantMessage {
+                            text: "(filtered)".to_string(),
+                            is_sensitive: true,
+                            language: None,
+                        },
+                        attachments,
+                    ));
+                }
+            }
         }
+    }
 
-        let Some(response) = last_update.response else {
-            return Err(ServerError::ChatResponseExpected);
-        };
-
-        let (text, is_sensitive) = match response.sensitive {
-            Some(v) => (response.text, v),
-            None if self.sensitive_marker.is_empty() => (response.text, false),
-            _ => match response.text.strip_prefix(&self.sensitive_marker) {
+    fn strip_sensitive_text(&self, original: String, explicit_sensitive: Option<bool>) -> (String, bool) {
+        match explicit_sensitive {
+            Some(v) => (original, v),
+            None if self.sensitive_marker.is_empty() => (original, false),
+            _ => match original.strip_prefix(&self.sensitive_marker) {
                 Some(stripped) => (stripped.to_string(), true),
-                None => (response.text, false),
+                None => (original, false),
             },
-        };
-
-        Ok(incomplete_conversation.finish(
-            AssistantMessage {
-                text,
-                is_sensitive,
-                language: response.language,
-            },
-            attachments,
-        ))
+        }
     }
 
     async fn process_tool_callings(
         &self,
-        tool_callings: Vec<MessageFunctionCall>,
+        tool_callings: Vec<MessageToolCalling>,
     ) -> Result<(Vec<FunctionResponseMessage>, Vec<ConversationAttachment>), ServerError> {
         let locked = self.simple_functions.lock().await;
 
