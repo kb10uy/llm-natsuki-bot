@@ -48,9 +48,9 @@ pub enum ServerError {
     #[error("expected conversation {0:?} not found")]
     ConversationNotFound(ConversationId),
 
-    /// 期待されていた応答が存在しなかった。
-    #[error("expected chat resnpose not found")]
-    ChatResponseExpected,
+    /// finished になるまでに API 回数の呼出し上限を超えた。
+    #[error("too much conversation updates found")]
+    TooMuchConversationCall,
 }
 
 /// LLM 層のエラー。

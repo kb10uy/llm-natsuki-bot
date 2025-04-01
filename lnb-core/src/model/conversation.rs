@@ -60,16 +60,53 @@ impl IncompleteConversation {
         self.pushed_messages.extend(messages);
     }
 
+    /// 最後の `AssistantMessage` に指定された `AssistantMessage` の内容を追加する。
+    /// 最後が `AssistantMessage` でなければ受け取ったものをそのまま追加する。
+    pub fn push_assistant(&mut self, appending_message: AssistantMessage) {
+        let Some(Message::Assistant(last_assistant)) = self.pushed_messages.last_mut() else {
+            self.pushed_messages.push(appending_message.into());
+            return;
+        };
+        last_assistant.text.push_str(&appending_message.text);
+        last_assistant.is_sensitive |= appending_message.is_sensitive;
+        if let Some(updated_language) = appending_message.language {
+            last_assistant.language = Some(updated_language);
+        }
+    }
+
+    /// 最後の `AssistantMessage` に指定された `AssistantMessage` の内容を追加してそれを合計の `AssistantMessage` とする。
+    /// 最後が `AssistantMessage` でなければ受け取ったものをそのまま適用する。
     pub fn finish(
-        self,
-        assistant_response: AssistantMessage,
-        assistant_attachments: Vec<ConversationAttachment>,
+        mut self,
+        finished_response: AssistantMessage,
+        attachments: Vec<ConversationAttachment>,
     ) -> ConversationUpdate {
+        let assistant_response = match self.pushed_messages.pop() {
+            // Cut ありで完了
+            Some(Message::Assistant(mut last_assistant)) => {
+                last_assistant.text.push_str(&finished_response.text);
+                last_assistant.is_sensitive |= finished_response.is_sensitive;
+                if let Some(updated_language) = finished_response.language {
+                    last_assistant.language = Some(updated_language);
+                }
+                last_assistant
+            }
+
+            // Cut なしで完了
+            Some(otherwise) => {
+                self.pushed_messages.push(otherwise);
+                finished_response
+            }
+
+            // 要素なし(普通 `User` が入ると思うけど)
+            None => finished_response,
+        };
+
         ConversationUpdate {
             base_conversation_id: self.base.id,
             intermediate_messages: self.pushed_messages,
             assistant_response,
-            assistant_attachments,
+            attachments,
         }
     }
 }
@@ -79,7 +116,7 @@ pub struct ConversationUpdate {
     base_conversation_id: ConversationId,
     intermediate_messages: Vec<Message>,
     assistant_response: AssistantMessage,
-    assistant_attachments: Vec<ConversationAttachment>,
+    attachments: Vec<ConversationAttachment>,
 }
 
 impl ConversationUpdate {
@@ -92,7 +129,7 @@ impl ConversationUpdate {
     }
 
     pub fn attachments(&self) -> &[ConversationAttachment] {
-        &self.assistant_attachments
+        &self.attachments
     }
 
     pub fn into_completing_messages(self) -> Vec<Message> {
