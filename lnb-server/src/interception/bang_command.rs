@@ -32,27 +32,27 @@ impl BangCommandInterception {
         incomplete: &mut IncompleteConversation,
         _user_role: &UserRole,
     ) -> Result<InterceptionStatus, LlmError> {
-        let user_text = incomplete
-            .last_user()
-            .ok_or_else(|| LlmError::ExpectationMismatch("user message not found".to_string()))?
-            .contents
-            .iter()
-            .filter_map(|c| match c {
+        let user_text = {
+            let Some(user_message) = incomplete.last_user() else {
+                return Ok(InterceptionStatus::Continue);
+            };
+            let mut text_contents = user_message.contents.iter().filter_map(|c| match c {
                 UserMessageContent::Text(t) => Some(t.as_str()),
                 _ => None,
-            })
-            .next()
-            .ok_or_else(|| LlmError::ExpectationMismatch("text content not found".to_string()))?
-            .trim();
-
+            });
+            let Some(first_text_content) = text_contents.next() else {
+                return Ok(InterceptionStatus::Continue);
+            };
+            first_text_content.trim()
+        };
         let (command_name, rest) = {
             let Some(bang_stripped) = user_text.strip_prefix('!') else {
                 return Ok(InterceptionStatus::Continue);
             };
-            let Some((command_name, rest)) = bang_stripped.split_once(|c: char| c.is_whitespace()) else {
-                return Ok(InterceptionStatus::Continue);
-            };
-            (command_name, rest.trim())
+            match bang_stripped.split_once(|c: char| c.is_whitespace()) {
+                Some((c, r)) => (c, r),
+                None => (bang_stripped, ""),
+            }
         };
         debug!("bang command: {command_name} [{rest}]");
 

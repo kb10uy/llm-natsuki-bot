@@ -70,7 +70,7 @@ impl IncompleteConversation {
 
     /// 元の `Conversation` のうち最後にある `UserMessage` を取得する。
     pub fn last_user(&self) -> Option<&UserMessage> {
-        let Some(Message::User(last_user)) = &self.base.messages.last() else {
+        let Some(Message::User(last_user)) = &self.pushed_messages.last() else {
             return None;
         };
         Some(last_user)
