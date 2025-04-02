@@ -17,7 +17,7 @@ use lnb_core::{
         message::{AssistantMessage, FunctionResponseMessage, Message, MessageToolCalling, UserMessage},
     },
 };
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 const MAX_CONVERSATION_LOOP: usize = 8;
@@ -26,8 +26,8 @@ const MAX_CONVERSATION_LOOP: usize = 8;
 pub struct NatsukiInner {
     llm: BoxLlm,
     storage: BoxConversationStorage,
-    simple_functions: Mutex<HashMap<String, BoxSimpleFunction>>,
-    interceptions: Mutex<Vec<BoxInterception>>,
+    simple_functions: RwLock<HashMap<String, BoxSimpleFunction>>,
+    interceptions: RwLock<Vec<BoxInterception>>,
     system_role: String,
     sensitive_marker: String,
 }
@@ -41,8 +41,8 @@ impl NatsukiInner {
         Ok(NatsukiInner {
             llm,
             storage,
-            simple_functions: Mutex::new(HashMap::new()),
-            interceptions: Mutex::new(Vec::new()),
+            simple_functions: RwLock::new(HashMap::new()),
+            interceptions: RwLock::new(Vec::new()),
             system_role: assistant_identity.system_role.clone(),
             sensitive_marker: assistant_identity.sensitive_marker.clone(),
         })
@@ -52,13 +52,13 @@ impl NatsukiInner {
     pub async fn add_simple_function(&self, simple_function: impl SimpleFunction + 'static) {
         let descriptor = simple_function.get_descriptor();
 
-        let mut locked = self.simple_functions.lock().await;
+        let mut locked = self.simple_functions.write().await;
         locked.insert(descriptor.name.clone(), Box::new(simple_function));
         self.llm.add_simple_function(descriptor).await;
     }
 
     pub async fn apply_interception(&self, interception: BoxInterception) {
-        let mut locked = self.interceptions.lock().await;
+        let mut locked = self.interceptions.write().await;
         locked.push(interception);
     }
 
@@ -76,7 +76,7 @@ impl NatsukiInner {
 
         // interception updates
         // 後から追加した方が前のものを "wrap" する (axum などと同じ)ので逆順
-        let interceptions = self.interceptions.lock().await;
+        let interceptions = self.interceptions.read().await;
         for interception in interceptions.iter().rev() {
             match interception.before_llm(&mut incomplete_conversation).await? {
                 InterceptionStatus::Complete(message) => return Ok(incomplete_conversation.finish(message)),
@@ -158,7 +158,7 @@ impl NatsukiInner {
         &self,
         tool_callings: Vec<MessageToolCalling>,
     ) -> Result<(Vec<FunctionResponseMessage>, Vec<ConversationAttachment>), ServerError> {
-        let locked = self.simple_functions.lock().await;
+        let locked = self.simple_functions.read().await;
 
         let mut responses = vec![];
         let mut attachments = vec![];
