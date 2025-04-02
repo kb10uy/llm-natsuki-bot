@@ -1,0 +1,32 @@
+name: "Check Rust Codes"
+
+on:
+  - "pull_request"
+
+jobs:
+  lint:
+    name: "Lint"
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: "actions/checkout@v4"
+      - uses: "actions-rust-lang/setup-rust-toolchain@v1"
+        with:
+          components: "rustfmt, clippy"
+
+      - uses: "actions-rust-lang/rustfmt@v1"
+      - shell: "bash"
+        run: |
+          cargo clippy --all-features
+
+  test:
+    name: "Test"
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: "actions/checkout@v4"
+      - uses: "actions-rust-lang/setup-rust-toolchain@v1"
+        with:
+          components: "rustfmt, clippy"
+
+      - shell: "bash"
+        run: |
+          cargo test --all-features
