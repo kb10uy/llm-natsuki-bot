@@ -17,7 +17,7 @@ use lnb_core::{
     },
 };
 use tokio::sync::Mutex;
-use tracing::{info, warn};
+use tracing::{debug, info, instrument, warn};
 
 const MAX_CONVERSATION_LOOP: usize = 8;
 
@@ -80,6 +80,7 @@ impl NatsukiInner {
             match update {
                 // 正常終了
                 LlmUpdate::Finished(finished) => {
+                    debug!("conversation finished");
                     let (text, is_sensitive) = self.strip_sensitive_text(finished.text, finished.sensitive);
                     return Ok(incomplete_conversation.finish(
                         AssistantMessage {
@@ -93,6 +94,7 @@ impl NatsukiInner {
 
                 // 続行
                 LlmUpdate::LengthCut(cut) => {
+                    debug!("conversation cut due to length");
                     let (text, is_sensitive) = self.strip_sensitive_text(cut.text, cut.sensitive);
                     incomplete_conversation.push_assistant(AssistantMessage {
                         text,
@@ -103,6 +105,7 @@ impl NatsukiInner {
 
                 // Tool Calling
                 LlmUpdate::ToolCalling(tool_callings) => {
+                    debug!("conversation requested tool calling");
                     let call_message = Message::new_function_calls(tool_callings.clone());
                     let (response_messages, called_attachments) = self.process_tool_callings(tool_callings).await?;
 
@@ -113,6 +116,7 @@ impl NatsukiInner {
 
                 // 強制終了
                 LlmUpdate::Filtered => {
+                    debug!("conversation filtered");
                     return Ok(incomplete_conversation.finish(
                         AssistantMessage {
                             text: "(filtered)".to_string(),
