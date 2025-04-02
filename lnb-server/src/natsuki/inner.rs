@@ -1,11 +1,15 @@
 use crate::config::AppConfigAssistantIdentity;
 
-use std::{collections::HashMap, iter::once};
+use std::{
+    collections::{HashMap, VecDeque},
+    iter::once,
+};
 
 use lnb_core::{
     error::ServerError,
     interface::{
         function::simple::SimpleFunction,
+        interception::Interception,
         llm::{Llm, LlmUpdate},
         storage::ConversationStorage,
     },
@@ -26,6 +30,7 @@ pub struct NatsukiInner {
     llm: Box<dyn Llm + 'static>,
     storage: Box<dyn ConversationStorage + 'static>,
     simple_functions: Mutex<HashMap<String, Box<dyn SimpleFunction + 'static>>>,
+    interceptions: Mutex<VecDeque<Box<dyn Interception + 'static>>>,
     system_role: String,
     sensitive_marker: String,
 }
@@ -40,6 +45,7 @@ impl NatsukiInner {
             llm,
             storage,
             simple_functions: Mutex::new(HashMap::new()),
+            interceptions: Mutex::new(VecDeque::new()),
             system_role: assistant_identity.system_role.clone(),
             sensitive_marker: assistant_identity.sensitive_marker.clone(),
         })

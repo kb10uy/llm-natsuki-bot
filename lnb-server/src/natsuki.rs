@@ -7,7 +7,10 @@ use std::sync::Arc;
 use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
     error::ServerError,
-    interface::{function::simple::SimpleFunction, llm::Llm, server::LnbServer, storage::ConversationStorage},
+    interface::{
+        function::simple::SimpleFunction, interception::Interception, llm::Llm, server::LnbServer,
+        storage::ConversationStorage,
+    },
     model::{
         conversation::{ConversationId, ConversationUpdate},
         message::UserMessage,
@@ -29,6 +32,10 @@ impl Natsuki {
 
     pub async fn add_simple_function(&self, simple_function: impl SimpleFunction + 'static) {
         self.0.add_simple_function(simple_function).await;
+    }
+
+    pub async fn apply_interception(&self, interception: impl Interception + 'static) {
+
     }
 }
 
