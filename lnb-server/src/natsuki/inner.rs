@@ -83,9 +83,15 @@ impl NatsukiInner {
                 .before_llm(&mut incomplete_conversation, &user_role)
                 .await?;
             match status {
-                InterceptionStatus::Complete(message) => return Ok(incomplete_conversation.finish(message)),
-                InterceptionStatus::Abort => return Err(ServerError::ConversationAborted),
                 InterceptionStatus::Continue => continue,
+                InterceptionStatus::Complete(message) => {
+                    debug!("interceptor reported conversation completion");
+                    return Ok(incomplete_conversation.finish(message));
+                }
+                InterceptionStatus::Abort => {
+                    debug!("interceptor reported conversation abortion");
+                    return Err(ServerError::ConversationAborted);
+                }
             }
         }
 
