@@ -68,6 +68,14 @@ impl IncompleteConversation {
         self.attachments.extend(attachments);
     }
 
+    /// 元の `Conversation` のうち最後にある `UserMessage` を取得する。
+    pub fn last_user(&self) -> Option<&UserMessage> {
+        let Some(Message::User(last_user)) = &self.base.messages.last() else {
+            return None;
+        };
+        Some(last_user)
+    }
+
     /// 最後の `AssistantMessage` に指定された `AssistantMessage` の内容を追加する。
     /// 最後が `AssistantMessage` でなければ受け取ったものをそのまま追加する。
     pub fn push_assistant(&mut self, appending_message: AssistantMessage) {
