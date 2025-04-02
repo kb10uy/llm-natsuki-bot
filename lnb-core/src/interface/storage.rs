@@ -35,3 +35,9 @@ pub trait ConversationStorage: Send + Sync + Debug {
         context_key: Option<&'a str>,
     ) -> BoxFuture<'a, Result<(), StorageError>>;
 }
+
+impl<T: ConversationStorage + 'static> From<T> for BoxConversationStorage {
+    fn from(value: T) -> BoxConversationStorage {
+        Box::new(value)
+    }
+}

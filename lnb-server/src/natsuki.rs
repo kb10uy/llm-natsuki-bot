@@ -23,10 +23,10 @@ pub struct Natsuki(Arc<NatsukiInner>);
 impl Natsuki {
     pub async fn new(
         assistant_identity: &AppConfigAssistantIdentity,
-        llm: BoxLlm,
-        storage: BoxConversationStorage,
+        llm: impl Into<BoxLlm>,
+        storage: impl Into<BoxConversationStorage>,
     ) -> Result<Natsuki, ServerError> {
-        let inner = NatsukiInner::new(assistant_identity, llm, storage)?;
+        let inner = NatsukiInner::new(assistant_identity, llm.into(), storage.into())?;
         Ok(Natsuki(Arc::new(inner)))
     }
 

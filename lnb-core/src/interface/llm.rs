@@ -38,3 +38,9 @@ pub struct LlmAssistantResponse {
     pub language: Option<String>,
     pub sensitive: Option<bool>,
 }
+
+impl<T: Llm + 'static> From<T> for BoxLlm {
+    fn from(value: T) -> BoxLlm {
+        Box::new(value)
+    }
+}
