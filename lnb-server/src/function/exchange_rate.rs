@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+use crate::{config::AppConfigToolExchangeRate, function::ConfigurableFunction};
 
-use crate::config::AppConfigToolExchangeRate;
+use std::collections::HashMap;
 
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use lnb_core::{
@@ -23,6 +23,21 @@ const API_RESPONSE_DATETIME: &[BorrowedFormatItem<'static>] = format_description
 pub struct ExchangeRate {
     client: Client,
     token_endpoint: String,
+}
+
+impl ConfigurableFunction for ExchangeRate {
+    const NAME: &'static str = stringify!(ExchangeRate);
+
+    type Configuration = AppConfigToolExchangeRate;
+
+    async fn create(config: &AppConfigToolExchangeRate) -> Result<ExchangeRate, FunctionError> {
+        let client = ClientBuilder::new()
+            .user_agent(APP_USER_AGENT)
+            .build()
+            .map_err(FunctionError::by_external)?;
+        let token_endpoint = format!("{}/v6/{}", config.endpoint, config.token);
+        Ok(ExchangeRate { client, token_endpoint })
+    }
 }
 
 impl SimpleFunction for ExchangeRate {
@@ -56,15 +71,6 @@ impl SimpleFunction for ExchangeRate {
 }
 
 impl ExchangeRate {
-    pub async fn new(config: &AppConfigToolExchangeRate) -> Result<ExchangeRate, FunctionError> {
-        let client = ClientBuilder::new()
-            .user_agent(APP_USER_AGENT)
-            .build()
-            .map_err(FunctionError::by_external)?;
-        let token_endpoint = format!("{}/v6/{}", config.endpoint, config.token);
-        Ok(ExchangeRate { client, token_endpoint })
-    }
-
     async fn get_exchange_rate(&self, parameters: RequestParameters) -> Result<SimpleFunctionResponse, FunctionError> {
         let response = self
             .client

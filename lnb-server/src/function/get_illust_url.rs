@@ -1,4 +1,4 @@
-use crate::config::AppConfigToolGetIllustUrl;
+use crate::{config::AppConfigToolGetIllustUrl, function::ConfigurableFunction};
 
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use lnb_core::{
@@ -14,6 +14,19 @@ use sqlx::{SqlitePool, prelude::FromRow};
 #[derive(Debug)]
 pub struct GetIllustUrl {
     pool: SqlitePool,
+}
+
+impl ConfigurableFunction for GetIllustUrl {
+    const NAME: &'static str = stringify!(GetIllustUrl);
+
+    type Configuration = AppConfigToolGetIllustUrl;
+
+    async fn create(config: &AppConfigToolGetIllustUrl) -> Result<GetIllustUrl, FunctionError> {
+        let pool = SqlitePool::connect(&config.database_filepath)
+            .map_err(FunctionError::by_external)
+            .await?;
+        Ok(GetIllustUrl { pool })
+    }
 }
 
 impl SimpleFunction for GetIllustUrl {
@@ -40,13 +53,6 @@ impl SimpleFunction for GetIllustUrl {
 }
 
 impl GetIllustUrl {
-    pub async fn new(config: &AppConfigToolGetIllustUrl) -> Result<GetIllustUrl, FunctionError> {
-        let pool = SqlitePool::connect(&config.database_filepath)
-            .map_err(FunctionError::by_external)
-            .await?;
-        Ok(GetIllustUrl { pool })
-    }
-
     async fn get_illust_infos(&self, count: usize) -> Result<SimpleFunctionResponse, FunctionError> {
         let all_illusts: Vec<SqliteRowIllust> = sqlx::query_as(r#"SELECT url, creator_name, comment FROM illusts;"#)
             .fetch_all(&self.pool)

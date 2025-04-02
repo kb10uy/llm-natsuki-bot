@@ -7,7 +7,7 @@ mod storage;
 
 use crate::{
     config::AppConfig,
-    function::{ExchangeRate, GetIllustUrl, ImageGenerator, LocalInfo, SelfInfo},
+    function::{ConfigurableFunction, ExchangeRate, GetIllustUrl, ImageGenerator, LocalInfo, SelfInfo},
     llm::create_llm,
     natsuki::Natsuki,
     storage::create_storage,
@@ -19,7 +19,7 @@ use anyhow::{Context as _, Result, bail};
 use clap::Parser;
 use config::AppConfigTool;
 use futures::future::join_all;
-use lnb_core::interface::client::LnbClient;
+use lnb_core::interface::{client::LnbClient, function::simple::SimpleFunction};
 use lnb_discord_client::DiscordLnbClient;
 use lnb_mastodon_client::MastodonLnbClient;
 use tokio::{fs::read_to_string, spawn};
@@ -76,21 +76,24 @@ async fn register_simple_functions(tool_config: &AppConfigTool, natsuki: &Natsuk
     natsuki.add_simple_function(SelfInfo::new()).await;
     natsuki.add_simple_function(LocalInfo::new()?).await;
 
-    if let Some(image_generator_config) = &tool_config.image_generator {
-        natsuki
-            .add_simple_function(ImageGenerator::new(image_generator_config)?)
-            .await;
-    }
-    if let Some(get_illust_url_config) = &tool_config.get_illust_url {
-        natsuki
-            .add_simple_function(GetIllustUrl::new(get_illust_url_config).await?)
-            .await;
-    }
-    if let Some(exchange_rate_config) = &tool_config.exchange_rate {
-        natsuki
-            .add_simple_function(ExchangeRate::new(exchange_rate_config).await?)
-            .await;
-    }
+    register_simple_function_config::<ImageGenerator>(tool_config.image_generator.as_ref(), natsuki).await?;
+    register_simple_function_config::<GetIllustUrl>(tool_config.get_illust_url.as_ref(), natsuki).await?;
+    register_simple_function_config::<ExchangeRate>(tool_config.exchange_rate.as_ref(), natsuki).await?;
+
+    Ok(())
+}
+
+async fn register_simple_function_config<F>(config: Option<&F::Configuration>, natsuki: &Natsuki) -> Result<()>
+where
+    F: SimpleFunction + ConfigurableFunction + 'static,
+{
+    let Some(config) = config else {
+        return Ok(());
+    };
+
+    let simple_function = F::create(config).await?;
+    natsuki.add_simple_function(simple_function).await;
+    info!("simple function registered: {}", F::NAME);
 
     Ok(())
 }

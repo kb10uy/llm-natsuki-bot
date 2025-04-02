@@ -1,4 +1,4 @@
-use crate::config::AppConfigToolImageGenerator;
+use crate::{config::AppConfigToolImageGenerator, function::ConfigurableFunction};
 
 use async_openai::{
     Client,
@@ -21,6 +21,28 @@ use url::Url;
 pub struct ImageGenerator {
     client: Client<OpenAIConfig>,
     model: String,
+}
+
+impl ConfigurableFunction for ImageGenerator {
+    const NAME: &'static str = stringify!(ImageGenerator);
+
+    type Configuration = AppConfigToolImageGenerator;
+
+    async fn create(config: &AppConfigToolImageGenerator) -> Result<ImageGenerator, FunctionError> {
+        let openai_config = OpenAIConfig::new()
+            .with_api_key(&config.token)
+            .with_api_base(&config.endpoint);
+        let http_client = reqwest::ClientBuilder::new()
+            .user_agent(APP_USER_AGENT)
+            .build()
+            .map_err(|e| FunctionError::External(e.into()))?;
+
+        let client = Client::with_config(openai_config).with_http_client(http_client);
+        Ok(ImageGenerator {
+            client,
+            model: config.model.to_string(),
+        })
+    }
 }
 
 impl SimpleFunction for ImageGenerator {
@@ -50,23 +72,7 @@ impl SimpleFunction for ImageGenerator {
 }
 
 impl ImageGenerator {
-    pub fn new(config: &AppConfigToolImageGenerator) -> Result<ImageGenerator, FunctionError> {
-        let openai_config = OpenAIConfig::new()
-            .with_api_key(&config.token)
-            .with_api_base(&config.endpoint);
-        let http_client = reqwest::ClientBuilder::new()
-            .user_agent(APP_USER_AGENT)
-            .build()
-            .map_err(|e| FunctionError::External(e.into()))?;
-
-        let client = Client::with_config(openai_config).with_http_client(http_client);
-        Ok(ImageGenerator {
-            client,
-            model: config.model.to_string(),
-        })
-    }
-
-    pub async fn generate(&self, prompt: String) -> Result<SimpleFunctionResponse, FunctionError> {
+    async fn generate(&self, prompt: String) -> Result<SimpleFunctionResponse, FunctionError> {
         if prompt.is_empty() {
             return make_error_value("prompt is empty");
         }
