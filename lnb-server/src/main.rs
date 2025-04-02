@@ -8,9 +8,9 @@ mod storage;
 use crate::{
     config::AppConfig,
     function::{ConfigurableFunction, ExchangeRate, GetIllustUrl, ImageGenerator, LocalInfo, SelfInfo},
-    llm::create_llm,
+    llm::initialize_llm,
     natsuki::Natsuki,
-    storage::create_storage,
+    storage::initialize_storage,
 };
 
 use std::path::Path;
@@ -65,10 +65,13 @@ async fn initialize_natsuki(config: &AppConfig) -> Result<Natsuki> {
     let Some(assistant_identity) = config.assistant.identities.get(&config.assistant.identity) else {
         bail!("assistant identity {} not defined", config.assistant.identity);
     };
+    info!("using assistant identity: {}", config.assistant.identity);
 
-    let llm = create_llm(&config.llm).await?;
-    let storage = create_storage(&config.storage).await?;
+    let (llm, llm_name) = initialize_llm(&config.llm).await?;
+    let (storage, storage_name) = initialize_storage(&config.storage).await?;
     let natsuki = Natsuki::new(assistant_identity, llm, storage).await?;
+    info!("assistant engine initialized (LLM engine: {llm_name}, storage engine: {storage_name})");
+
     Ok(natsuki)
 }
 
@@ -93,7 +96,7 @@ where
 
     let simple_function = F::create(config).await?;
     natsuki.add_simple_function(simple_function).await;
-    info!("simple function registered: {}", F::NAME);
+    info!("simple function configured: {}", F::NAME);
 
     Ok(())
 }

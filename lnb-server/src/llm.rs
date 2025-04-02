@@ -29,11 +29,17 @@ pub static ASSISTANT_RESPONSE_SCHEMA: LazyLock<DescribedSchema> = LazyLock::new(
     )
 });
 
-pub async fn create_llm(config: &AppConfigLlm) -> Result<Box<dyn Llm + 'static>, LlmError> {
+pub async fn initialize_llm(config: &AppConfigLlm) -> Result<(Box<dyn Llm + 'static>, &'static str), LlmError> {
     match config.backend {
         AppConfigLlmBackend::Openai => match config.openai.api {
-            AppConfigLlmOpenaiApi::ChatCompletion => Ok(Box::new(ChatCompletionBackend::new(&config.openai).await?)),
-            AppConfigLlmOpenaiApi::Resnposes => Ok(Box::new(ResponsesBackend::new(&config.openai).await?)),
+            AppConfigLlmOpenaiApi::ChatCompletion => Ok((
+                Box::new(ChatCompletionBackend::new(&config.openai).await?),
+                "OpenAI (Chat Completion)",
+            )),
+            AppConfigLlmOpenaiApi::Resnposes => Ok((
+                Box::new(ResponsesBackend::new(&config.openai).await?),
+                "OpenAI (Responses)",
+            )),
         },
     }
 }
