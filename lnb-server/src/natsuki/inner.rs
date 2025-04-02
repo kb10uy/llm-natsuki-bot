@@ -17,7 +17,7 @@ use lnb_core::{
     },
 };
 use tokio::sync::Mutex;
-use tracing::{debug, info, instrument, warn};
+use tracing::{debug, info, warn};
 
 const MAX_CONVERSATION_LOOP: usize = 8;
 
