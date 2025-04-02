@@ -8,8 +8,8 @@ use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
     error::ServerError,
     interface::{
-        function::simple::SimpleFunction, interception::Interception, llm::Llm, server::LnbServer,
-        storage::ConversationStorage,
+        function::simple::SimpleFunction, interception::Interception, llm::BoxLlm, server::LnbServer,
+        storage::BoxConversationStorage,
     },
     model::{
         conversation::{ConversationId, ConversationUpdate},
@@ -23,8 +23,8 @@ pub struct Natsuki(Arc<NatsukiInner>);
 impl Natsuki {
     pub async fn new(
         assistant_identity: &AppConfigAssistantIdentity,
-        llm: Box<dyn Llm + 'static>,
-        storage: Box<dyn ConversationStorage + 'static>,
+        llm: BoxLlm,
+        storage: BoxConversationStorage,
     ) -> Result<Natsuki, ServerError> {
         let inner = NatsukiInner::new(assistant_identity, llm, storage)?;
         Ok(Natsuki(Arc::new(inner)))
@@ -34,9 +34,7 @@ impl Natsuki {
         self.0.add_simple_function(simple_function).await;
     }
 
-    pub async fn apply_interception(&self, interception: impl Interception + 'static) {
-
-    }
+    pub async fn apply_interception(&self, interception: impl Interception + 'static) {}
 }
 
 impl LnbServer for Natsuki {

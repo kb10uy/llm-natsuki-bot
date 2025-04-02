@@ -9,6 +9,8 @@ use std::fmt::Debug;
 use futures::future::BoxFuture;
 use serde::Deserialize;
 
+pub type BoxLlm = Box<dyn Llm + 'static>;
+
 #[allow(dead_code)]
 pub trait Llm: Send + Sync + Debug {
     /// `SimpleFunction` の追加を告知する。

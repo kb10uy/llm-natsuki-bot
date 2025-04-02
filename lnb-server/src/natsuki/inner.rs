@@ -8,10 +8,10 @@ use std::{
 use lnb_core::{
     error::ServerError,
     interface::{
-        function::simple::SimpleFunction,
-        interception::Interception,
-        llm::{Llm, LlmUpdate},
-        storage::ConversationStorage,
+        function::simple::{BoxSimpleFunction, SimpleFunction},
+        interception::BoxInterception,
+        llm::{BoxLlm, LlmUpdate},
+        storage::BoxConversationStorage,
     },
     model::{
         conversation::{
@@ -27,10 +27,10 @@ const MAX_CONVERSATION_LOOP: usize = 8;
 
 #[derive(Debug)]
 pub struct NatsukiInner {
-    llm: Box<dyn Llm + 'static>,
-    storage: Box<dyn ConversationStorage + 'static>,
-    simple_functions: Mutex<HashMap<String, Box<dyn SimpleFunction + 'static>>>,
-    interceptions: Mutex<VecDeque<Box<dyn Interception + 'static>>>,
+    llm: BoxLlm,
+    storage: BoxConversationStorage,
+    simple_functions: Mutex<HashMap<String, BoxSimpleFunction>>,
+    interceptions: Mutex<VecDeque<BoxInterception>>,
     system_role: String,
     sensitive_marker: String,
 }
@@ -38,8 +38,8 @@ pub struct NatsukiInner {
 impl NatsukiInner {
     pub fn new(
         assistant_identity: &AppConfigAssistantIdentity,
-        llm: Box<dyn Llm + 'static>,
-        storage: Box<dyn ConversationStorage + 'static>,
+        llm: BoxLlm,
+        storage: BoxConversationStorage,
     ) -> Result<NatsukiInner, ServerError> {
         Ok(NatsukiInner {
             llm,

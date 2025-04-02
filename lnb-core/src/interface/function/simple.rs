@@ -9,6 +9,8 @@ use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+pub type BoxSimpleFunction = Box<dyn SimpleFunction + 'static>;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SimpleFunctionDescriptor {
     pub name: String,

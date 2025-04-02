@@ -7,6 +7,8 @@ use std::fmt::Debug;
 
 use futures::future::BoxFuture;
 
+pub type BoxConversationStorage = Box<dyn ConversationStorage + 'static>;
+
 /// `Conversation` の永続化層の抽象化。
 /// 本当は Repository と Service に分けたりした方がいいんだろうけど、面倒なのでこれで……。
 #[allow(dead_code)]
