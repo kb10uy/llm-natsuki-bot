@@ -22,7 +22,6 @@ use tracing::{debug, info, warn};
 
 const MAX_CONVERSATION_LOOP: usize = 8;
 
-#[derive(Debug)]
 pub struct NatsukiInner {
     llm: BoxLlm,
     storage: BoxConversationStorage,

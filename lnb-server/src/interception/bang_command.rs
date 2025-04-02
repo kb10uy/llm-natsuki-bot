@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
     error::LlmError,
@@ -9,8 +11,11 @@ use lnb_core::{
 };
 use tracing::debug;
 
-#[derive(Debug)]
-pub struct BangCommandInterception {}
+type BoxBangCommand = Box<dyn BangCommand + 'static>;
+
+pub struct BangCommandInterception {
+    commands: HashMap<String, BoxBangCommand>,
+}
 
 impl Interception for BangCommandInterception {
     fn before_llm<'a>(
@@ -24,7 +29,9 @@ impl Interception for BangCommandInterception {
 
 impl BangCommandInterception {
     pub fn new() -> BangCommandInterception {
-        BangCommandInterception {}
+        BangCommandInterception {
+            commands: HashMap::new(),
+        }
     }
 
     async fn execute(
@@ -64,5 +71,15 @@ impl BangCommandInterception {
             text: text.into(),
             ..Default::default()
         })
+    }
+}
+
+pub trait BangCommand: Send + Sync {
+    fn call(&self, rest_text: &str, user_role: UserRole) -> Result<AssistantMessage, LlmError>;
+}
+
+impl<F: Send + Sync + Fn(&str, UserRole) -> Result<AssistantMessage, LlmError>> BangCommand for F {
+    fn call(&self, rest_text: &str, user_role: UserRole) -> Result<AssistantMessage, LlmError> {
+        self(rest_text, user_role)
     }
 }
