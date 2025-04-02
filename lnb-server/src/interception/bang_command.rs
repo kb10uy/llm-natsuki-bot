@@ -9,12 +9,13 @@ use lnb_core::{
         message::{AssistantMessage, UserMessageContent},
     },
 };
+use tokio::sync::RwLock;
 use tracing::debug;
 
 type BoxBangCommand = Box<dyn BangCommand + 'static>;
 
 pub struct BangCommandInterception {
-    commands: HashMap<String, BoxBangCommand>,
+    commands: RwLock<HashMap<String, BoxBangCommand>>,
 }
 
 impl Interception for BangCommandInterception {
@@ -30,14 +31,19 @@ impl Interception for BangCommandInterception {
 impl BangCommandInterception {
     pub fn new() -> BangCommandInterception {
         BangCommandInterception {
-            commands: HashMap::new(),
+            commands: RwLock::new(HashMap::new()),
         }
+    }
+
+    pub async fn register_command(&self, name: impl Into<String>, command: impl Into<BoxBangCommand>) {
+        let mut locked = self.commands.write().await;
+        locked.insert(name.into(), command.into());
     }
 
     async fn execute(
         &self,
         incomplete: &mut IncompleteConversation,
-        _user_role: &UserRole,
+        user_role: &UserRole,
     ) -> Result<InterceptionStatus, LlmError> {
         let user_text = {
             let Some(user_message) = incomplete.last_user() else {
@@ -63,7 +69,13 @@ impl BangCommandInterception {
         };
         debug!("bang command: {command_name} [{rest}]");
 
-        Ok(self.complete_with(format!("unknown command: {command_name}")))
+        let commands = self.commands.read().await;
+        let Some(command) = commands.get(command_name) else {
+            return Ok(self.complete_with(format!("unknown command: {command_name}")));
+        };
+
+        let result_message = command.call(rest, user_role).await?;
+        Ok(InterceptionStatus::Complete(result_message))
     }
 
     fn complete_with(&self, text: impl Into<String>) -> InterceptionStatus {
@@ -75,11 +87,22 @@ impl BangCommandInterception {
 }
 
 pub trait BangCommand: Send + Sync {
-    fn call(&self, rest_text: &str, user_role: UserRole) -> Result<AssistantMessage, LlmError>;
+    fn call<'a>(
+        &'a self,
+        rest_text: &'a str,
+        user_role: &'a UserRole,
+    ) -> BoxFuture<'a, Result<AssistantMessage, LlmError>>;
 }
 
-impl<F: Send + Sync + Fn(&str, UserRole) -> Result<AssistantMessage, LlmError>> BangCommand for F {
-    fn call(&self, rest_text: &str, user_role: UserRole) -> Result<AssistantMessage, LlmError> {
+impl<F> BangCommand for F
+where
+    F: Send + Sync + for<'a> Fn(&'a str, &'a UserRole) -> BoxFuture<'a, Result<AssistantMessage, LlmError>>,
+{
+    fn call<'a>(
+        &'a self,
+        rest_text: &'a str,
+        user_role: &'a UserRole,
+    ) -> BoxFuture<'a, Result<AssistantMessage, LlmError>> {
         self(rest_text, user_role)
     }
 }
