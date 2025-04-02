@@ -3,8 +3,6 @@ use crate::{
     model::{conversation::ConversationAttachment, schema::DescribedSchema},
 };
 
-use std::fmt::Debug;
-
 use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -24,7 +22,7 @@ pub struct SimpleFunctionResponse {
     pub attachments: Vec<ConversationAttachment>,
 }
 
-pub trait SimpleFunction: Send + Sync + Debug {
+pub trait SimpleFunction: Send + Sync {
     /// この `SimpleFunction` のディスクリプタを返す。
     fn get_descriptor(&self) -> SimpleFunctionDescriptor;
 

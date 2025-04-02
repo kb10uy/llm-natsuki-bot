@@ -6,14 +6,12 @@ use crate::{
     },
 };
 
-use std::fmt::Debug;
-
 use futures::future::BoxFuture;
 
 pub type BoxInterception = Box<dyn Interception + 'static>;
 
 /// Llm に渡す前に処理を挟む。
-pub trait Interception: Send + Sync + Debug {
+pub trait Interception: Send + Sync {
     fn before_llm<'a>(
         &'a self,
         incomplete: &'a mut IncompleteConversation,

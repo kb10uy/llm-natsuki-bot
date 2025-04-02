@@ -17,7 +17,7 @@ use lnb_core::{
     },
 };
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Natsuki(Arc<NatsukiInner>);
 
 impl Natsuki {
