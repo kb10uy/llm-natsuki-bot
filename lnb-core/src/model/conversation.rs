@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use crate::model::message::{AssistantMessage, Message, UserMessage};
 
 use serde::{Deserialize, Serialize};
@@ -144,4 +146,17 @@ impl ConversationUpdate {
 #[derive(Debug, Clone)]
 pub enum ConversationAttachment {
     Image { url: Url, description: Option<String> },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum UserRole {
+    Privileged,
+    Scoped(BTreeSet<String>),
+    Normal,
+}
+
+impl UserRole {
+    pub fn scoped_with(scopes: impl IntoIterator<Item = impl Into<String>>) -> UserRole {
+        UserRole::Scoped(scopes.into_iter().map(|s| s.into()).collect())
+    }
 }
