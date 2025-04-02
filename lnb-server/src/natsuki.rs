@@ -8,7 +8,7 @@ use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
     error::ServerError,
     interface::{
-        function::simple::BoxSimpleFunction, interception::BoxInterception, llm::BoxLlm, server::LnbServer,
+        Context, function::simple::BoxSimpleFunction, interception::BoxInterception, llm::BoxLlm, server::LnbServer,
         storage::BoxConversationStorage,
     },
     model::{
@@ -61,13 +61,14 @@ impl LnbServer for Natsuki {
 
     fn process_conversation(
         &self,
+        context: Context,
         conversation_id: ConversationId,
         user_message: UserMessage,
         user_role: UserRole,
     ) -> BoxFuture<'_, Result<ConversationUpdate, ServerError>> {
         async move {
             self.0
-                .process_conversation(conversation_id, user_message, user_role)
+                .process_conversation(context, conversation_id, user_message, user_role)
                 .await
         }
         .boxed()

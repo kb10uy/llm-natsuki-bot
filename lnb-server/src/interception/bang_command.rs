@@ -3,7 +3,10 @@ use std::collections::HashMap;
 use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
     error::LlmError,
-    interface::interception::{Interception, InterceptionStatus},
+    interface::{
+        Context,
+        interception::{Interception, InterceptionStatus},
+    },
     model::{
         conversation::{IncompleteConversation, UserRole},
         message::{AssistantMessage, UserMessageContent},
@@ -21,10 +24,11 @@ pub struct BangCommandInterception {
 impl Interception for BangCommandInterception {
     fn before_llm<'a>(
         &'a self,
+        context: &'a Context,
         incomplete: &'a mut IncompleteConversation,
         user_role: &'a UserRole,
     ) -> BoxFuture<'a, Result<InterceptionStatus, LlmError>> {
-        async move { self.execute(incomplete, user_role).await }.boxed()
+        async move { self.execute(context, incomplete, user_role).await }.boxed()
     }
 }
 
@@ -42,6 +46,7 @@ impl BangCommandInterception {
 
     async fn execute(
         &self,
+        context: &Context,
         incomplete: &mut IncompleteConversation,
         user_role: &UserRole,
     ) -> Result<InterceptionStatus, LlmError> {
@@ -74,7 +79,7 @@ impl BangCommandInterception {
             return Ok(self.complete_with(format!("unknown command: {command_name}")));
         };
 
-        let result_message = command.call(rest, user_role).await?;
+        let result_message = command.call(context, rest, user_role).await?;
         Ok(InterceptionStatus::Complete(result_message))
     }
 
@@ -89,6 +94,7 @@ impl BangCommandInterception {
 pub trait BangCommand: Send + Sync {
     fn call<'a>(
         &'a self,
+        context: &'a Context,
         rest_text: &'a str,
         user_role: &'a UserRole,
     ) -> BoxFuture<'a, Result<AssistantMessage, LlmError>>;
@@ -96,13 +102,16 @@ pub trait BangCommand: Send + Sync {
 
 impl<F> BangCommand for F
 where
-    F: Send + Sync + for<'a> Fn(&'a str, &'a UserRole) -> BoxFuture<'a, Result<AssistantMessage, LlmError>>,
+    F: Send
+        + Sync
+        + for<'a> Fn(&'a Context, &'a str, &'a UserRole) -> BoxFuture<'a, Result<AssistantMessage, LlmError>>,
 {
     fn call<'a>(
         &'a self,
+        context: &'a Context,
         rest_text: &'a str,
         user_role: &'a UserRole,
     ) -> BoxFuture<'a, Result<AssistantMessage, LlmError>> {
-        self(rest_text, user_role)
+        self(context, rest_text, user_role)
     }
 }

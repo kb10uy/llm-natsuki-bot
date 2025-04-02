@@ -13,7 +13,7 @@ use std::{
 // TODO: Serialize/Deserialize にしないと RPC 化に対応できない
 #[derive(Debug)]
 pub struct Context {
-    values: HashMap<TypeId, Box<dyn Any>>,
+    values: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
 }
 
 impl Context {
@@ -21,11 +21,11 @@ impl Context {
         Context { values: HashMap::new() }
     }
 
-    pub fn set<T: Any>(&mut self, value: T) {
+    pub fn set<T: Any + Send + Sync>(&mut self, value: T) {
         self.values.insert(TypeId::of::<T>(), Box::new(value));
     }
 
-    pub fn get<T: Any>(&self) -> Option<&T> {
+    pub fn get<T: Any + Send + Sync>(&self) -> Option<&T> {
         self.values.get(&TypeId::of::<T>()).and_then(|v| v.downcast_ref())
     }
 }

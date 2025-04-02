@@ -2,6 +2,7 @@ use futures::future::BoxFuture;
 
 use crate::{
     error::ServerError,
+    interface::Context,
     model::{
         conversation::{ConversationId, ConversationUpdate, UserRole},
         message::UserMessage,
@@ -28,6 +29,7 @@ pub trait LnbServer: Send + Sync + 'static {
 
     fn process_conversation(
         &self,
+        context: Context,
         conversation_id: ConversationId,
         user_message: UserMessage,
         user_role: UserRole,

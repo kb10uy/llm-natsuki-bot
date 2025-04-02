@@ -5,6 +5,7 @@ use std::{collections::HashMap, iter::once};
 use lnb_core::{
     error::ServerError,
     interface::{
+        Context,
         function::simple::BoxSimpleFunction,
         interception::{BoxInterception, InterceptionStatus},
         llm::{BoxLlm, LlmUpdate},
@@ -63,6 +64,7 @@ impl NatsukiInner {
 
     pub async fn process_conversation(
         &self,
+        context: Context,
         conversation_id: ConversationId,
         user_message: UserMessage,
         user_role: UserRole,
@@ -79,7 +81,7 @@ impl NatsukiInner {
         let interceptions = self.interceptions.read().await;
         for interception in interceptions.iter().rev() {
             let status = interception
-                .before_llm(&mut incomplete_conversation, &user_role)
+                .before_llm(&context, &mut incomplete_conversation, &user_role)
                 .await?;
             match status {
                 InterceptionStatus::Continue => continue,
