@@ -2,16 +2,14 @@ use crate::{error::LlmError, model::conversation::IncompleteConversation};
 
 use std::fmt::Debug;
 
-use futures::{FutureExt, future::BoxFuture};
+use futures::future::BoxFuture;
 
 /// Llm に渡す前に処理を挟む。
 pub trait Interception: Send + Sync + Debug {
     fn before_llm<'a>(
         &'a self,
-        _incomplete: &'a mut IncompleteConversation,
-    ) -> BoxFuture<'a, Result<InterceptionStatus, LlmError>> {
-        async { Ok(InterceptionStatus::Continue) }.boxed()
-    }
+        incomplete: &'a mut IncompleteConversation,
+    ) -> BoxFuture<'a, Result<InterceptionStatus, LlmError>>;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
