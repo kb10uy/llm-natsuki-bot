@@ -31,3 +31,9 @@ pub trait SimpleFunction: Send + Sync + Debug {
     /// Function を実行する。
     fn call<'a>(&'a self, id: &str, params: Value) -> BoxFuture<'a, Result<SimpleFunctionResponse, FunctionError>>;
 }
+
+impl<T: SimpleFunction + 'static> From<T> for BoxSimpleFunction {
+    fn from(value: T) -> BoxSimpleFunction {
+        Box::new(value)
+    }
+}

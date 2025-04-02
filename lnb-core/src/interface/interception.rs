@@ -17,7 +17,7 @@ pub trait Interception: Send + Sync + Debug {
     fn before_llm<'a>(
         &'a self,
         incomplete: &'a mut IncompleteConversation,
-        user_role: &UserRole,
+        user_role: &'a UserRole,
     ) -> BoxFuture<'a, Result<InterceptionStatus, LlmError>>;
 }
 
@@ -31,4 +31,10 @@ pub enum InterceptionStatus {
 
     /// 処理を中断する。
     Abort,
+}
+
+impl<T: Interception + 'static> From<T> for BoxInterception {
+    fn from(value: T) -> BoxInterception {
+        Box::new(value)
+    }
 }

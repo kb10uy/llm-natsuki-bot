@@ -5,7 +5,7 @@ use std::{collections::HashMap, iter::once};
 use lnb_core::{
     error::ServerError,
     interface::{
-        function::simple::{BoxSimpleFunction, SimpleFunction},
+        function::simple::BoxSimpleFunction,
         interception::{BoxInterception, InterceptionStatus},
         llm::{BoxLlm, LlmUpdate},
         storage::BoxConversationStorage,
@@ -49,11 +49,11 @@ impl NatsukiInner {
     }
 
     /// `SimpleFunction` を登録する。
-    pub async fn add_simple_function(&self, simple_function: impl SimpleFunction + 'static) {
+    pub async fn add_simple_function(&self, simple_function: BoxSimpleFunction) {
         let descriptor = simple_function.get_descriptor();
 
         let mut locked = self.simple_functions.write().await;
-        locked.insert(descriptor.name.clone(), Box::new(simple_function));
+        locked.insert(descriptor.name.clone(), simple_function);
         self.llm.add_simple_function(descriptor).await;
     }
 

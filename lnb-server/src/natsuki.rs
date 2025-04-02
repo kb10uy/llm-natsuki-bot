@@ -8,7 +8,7 @@ use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
     error::ServerError,
     interface::{
-        function::simple::SimpleFunction, interception::BoxInterception, llm::BoxLlm, server::LnbServer,
+        function::simple::BoxSimpleFunction, interception::BoxInterception, llm::BoxLlm, server::LnbServer,
         storage::BoxConversationStorage,
     },
     model::{
@@ -30,8 +30,8 @@ impl Natsuki {
         Ok(Natsuki(Arc::new(inner)))
     }
 
-    pub async fn add_simple_function(&self, simple_function: impl SimpleFunction + 'static) {
-        self.0.add_simple_function(simple_function).await;
+    pub async fn add_simple_function(&self, simple_function: impl Into<BoxSimpleFunction>) {
+        self.0.add_simple_function(simple_function.into()).await;
     }
 
     pub async fn apply_interception(&self, interception: impl Into<BoxInterception>) {

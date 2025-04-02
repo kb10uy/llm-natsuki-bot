@@ -1,6 +1,7 @@
 mod cli;
 mod config;
 mod function;
+mod interception;
 mod llm;
 mod natsuki;
 mod storage;
@@ -8,6 +9,7 @@ mod storage;
 use crate::{
     config::AppConfig,
     function::{ConfigurableFunction, ExchangeRate, GetIllustUrl, ImageGenerator, LocalInfo, SelfInfo},
+    interception::BangCommandInterception,
     llm::initialize_llm,
     natsuki::Natsuki,
     storage::initialize_storage,
@@ -33,6 +35,7 @@ async fn main() -> Result<()> {
 
     let natsuki = initialize_natsuki(&config).await?;
     register_simple_functions(&config.tool, &natsuki).await?;
+    register_interceptions(&natsuki).await?;
 
     let mut client_tasks = vec![];
 
@@ -83,6 +86,11 @@ async fn register_simple_functions(tool_config: &AppConfigTool, natsuki: &Natsuk
     register_simple_function_config::<GetIllustUrl>(&tool_config.get_illust_url, natsuki).await?;
     register_simple_function_config::<ExchangeRate>(&tool_config.exchange_rate, natsuki).await?;
 
+    Ok(())
+}
+
+async fn register_interceptions(natsuki: &Natsuki) -> Result<()> {
+    natsuki.apply_interception(BangCommandInterception::new()).await;
     Ok(())
 }
 
