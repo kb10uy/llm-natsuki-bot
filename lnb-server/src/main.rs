@@ -76,18 +76,18 @@ async fn register_simple_functions(tool_config: &AppConfigTool, natsuki: &Natsuk
     natsuki.add_simple_function(SelfInfo::new()).await;
     natsuki.add_simple_function(LocalInfo::new()?).await;
 
-    register_simple_function_config::<ImageGenerator>(tool_config.image_generator.as_ref(), natsuki).await?;
-    register_simple_function_config::<GetIllustUrl>(tool_config.get_illust_url.as_ref(), natsuki).await?;
-    register_simple_function_config::<ExchangeRate>(tool_config.exchange_rate.as_ref(), natsuki).await?;
+    register_simple_function_config::<ImageGenerator>(&tool_config.image_generator, natsuki).await?;
+    register_simple_function_config::<GetIllustUrl>(&tool_config.get_illust_url, natsuki).await?;
+    register_simple_function_config::<ExchangeRate>(&tool_config.exchange_rate, natsuki).await?;
 
     Ok(())
 }
 
-async fn register_simple_function_config<F>(config: Option<&F::Configuration>, natsuki: &Natsuki) -> Result<()>
+async fn register_simple_function_config<F>(config: &Option<F::Configuration>, natsuki: &Natsuki) -> Result<()>
 where
     F: SimpleFunction + ConfigurableFunction + 'static,
 {
-    let Some(config) = config else {
+    let Some(config) = config.as_ref() else {
         return Ok(());
     };
 
