@@ -1,6 +1,9 @@
 use crate::{
     error::LlmError,
-    model::{conversation::IncompleteConversation, message::AssistantMessage},
+    model::{
+        conversation::{IncompleteConversation, UserRole},
+        message::AssistantMessage,
+    },
 };
 
 use std::fmt::Debug;
@@ -14,6 +17,7 @@ pub trait Interception: Send + Sync + Debug {
     fn before_llm<'a>(
         &'a self,
         incomplete: &'a mut IncompleteConversation,
+        user_role: &UserRole,
     ) -> BoxFuture<'a, Result<InterceptionStatus, LlmError>>;
 }
 

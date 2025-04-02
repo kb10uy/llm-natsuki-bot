@@ -12,7 +12,7 @@ use lnb_core::{
     },
     model::{
         conversation::{
-            Conversation, ConversationAttachment, ConversationId, ConversationUpdate, IncompleteConversation,
+            Conversation, ConversationAttachment, ConversationId, ConversationUpdate, IncompleteConversation, UserRole,
         },
         message::{AssistantMessage, FunctionResponseMessage, Message, MessageToolCalling, UserMessage},
     },
@@ -66,6 +66,7 @@ impl NatsukiInner {
         &self,
         conversation_id: ConversationId,
         user_message: UserMessage,
+        user_role: UserRole,
     ) -> Result<ConversationUpdate, ServerError> {
         let conversation = self
             .storage
@@ -78,7 +79,10 @@ impl NatsukiInner {
         // 後から追加した方が前のものを "wrap" する (axum などと同じ)ので逆順
         let interceptions = self.interceptions.read().await;
         for interception in interceptions.iter().rev() {
-            match interception.before_llm(&mut incomplete_conversation).await? {
+            let status = interception
+                .before_llm(&mut incomplete_conversation, &user_role)
+                .await?;
+            match status {
                 InterceptionStatus::Complete(message) => return Ok(incomplete_conversation.finish(message)),
                 InterceptionStatus::Abort => return Err(ServerError::ConversationAborted),
                 InterceptionStatus::Continue => continue,
