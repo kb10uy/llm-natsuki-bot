@@ -1,15 +1,12 @@
 use crate::config::AppConfigAssistantIdentity;
 
-use std::{
-    collections::{HashMap, VecDeque},
-    iter::once,
-};
+use std::{collections::HashMap, iter::once};
 
 use lnb_core::{
     error::ServerError,
     interface::{
         function::simple::{BoxSimpleFunction, SimpleFunction},
-        interception::BoxInterception,
+        interception::{BoxInterception, InterceptionStatus},
         llm::{BoxLlm, LlmUpdate},
         storage::BoxConversationStorage,
     },
@@ -30,7 +27,7 @@ pub struct NatsukiInner {
     llm: BoxLlm,
     storage: BoxConversationStorage,
     simple_functions: Mutex<HashMap<String, BoxSimpleFunction>>,
-    interceptions: Mutex<VecDeque<BoxInterception>>,
+    interceptions: Mutex<Vec<BoxInterception>>,
     system_role: String,
     sensitive_marker: String,
 }
@@ -45,7 +42,7 @@ impl NatsukiInner {
             llm,
             storage,
             simple_functions: Mutex::new(HashMap::new()),
-            interceptions: Mutex::new(VecDeque::new()),
+            interceptions: Mutex::new(Vec::new()),
             system_role: assistant_identity.system_role.clone(),
             sensitive_marker: assistant_identity.sensitive_marker.clone(),
         })
@@ -60,6 +57,11 @@ impl NatsukiInner {
         self.llm.add_simple_function(descriptor).await;
     }
 
+    pub async fn apply_interception(&self, interception: BoxInterception) {
+        let mut locked = self.interceptions.lock().await;
+        locked.push(interception);
+    }
+
     pub async fn process_conversation(
         &self,
         conversation_id: ConversationId,
@@ -72,7 +74,18 @@ impl NatsukiInner {
             .ok_or_else(|| ServerError::ConversationNotFound(conversation_id))?;
         let mut incomplete_conversation = IncompleteConversation::start(conversation, user_message);
 
-        let mut attachments = vec![];
+        // interception updates
+        // 後から追加した方が前のものを "wrap" する (axum などと同じ)ので逆順
+        let interceptions = self.interceptions.lock().await;
+        for interception in interceptions.iter().rev() {
+            match interception.before_llm(&mut incomplete_conversation).await? {
+                InterceptionStatus::Complete(message) => return Ok(incomplete_conversation.finish(message)),
+                InterceptionStatus::Abort => return Err(ServerError::ConversationAborted),
+                InterceptionStatus::Continue => continue,
+            }
+        }
+
+        // LLM updates
         let mut sent_count = 0;
         loop {
             // 超過したらエラー
@@ -88,14 +101,11 @@ impl NatsukiInner {
                 LlmUpdate::Finished(finished) => {
                     debug!("conversation finished");
                     let (text, is_sensitive) = self.strip_sensitive_text(finished.text, finished.sensitive);
-                    return Ok(incomplete_conversation.finish(
-                        AssistantMessage {
-                            text,
-                            is_sensitive,
-                            language: finished.language,
-                        },
-                        attachments,
-                    ));
+                    return Ok(incomplete_conversation.finish(AssistantMessage {
+                        text,
+                        is_sensitive,
+                        language: finished.language,
+                    }));
                 }
 
                 // 続行
@@ -116,21 +126,18 @@ impl NatsukiInner {
                     let (response_messages, called_attachments) = self.process_tool_callings(tool_callings).await?;
 
                     let extending_messages = once(call_message).chain(response_messages.into_iter().map(|m| m.into()));
-                    incomplete_conversation.extend_message(extending_messages);
-                    attachments.extend(called_attachments);
+                    incomplete_conversation.extend_messages(extending_messages);
+                    incomplete_conversation.extend_attachments(called_attachments);
                 }
 
                 // 強制終了
                 LlmUpdate::Filtered => {
                     debug!("conversation filtered");
-                    return Ok(incomplete_conversation.finish(
-                        AssistantMessage {
-                            text: "(filtered)".to_string(),
-                            is_sensitive: true,
-                            language: None,
-                        },
-                        attachments,
-                    ));
+                    return Ok(incomplete_conversation.finish(AssistantMessage {
+                        text: "(filtered)".to_string(),
+                        is_sensitive: true,
+                        language: None,
+                    }));
                 }
             }
         }

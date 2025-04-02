@@ -1,4 +1,7 @@
-use crate::{error::LlmError, model::conversation::IncompleteConversation};
+use crate::{
+    error::LlmError,
+    model::{conversation::IncompleteConversation, message::AssistantMessage},
+};
 
 use std::fmt::Debug;
 
@@ -14,13 +17,13 @@ pub trait Interception: Send + Sync + Debug {
     ) -> BoxFuture<'a, Result<InterceptionStatus, LlmError>>;
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InterceptionStatus {
     /// 処理を続行する(後続の `Llm::send_conversation` が実行される)。
     Continue,
 
     /// 処理を完了する(後続の `Llm::send_conversation` は実行されずすぐに `ConversationUpdate` が構築される)。
-    Complete,
+    Complete(AssistantMessage),
 
     /// 処理を中断する。
     Abort,

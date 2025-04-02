@@ -41,6 +41,7 @@ impl Conversation {
 pub struct IncompleteConversation {
     base: Conversation,
     pushed_messages: Vec<Message>,
+    attachments: Vec<ConversationAttachment>,
 }
 
 impl IncompleteConversation {
@@ -49,6 +50,7 @@ impl IncompleteConversation {
         IncompleteConversation {
             base: conversation,
             pushed_messages,
+            attachments: vec![],
         }
     }
 
@@ -56,8 +58,12 @@ impl IncompleteConversation {
         self.base.messages.iter().chain(self.pushed_messages.iter())
     }
 
-    pub fn extend_message(&mut self, messages: impl IntoIterator<Item = Message>) {
+    pub fn extend_messages(&mut self, messages: impl IntoIterator<Item = Message>) {
         self.pushed_messages.extend(messages);
+    }
+
+    pub fn extend_attachments(&mut self, attachments: impl IntoIterator<Item = ConversationAttachment>) {
+        self.attachments.extend(attachments);
     }
 
     /// 最後の `AssistantMessage` に指定された `AssistantMessage` の内容を追加する。
@@ -76,11 +82,7 @@ impl IncompleteConversation {
 
     /// 最後の `AssistantMessage` に指定された `AssistantMessage` の内容を追加してそれを合計の `AssistantMessage` とする。
     /// 最後が `AssistantMessage` でなければ受け取ったものをそのまま適用する。
-    pub fn finish(
-        mut self,
-        finished_response: AssistantMessage,
-        attachments: Vec<ConversationAttachment>,
-    ) -> ConversationUpdate {
+    pub fn finish(mut self, finished_response: AssistantMessage) -> ConversationUpdate {
         let assistant_response = match self.pushed_messages.pop() {
             // Cut ありで完了
             Some(Message::Assistant(mut last_assistant)) => {
@@ -106,7 +108,7 @@ impl IncompleteConversation {
             base_conversation_id: self.base.id,
             intermediate_messages: self.pushed_messages,
             assistant_response,
-            attachments,
+            attachments: self.attachments,
         }
     }
 }
