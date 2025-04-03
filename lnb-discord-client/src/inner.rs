@@ -6,7 +6,7 @@ use crate::{
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use lnb_core::{
     error::ClientError,
-    interface::{server::LnbServer, Context as LnbContext},
+    interface::{Context as LnbContext, server::LnbServer},
     model::{
         conversation::UserRole,
         message::{UserMessage, UserMessageContent},
