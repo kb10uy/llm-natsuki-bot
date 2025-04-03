@@ -32,7 +32,7 @@ use lnb_core::{
         message::{Message, MessageToolCalling, UserMessageContent},
     },
 };
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 
 /// OpenAI Chat Completion API を利用したバックエンド。
 #[derive(Debug, Clone)]
@@ -45,7 +45,7 @@ impl ChatCompletionBackend {
 
         Ok(ChatCompletionBackend(Arc::new(ChatCompletionBackendInner {
             client,
-            tools: Mutex::new(vec![]),
+            tools: RwLock::new(Vec::new()),
             model,
             max_token: config.max_token,
             structured_mode: config.use_structured_output,
@@ -70,7 +70,7 @@ impl Llm for ChatCompletionBackend {
 #[derive(Debug)]
 struct ChatCompletionBackendInner {
     client: Client<OpenAIConfig>,
-    tools: Mutex<Vec<ChatCompletionTool>>,
+    tools: RwLock<Vec<ChatCompletionTool>>,
     model: String,
     max_token: usize,
     structured_mode: bool,
@@ -88,7 +88,7 @@ impl ChatCompletionBackendInner {
             ..Default::default()
         };
 
-        let mut locked = self.tools.lock().await;
+        let mut locked = self.tools.write().await;
         locked.push(tool);
     }
 
@@ -107,7 +107,7 @@ impl ChatCompletionBackendInner {
     ) -> Result<LlmUpdate, LlmError> {
         let request = CreateChatCompletionRequest {
             messages,
-            tools: Some(self.tools.lock().await.clone()),
+            tools: Some(self.tools.read().await.clone()),
             model: self.model.clone(),
             max_completion_tokens: Some(self.max_token as u32),
             ..Default::default()
@@ -127,7 +127,7 @@ impl ChatCompletionBackendInner {
     ) -> Result<LlmUpdate, LlmError> {
         let request = CreateChatCompletionRequest {
             messages,
-            tools: Some(self.tools.lock().await.clone()),
+            tools: Some(self.tools.read().await.clone()),
             model: self.model.clone(),
             response_format: Some(ResponseFormat::JsonSchema {
                 json_schema: RESPONSE_JSON_SCHEMA.clone(),

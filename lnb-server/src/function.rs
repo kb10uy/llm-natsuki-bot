@@ -4,11 +4,11 @@ mod image_generator;
 mod local_info;
 mod self_info;
 
-pub use self::exchange_rate::ExchangeRate;
-pub use self::get_illust_url::GetIllustUrl;
-pub use self::image_generator::ImageGenerator;
-pub use self::local_info::LocalInfo;
-pub use self::self_info::SelfInfo;
+pub use exchange_rate::ExchangeRate;
+pub use get_illust_url::GetIllustUrl;
+pub use image_generator::ImageGenerator;
+pub use local_info::LocalInfo;
+pub use self_info::SelfInfo;
 
 use lnb_core::error::FunctionError;
 

@@ -8,7 +8,7 @@ use std::{collections::HashMap, sync::LazyLock};
 
 use lnb_core::{
     error::LlmError,
-    interface::llm::Llm,
+    interface::llm::BoxLlm,
     model::schema::{DescribedSchema, DescribedSchemaType},
 };
 use serde_json::{Value, json};
@@ -29,7 +29,7 @@ pub static ASSISTANT_RESPONSE_SCHEMA: LazyLock<DescribedSchema> = LazyLock::new(
     )
 });
 
-pub async fn initialize_llm(config: &AppConfigLlm) -> Result<(Box<dyn Llm + 'static>, &'static str), LlmError> {
+pub async fn initialize_llm(config: &AppConfigLlm) -> Result<(BoxLlm, &'static str), LlmError> {
     match config.backend {
         AppConfigLlmBackend::Openai => match config.openai.api {
             AppConfigLlmOpenaiApi::ChatCompletion => Ok((

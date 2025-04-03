@@ -4,13 +4,12 @@ use crate::{
     model::{conversation::IncompleteConversation, message::MessageToolCalling},
 };
 
-use std::fmt::Debug;
-
 use futures::future::BoxFuture;
 use serde::Deserialize;
 
-#[allow(dead_code)]
-pub trait Llm: Send + Sync + Debug {
+pub type BoxLlm = Box<dyn Llm + 'static>;
+
+pub trait Llm: Send + Sync {
     /// `SimpleFunction` の追加を告知する。
     fn add_simple_function(&self, descriptor: SimpleFunctionDescriptor) -> BoxFuture<'_, ()>;
 
@@ -35,4 +34,10 @@ pub struct LlmAssistantResponse {
     pub text: String,
     pub language: Option<String>,
     pub sensitive: Option<bool>,
+}
+
+impl<T: Llm + 'static> From<T> for BoxLlm {
+    fn from(value: T) -> BoxLlm {
+        Box::new(value)
+    }
 }

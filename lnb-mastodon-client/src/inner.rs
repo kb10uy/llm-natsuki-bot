@@ -9,9 +9,9 @@ use futures::prelude::*;
 use lnb_core::{
     APP_USER_AGENT,
     error::ClientError,
-    interface::server::LnbServer,
+    interface::{Context, server::LnbServer},
     model::{
-        conversation::ConversationAttachment,
+        conversation::{ConversationAttachment, UserRole},
         message::{UserMessage, UserMessageContent},
     },
 };
@@ -153,7 +153,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         };
         let conversation_update = self
             .assistant
-            .process_conversation(conversation_id, user_message)
+            .process_conversation(Context::default(), conversation_id, user_message, UserRole::Normal)
             .await?;
         let assistant_message = conversation_update.assistant_response();
         let attachments = conversation_update.attachments();

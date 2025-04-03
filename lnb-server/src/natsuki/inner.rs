@@ -5,27 +5,29 @@ use std::{collections::HashMap, iter::once};
 use lnb_core::{
     error::ServerError,
     interface::{
-        function::simple::SimpleFunction,
-        llm::{Llm, LlmUpdate},
-        storage::ConversationStorage,
+        Context,
+        function::simple::BoxSimpleFunction,
+        interception::{BoxInterception, InterceptionStatus},
+        llm::{BoxLlm, LlmUpdate},
+        storage::BoxConversationStorage,
     },
     model::{
         conversation::{
-            Conversation, ConversationAttachment, ConversationId, ConversationUpdate, IncompleteConversation,
+            Conversation, ConversationAttachment, ConversationId, ConversationUpdate, IncompleteConversation, UserRole,
         },
         message::{AssistantMessage, FunctionResponseMessage, Message, MessageToolCalling, UserMessage},
     },
 };
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 const MAX_CONVERSATION_LOOP: usize = 8;
 
-#[derive(Debug)]
 pub struct NatsukiInner {
-    llm: Box<dyn Llm + 'static>,
-    storage: Box<dyn ConversationStorage + 'static>,
-    simple_functions: Mutex<HashMap<String, Box<dyn SimpleFunction + 'static>>>,
+    llm: BoxLlm,
+    storage: BoxConversationStorage,
+    simple_functions: RwLock<HashMap<String, BoxSimpleFunction>>,
+    interceptions: RwLock<Vec<BoxInterception>>,
     system_role: String,
     sensitive_marker: String,
 }
@@ -33,31 +35,39 @@ pub struct NatsukiInner {
 impl NatsukiInner {
     pub fn new(
         assistant_identity: &AppConfigAssistantIdentity,
-        llm: Box<dyn Llm + 'static>,
-        storage: Box<dyn ConversationStorage + 'static>,
+        llm: BoxLlm,
+        storage: BoxConversationStorage,
     ) -> Result<NatsukiInner, ServerError> {
         Ok(NatsukiInner {
             llm,
             storage,
-            simple_functions: Mutex::new(HashMap::new()),
+            simple_functions: RwLock::new(HashMap::new()),
+            interceptions: RwLock::new(Vec::new()),
             system_role: assistant_identity.system_role.clone(),
             sensitive_marker: assistant_identity.sensitive_marker.clone(),
         })
     }
 
     /// `SimpleFunction` を登録する。
-    pub async fn add_simple_function(&self, simple_function: impl SimpleFunction + 'static) {
+    pub async fn add_simple_function(&self, simple_function: BoxSimpleFunction) {
         let descriptor = simple_function.get_descriptor();
 
-        let mut locked = self.simple_functions.lock().await;
-        locked.insert(descriptor.name.clone(), Box::new(simple_function));
+        let mut locked = self.simple_functions.write().await;
+        locked.insert(descriptor.name.clone(), simple_function);
         self.llm.add_simple_function(descriptor).await;
+    }
+
+    pub async fn apply_interception(&self, interception: BoxInterception) {
+        let mut locked = self.interceptions.write().await;
+        locked.push(interception);
     }
 
     pub async fn process_conversation(
         &self,
+        context: Context,
         conversation_id: ConversationId,
         user_message: UserMessage,
+        user_role: UserRole,
     ) -> Result<ConversationUpdate, ServerError> {
         let conversation = self
             .storage
@@ -66,7 +76,27 @@ impl NatsukiInner {
             .ok_or_else(|| ServerError::ConversationNotFound(conversation_id))?;
         let mut incomplete_conversation = IncompleteConversation::start(conversation, user_message);
 
-        let mut attachments = vec![];
+        // interception updates
+        // 後から追加した方が前のものを "wrap" する (axum などと同じ)ので逆順
+        let interceptions = self.interceptions.read().await;
+        for interception in interceptions.iter().rev() {
+            let status = interception
+                .before_llm(&context, &mut incomplete_conversation, &user_role)
+                .await?;
+            match status {
+                InterceptionStatus::Continue => continue,
+                InterceptionStatus::Complete(message) => {
+                    debug!("interceptor reported conversation completion");
+                    return Ok(incomplete_conversation.finish(message));
+                }
+                InterceptionStatus::Abort => {
+                    debug!("interceptor reported conversation abortion");
+                    return Err(ServerError::ConversationAborted);
+                }
+            }
+        }
+
+        // LLM updates
         let mut sent_count = 0;
         loop {
             // 超過したらエラー
@@ -82,14 +112,11 @@ impl NatsukiInner {
                 LlmUpdate::Finished(finished) => {
                     debug!("conversation finished");
                     let (text, is_sensitive) = self.strip_sensitive_text(finished.text, finished.sensitive);
-                    return Ok(incomplete_conversation.finish(
-                        AssistantMessage {
-                            text,
-                            is_sensitive,
-                            language: finished.language,
-                        },
-                        attachments,
-                    ));
+                    return Ok(incomplete_conversation.finish(AssistantMessage {
+                        text,
+                        is_sensitive,
+                        language: finished.language,
+                    }));
                 }
 
                 // 続行
@@ -110,21 +137,18 @@ impl NatsukiInner {
                     let (response_messages, called_attachments) = self.process_tool_callings(tool_callings).await?;
 
                     let extending_messages = once(call_message).chain(response_messages.into_iter().map(|m| m.into()));
-                    incomplete_conversation.extend_message(extending_messages);
-                    attachments.extend(called_attachments);
+                    incomplete_conversation.extend_messages(extending_messages);
+                    incomplete_conversation.extend_attachments(called_attachments);
                 }
 
                 // 強制終了
                 LlmUpdate::Filtered => {
                     debug!("conversation filtered");
-                    return Ok(incomplete_conversation.finish(
-                        AssistantMessage {
-                            text: "(filtered)".to_string(),
-                            is_sensitive: true,
-                            language: None,
-                        },
-                        attachments,
-                    ));
+                    return Ok(incomplete_conversation.finish(AssistantMessage {
+                        text: "(filtered)".to_string(),
+                        is_sensitive: true,
+                        language: None,
+                    }));
                 }
             }
         }
@@ -145,7 +169,7 @@ impl NatsukiInner {
         &self,
         tool_callings: Vec<MessageToolCalling>,
     ) -> Result<(Vec<FunctionResponseMessage>, Vec<ConversationAttachment>), ServerError> {
-        let locked = self.simple_functions.lock().await;
+        let locked = self.simple_functions.read().await;
 
         let mut responses = vec![];
         let mut attachments = vec![];

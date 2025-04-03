@@ -51,6 +51,10 @@ pub enum ServerError {
     /// finished になるまでに API 回数の呼出し上限を超えた。
     #[error("too much conversation updates found")]
     TooMuchConversationCall,
+
+    /// Interception によって中断された。
+    #[error("interception reported abortion before LLM calls")]
+    ConversationAborted,
 }
 
 /// LLM 層のエラー。

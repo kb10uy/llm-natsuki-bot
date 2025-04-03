@@ -17,7 +17,6 @@ pub struct DescribedSchema {
     pub field_type: DescribedSchemaType,
 }
 
-#[allow(dead_code)]
 impl DescribedSchema {
     pub fn integer(name: impl Into<String>, description: impl Into<String>) -> DescribedSchema {
         DescribedSchema {

@@ -7,28 +7,35 @@ use std::sync::Arc;
 use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
     error::ServerError,
-    interface::{function::simple::SimpleFunction, llm::Llm, server::LnbServer, storage::ConversationStorage},
+    interface::{
+        Context, function::simple::BoxSimpleFunction, interception::BoxInterception, llm::BoxLlm, server::LnbServer,
+        storage::BoxConversationStorage,
+    },
     model::{
-        conversation::{ConversationId, ConversationUpdate},
+        conversation::{ConversationId, ConversationUpdate, UserRole},
         message::UserMessage,
     },
 };
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Natsuki(Arc<NatsukiInner>);
 
 impl Natsuki {
     pub async fn new(
         assistant_identity: &AppConfigAssistantIdentity,
-        llm: Box<dyn Llm + 'static>,
-        storage: Box<dyn ConversationStorage + 'static>,
+        llm: impl Into<BoxLlm>,
+        storage: impl Into<BoxConversationStorage>,
     ) -> Result<Natsuki, ServerError> {
-        let inner = NatsukiInner::new(assistant_identity, llm, storage)?;
+        let inner = NatsukiInner::new(assistant_identity, llm.into(), storage.into())?;
         Ok(Natsuki(Arc::new(inner)))
     }
 
-    pub async fn add_simple_function(&self, simple_function: impl SimpleFunction + 'static) {
-        self.0.add_simple_function(simple_function).await;
+    pub async fn add_simple_function(&self, simple_function: impl Into<BoxSimpleFunction>) {
+        self.0.add_simple_function(simple_function.into()).await;
+    }
+
+    pub async fn apply_interception(&self, interception: impl Into<BoxInterception>) {
+        self.0.apply_interception(interception.into()).await;
     }
 }
 
@@ -54,9 +61,16 @@ impl LnbServer for Natsuki {
 
     fn process_conversation(
         &self,
+        context: Context,
         conversation_id: ConversationId,
         user_message: UserMessage,
+        user_role: UserRole,
     ) -> BoxFuture<'_, Result<ConversationUpdate, ServerError>> {
-        async move { self.0.process_conversation(conversation_id, user_message).await }.boxed()
+        async move {
+            self.0
+                .process_conversation(context, conversation_id, user_message, user_role)
+                .await
+        }
+        .boxed()
     }
 }

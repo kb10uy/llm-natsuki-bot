@@ -6,8 +6,11 @@ use crate::{
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use lnb_core::{
     error::ClientError,
-    interface::server::LnbServer,
-    model::message::{UserMessage, UserMessageContent},
+    interface::{Context as LnbContext, server::LnbServer},
+    model::{
+        conversation::UserRole,
+        message::{UserMessage, UserMessageContent},
+    },
 };
 use serenity::{
     Client as SerenityClient,
@@ -121,7 +124,7 @@ impl<S: LnbServer> DiscordLnbClientInner<S> {
         };
         let conversation_update = self
             .assistant
-            .process_conversation(conversation_id, user_message)
+            .process_conversation(LnbContext::default(), conversation_id, user_message, UserRole::Normal)
             .await?;
         let assistant_message = conversation_update.assistant_response();
         let attachments = conversation_update.attachments();
