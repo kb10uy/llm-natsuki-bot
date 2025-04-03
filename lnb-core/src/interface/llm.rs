@@ -9,7 +9,6 @@ use serde::Deserialize;
 
 pub type BoxLlm = Box<dyn Llm + 'static>;
 
-#[allow(dead_code)]
 pub trait Llm: Send + Sync {
     /// `SimpleFunction` の追加を告知する。
     fn add_simple_function(&self, descriptor: SimpleFunctionDescriptor) -> BoxFuture<'_, ()>;

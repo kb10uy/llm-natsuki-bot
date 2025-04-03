@@ -140,6 +140,7 @@ impl BangCommand for SyncClosure {
     }
 }
 
+#[allow(dead_code)]
 pub fn async_fn_command<F>(f: F) -> AsyncClosure
 where
     F: Send
@@ -150,6 +151,7 @@ where
     AsyncClosure(Box::new(f))
 }
 
+#[allow(dead_code)]
 pub fn fn_command<F>(f: F) -> SyncClosure
 where
     F: Send + Sync + for<'a> Fn(&'a Context, &'a str, &'a UserRole) -> Result<AssistantMessage, LlmError> + 'static,
