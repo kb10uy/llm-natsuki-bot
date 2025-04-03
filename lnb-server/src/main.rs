@@ -9,7 +9,7 @@ mod storage;
 use crate::{
     config::AppConfig,
     function::{ConfigurableFunction, ExchangeRate, GetIllustUrl, ImageGenerator, LocalInfo, SelfInfo},
-    interception::BangCommandInterception,
+    interception::{BangCommandInterception, fn_command},
     llm::initialize_llm,
     natsuki::Natsuki,
     storage::initialize_storage,
@@ -21,7 +21,10 @@ use anyhow::{Context as _, Result, bail};
 use clap::Parser;
 use config::AppConfigTool;
 use futures::future::join_all;
-use lnb_core::interface::{client::LnbClient, function::simple::SimpleFunction};
+use lnb_core::{
+    interface::{client::LnbClient, function::simple::SimpleFunction},
+    model::message::AssistantMessage,
+};
 use lnb_discord_client::DiscordLnbClient;
 use lnb_mastodon_client::MastodonLnbClient;
 use tokio::{fs::read_to_string, spawn};
@@ -90,7 +93,20 @@ async fn register_simple_functions(tool_config: &AppConfigTool, natsuki: &Natsuk
 }
 
 async fn register_interceptions(natsuki: &Natsuki) -> Result<()> {
-    natsuki.apply_interception(BangCommandInterception::new()).await;
+    let bang_command = BangCommandInterception::new();
+    bang_command
+        .register_command(
+            "ping",
+            fn_command(|_, _, _| {
+                Ok(AssistantMessage {
+                    text: "pong".to_string(),
+                    ..Default::default()
+                })
+            }),
+        )
+        .await;
+
+    natsuki.apply_interception(bang_command).await;
     Ok(())
 }
 
