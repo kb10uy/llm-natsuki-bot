@@ -1,3 +1,4 @@
+mod daily_private;
 mod exchange_rate;
 mod get_illust_url;
 mod image_generator;
