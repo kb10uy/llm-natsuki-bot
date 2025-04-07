@@ -12,13 +12,19 @@ pub use image_generator::ImageGenerator;
 pub use local_info::LocalInfo;
 pub use self_info::SelfInfo;
 
-use lnb_core::error::FunctionError;
+use lnb_core::{error::FunctionError, interface::function::simple::SimpleFunction};
+use serde::de::DeserializeOwned;
 
-pub trait ConfigurableFunction
+pub trait ConfigurableSimpleFunction: SimpleFunction
 where
     Self: Sized,
 {
+    /// Name used for logging.
     const NAME: &'static str;
-    type Configuration;
-    async fn create(config: &Self::Configuration) -> Result<Self, FunctionError>;
+
+    /// Configuration type.
+    type Configuration: DeserializeOwned;
+
+    /// Configures new instance.
+    async fn configure(config: Self::Configuration) -> Result<Self, FunctionError>;
 }

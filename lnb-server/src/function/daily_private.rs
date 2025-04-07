@@ -1,15 +1,30 @@
+use crate::function::ConfigurableSimpleFunction;
+
 use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
     error::FunctionError,
     interface::function::simple::{SimpleFunction, SimpleFunctionDescriptor, SimpleFunctionResponse},
     model::schema::DescribedSchema,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use time::OffsetDateTime;
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct DailyPrivateConfig {}
+
 #[derive(Debug)]
 pub struct DailyPrivate {}
+
+impl ConfigurableSimpleFunction for DailyPrivate {
+    const NAME: &'static str = stringify!(DailyPrivate);
+
+    type Configuration = DailyPrivateConfig;
+
+    async fn configure(config: DailyPrivateConfig) -> Result<Self, FunctionError> {
+        Ok(DailyPrivate {})
+    }
+}
 
 impl SimpleFunction for DailyPrivate {
     fn get_descriptor(&self) -> SimpleFunctionDescriptor {

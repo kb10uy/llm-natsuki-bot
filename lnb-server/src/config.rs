@@ -3,6 +3,7 @@ use std::{collections::HashMap, path::PathBuf};
 use lnb_discord_client::DiscordLnbClientConfig;
 use lnb_mastodon_client::MastodonLnbClientConfig;
 use serde::Deserialize;
+use toml::Value;
 
 /// config.toml
 #[derive(Debug, Clone, Deserialize)]
@@ -28,29 +29,10 @@ pub struct AppConfigClient {
 /// [tool]
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct AppConfigTool {
-    pub image_generator: Option<AppConfigToolImageGenerator>,
-    pub get_illust_url: Option<AppConfigToolGetIllustUrl>,
-    pub exchange_rate: Option<AppConfigToolExchangeRate>,
-}
-
-/// [tool.image_generator]
-#[derive(Debug, Clone, Deserialize)]
-pub struct AppConfigToolImageGenerator {
-    pub endpoint: String,
-    pub token: String,
-    pub model: String,
-}
-
-/// [tool.get_illust_url]
-#[derive(Debug, Clone, Deserialize)]
-pub struct AppConfigToolGetIllustUrl {
-    pub database_filepath: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct AppConfigToolExchangeRate {
-    pub endpoint: String,
-    pub token: String,
+    pub image_generator: Option<Value>,
+    pub get_illust_url: Option<Value>,
+    pub exchange_rate: Option<Value>,
+    pub daily_private: Option<Value>,
 }
 
 /// [storage]

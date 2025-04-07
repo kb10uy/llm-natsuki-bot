@@ -1,4 +1,4 @@
-use crate::{config::AppConfigToolExchangeRate, function::ConfigurableFunction};
+use crate::function::ConfigurableSimpleFunction;
 
 use std::collections::HashMap;
 
@@ -19,18 +19,24 @@ const API_RESPONSE_DATETIME: &[BorrowedFormatItem<'static>] = format_description
     "[weekday repr:short], [day] [month repr:short] [year] [hour]:[minute]:[second] [offset_hour sign:mandatory][offset_minute]"
 );
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct ExchangeRateConfig {
+    pub endpoint: String,
+    pub token: String,
+}
+
 #[derive(Debug)]
 pub struct ExchangeRate {
     client: Client,
     token_endpoint: String,
 }
 
-impl ConfigurableFunction for ExchangeRate {
+impl ConfigurableSimpleFunction for ExchangeRate {
     const NAME: &'static str = stringify!(ExchangeRate);
 
-    type Configuration = AppConfigToolExchangeRate;
+    type Configuration = ExchangeRateConfig;
 
-    async fn create(config: &AppConfigToolExchangeRate) -> Result<ExchangeRate, FunctionError> {
+    async fn configure(config: ExchangeRateConfig) -> Result<ExchangeRate, FunctionError> {
         let client = ClientBuilder::new()
             .user_agent(APP_USER_AGENT)
             .build()
