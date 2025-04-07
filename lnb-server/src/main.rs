@@ -9,7 +9,7 @@ mod storage;
 use crate::{
     bang_command::initialize_bang_command,
     config::AppConfig,
-    function::{ConfigurableFunction, ExchangeRate, GetIllustUrl, ImageGenerator, LocalInfo, SelfInfo},
+    function::{ConfigurableFunction, DailyPrivate, ExchangeRate, GetIllustUrl, ImageGenerator, LocalInfo, SelfInfo},
     llm::initialize_llm,
     natsuki::Natsuki,
     storage::initialize_storage,
@@ -81,6 +81,7 @@ async fn initialize_natsuki(config: &AppConfig) -> Result<Natsuki> {
 async fn register_simple_functions(tool_config: &AppConfigTool, natsuki: &Natsuki) -> Result<()> {
     natsuki.add_simple_function(SelfInfo::new()).await;
     natsuki.add_simple_function(LocalInfo::new()?).await;
+    natsuki.add_simple_function(DailyPrivate::new()).await;
 
     register_simple_function_config::<ImageGenerator>(&tool_config.image_generator, natsuki).await?;
     register_simple_function_config::<GetIllustUrl>(&tool_config.get_illust_url, natsuki).await?;

@@ -31,6 +31,10 @@ impl SimpleFunction for DailyPrivate {
 }
 
 impl DailyPrivate {
+    pub fn new() -> DailyPrivate {
+        DailyPrivate {}
+    }
+
     async fn get_daily_info(&self) -> Result<SimpleFunctionResponse, FunctionError> {
         let now = OffsetDateTime::now_local().map_err(FunctionError::by_external)?;
 
@@ -55,7 +59,7 @@ impl DailyPrivate {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct ClothesDesign {
+struct ClothesDesign {
     color: String,
     pattern: String,
 }
