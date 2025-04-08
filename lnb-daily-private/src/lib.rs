@@ -1,5 +1,5 @@
-mod self_pleasure;
-mod underwear;
+mod masturbation;
+pub mod underwear;
 
 use serde::{Deserialize, Serialize};
 use time::{Date, Duration, PrimitiveDateTime, Time};

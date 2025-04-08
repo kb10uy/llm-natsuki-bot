@@ -6,5 +6,6 @@ authors.workspace = true
 edition.workspace = true
 
 [dependencies]
-time = { workspace = true }
+rand = { workspace = true }
 serde = { workspace = true }
+time = { workspace = true }

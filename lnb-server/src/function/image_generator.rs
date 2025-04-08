@@ -35,7 +35,7 @@ impl ConfigurableSimpleFunction for ImageGenerator {
 
     type Configuration = ImageGeneratorConfig;
 
-    async fn configure(config: ImageGeneratorConfig) -> Result<ImageGenerator, FunctionError> {
+    async fn configure(config: &ImageGeneratorConfig) -> Result<ImageGenerator, FunctionError> {
         let openai_config = OpenAIConfig::new()
             .with_api_key(&config.token)
             .with_api_base(&config.endpoint);

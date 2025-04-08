@@ -6,40 +6,42 @@ use lnb_core::{
     interface::function::simple::{SimpleFunction, SimpleFunctionDescriptor, SimpleFunctionResponse},
     model::schema::DescribedSchema,
 };
-use lnb_daily_private::{Configuration, DayStep};
+use lnb_daily_private::{
+    Configuration, DayStep,
+    underwear::{UnderwearConfiguration, UnderwearStatus},
+};
+use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use time::{Duration, OffsetDateTime, PrimitiveDateTime};
 use toml::value::Datetime as TomlDateTime;
 
 // TOML は Time だけを書けるが toml::Time は from str しかできないので TomlDateTime で拾う
 #[derive(Debug, Clone, Deserialize)]
 pub struct DailyPrivateConfig {
+    daily_rng_salt: String,
     morning_start: TomlDateTime,
     morning_preparation_minutes: usize,
     night_start: TomlDateTime,
     bathtime_minutes: usize,
-}
-
-#[derive(Debug, Clone, Serialize)]
-struct ClothesDesign {
-    color: String,
-    pattern: String,
+    underwear: UnderwearConfiguration,
 }
 
 #[derive(Debug, Clone, Serialize)]
 struct DailyPrivateInfo {
     asked_at: OffsetDateTime,
     current_status: DayStep,
-    bra_design: ClothesDesign,
-    panty_design: ClothesDesign,
+    underwear_status: UnderwearStatus,
     menstruation_cycle: usize,
     self_pleasure_count: usize,
 }
 
 #[derive(Debug)]
 pub struct DailyPrivate {
+    rng_salt: String,
     configuration: Configuration,
+    underwear: UnderwearConfiguration,
 }
 
 impl ConfigurableSimpleFunction for DailyPrivate {
@@ -47,14 +49,16 @@ impl ConfigurableSimpleFunction for DailyPrivate {
 
     type Configuration = DailyPrivateConfig;
 
-    async fn configure(config: DailyPrivateConfig) -> Result<Self, FunctionError> {
+    async fn configure(config: &DailyPrivateConfig) -> Result<Self, FunctionError> {
         Ok(DailyPrivate {
+            rng_salt: config.daily_rng_salt.clone(),
             configuration: Configuration {
                 daytime_start_at: extract_time_from_toml(config.morning_start)?,
                 morning_preparation: Duration::minutes(config.morning_preparation_minutes as i64),
                 night_start_at: extract_time_from_toml(config.night_start)?,
                 bathtime_duration: Duration::minutes(config.bathtime_minutes as i64),
             },
+            underwear: config.underwear.clone(),
         })
     }
 }
@@ -88,17 +92,17 @@ impl DailyPrivate {
         let logical_date = self.configuration.logical_date(local_now);
         let day_step = self.configuration.determine_day_step(local_now);
 
+        let mut daily_rng = {
+            let mut hasher = Sha256::new();
+            hasher.update(&self.rng_salt);
+            hasher.update(logical_date.ordinal().to_le_bytes());
+            StdRng::from_seed(hasher.finalize().into())
+        };
+
         let info = DailyPrivateInfo {
             asked_at: now,
             current_status: day_step,
-            bra_design: ClothesDesign {
-                color: "青".to_string(),
-                pattern: "しましま".to_string(),
-            },
-            panty_design: ClothesDesign {
-                color: "オレンジ".to_string(),
-                pattern: "しましま".to_string(),
-            },
+            underwear_status: self.underwear.generate_status(&mut daily_rng, None),
             menstruation_cycle: 1,
             self_pleasure_count: 2,
         };

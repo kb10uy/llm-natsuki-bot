@@ -26,7 +26,7 @@ impl ConfigurableSimpleFunction for GetIllustUrl {
 
     type Configuration = GetIllustUrlConfig;
 
-    async fn configure(config: GetIllustUrlConfig) -> Result<GetIllustUrl, FunctionError> {
+    async fn configure(config: &GetIllustUrlConfig) -> Result<GetIllustUrl, FunctionError> {
         let pool = SqlitePool::connect(&config.database_filepath)
             .map_err(FunctionError::by_external)
             .await?;

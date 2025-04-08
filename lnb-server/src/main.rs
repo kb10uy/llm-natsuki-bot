@@ -27,7 +27,6 @@ use lnb_core::interface::client::LnbClient;
 use lnb_discord_client::DiscordLnbClient;
 use lnb_mastodon_client::MastodonLnbClient;
 use tokio::{fs::read_to_string, spawn};
-use toml::Value;
 use tracing::info;
 
 #[tokio::main]
@@ -99,18 +98,15 @@ async fn register_interceptions(natsuki: &Natsuki) -> Result<()> {
     Ok(())
 }
 
-async fn register_simple_function_config<F>(config: &Option<Value>, natsuki: &Natsuki) -> Result<()>
+async fn register_simple_function_config<F>(config: &Option<F::Configuration>, natsuki: &Natsuki) -> Result<()>
 where
     F: ConfigurableSimpleFunction + 'static,
 {
     let Some(config) = config.as_ref() else {
         return Ok(());
     };
-    println!("{config:?}");
-    let transformed_config = config.clone().try_into()?;
-    println!("{transformed_config:?}");
 
-    let simple_function = F::configure(transformed_config).await?;
+    let simple_function = F::configure(config).await?;
     natsuki.add_simple_function(simple_function).await;
     info!("simple function configured: {}", F::NAME);
 

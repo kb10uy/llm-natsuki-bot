@@ -36,7 +36,7 @@ impl ConfigurableSimpleFunction for ExchangeRate {
 
     type Configuration = ExchangeRateConfig;
 
-    async fn configure(config: ExchangeRateConfig) -> Result<ExchangeRate, FunctionError> {
+    async fn configure(config: &ExchangeRateConfig) -> Result<ExchangeRate, FunctionError> {
         let client = ClientBuilder::new()
             .user_agent(APP_USER_AGENT)
             .build()
