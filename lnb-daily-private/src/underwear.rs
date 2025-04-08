@@ -16,6 +16,7 @@ pub struct UnderwearConfiguration {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case", tag = "status", content = "details")]
 pub enum UnderwearStatus {
     /// セットの下着を着ている
     IntegratedDesignBraAndPanty(UnderwearPart),

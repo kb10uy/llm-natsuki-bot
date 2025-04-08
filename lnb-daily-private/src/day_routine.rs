@@ -17,6 +17,7 @@ pub struct DayRoutineConfiguration {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum DayStep {
     /// 起きた後着替えるまで(昼パート)
     Morning,
