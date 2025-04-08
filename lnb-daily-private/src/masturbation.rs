@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::ops::{Not, Range};
 
 use rand::prelude::*;
 use rand_distr::{Normal, Poisson, StandardUniform};
@@ -17,6 +17,9 @@ pub struct MasturbationConfiguration {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MasturbationStatus {
     pub completed_count: usize,
+
+    // 殊更にしてないのを強調してほしいわけじゃないので true のときだけシリアライズする
+    #[serde(skip_serializing_if = "<&bool>::not")]
     pub playing_now: bool,
 }
 
