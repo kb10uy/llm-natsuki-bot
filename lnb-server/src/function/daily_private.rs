@@ -7,14 +7,14 @@ use lnb_core::{
     model::schema::DescribedSchema,
 };
 use lnb_daily_private::{
-    Configuration, DayStep,
+    day_routine::{DayRoutineConfiguration, DayStep},
     underwear::{UnderwearConfiguration, UnderwearStatus},
 };
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use time::{Duration, OffsetDateTime, PrimitiveDateTime};
+use time::{Duration, OffsetDateTime, PrimitiveDateTime, format_description::well_known::Rfc3339};
 use toml::value::Datetime as TomlDateTime;
 
 // TOML は Time だけを書けるが toml::Time は from str しかできないので TomlDateTime で拾う
@@ -30,7 +30,7 @@ pub struct DailyPrivateConfig {
 
 #[derive(Debug, Clone, Serialize)]
 struct DailyPrivateInfo {
-    asked_at: OffsetDateTime,
+    asked_at: String,
     current_status: DayStep,
     underwear_status: UnderwearStatus,
     menstruation_cycle: usize,
@@ -40,7 +40,7 @@ struct DailyPrivateInfo {
 #[derive(Debug)]
 pub struct DailyPrivate {
     rng_salt: String,
-    configuration: Configuration,
+    day_routine: DayRoutineConfiguration,
     underwear: UnderwearConfiguration,
 }
 
@@ -52,7 +52,7 @@ impl ConfigurableSimpleFunction for DailyPrivate {
     async fn configure(config: &DailyPrivateConfig) -> Result<Self, FunctionError> {
         Ok(DailyPrivate {
             rng_salt: config.daily_rng_salt.clone(),
-            configuration: Configuration {
+            day_routine: DayRoutineConfiguration {
                 daytime_start_at: extract_time_from_toml(config.morning_start)?,
                 morning_preparation: Duration::minutes(config.morning_preparation_minutes as i64),
                 night_start_at: extract_time_from_toml(config.night_start)?,
@@ -89,8 +89,8 @@ impl DailyPrivate {
     async fn get_daily_info(&self) -> Result<SimpleFunctionResponse, FunctionError> {
         let now = OffsetDateTime::now_local().map_err(FunctionError::by_external)?;
         let local_now = PrimitiveDateTime::new(now.date(), now.time());
-        let logical_date = self.configuration.logical_date(local_now);
-        let day_step = self.configuration.determine_day_step(local_now);
+        let logical_date = self.day_routine.logical_date(local_now);
+        let day_step = self.day_routine.determine_day_step(local_now);
 
         let mut daily_rng = {
             let mut hasher = Sha256::new();
@@ -100,9 +100,9 @@ impl DailyPrivate {
         };
 
         let info = DailyPrivateInfo {
-            asked_at: now,
+            asked_at: now.format(&Rfc3339).map_err(FunctionError::by_serialization)?,
             current_status: day_step,
-            underwear_status: self.underwear.generate_status(&mut daily_rng, None),
+            underwear_status: self.underwear.generate_status(&mut daily_rng, day_step, None),
             menstruation_cycle: 1,
             self_pleasure_count: 2,
         };

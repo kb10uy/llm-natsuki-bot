@@ -1,6 +1,8 @@
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 
+use crate::day_routine::DayStep;
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct UnderwearConfiguration {
     pub separate_colors: Vec<String>,
@@ -10,6 +12,7 @@ pub struct UnderwearConfiguration {
     pub unified_ratio: f64,
     pub no_wear_reasons: Vec<String>,
     pub masturbating_reason: String,
+    pub bathtime_reason: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -46,6 +49,7 @@ impl UnderwearConfiguration {
     pub fn generate_status<R: RngCore + ?Sized>(
         &self,
         rng: &mut R,
+        day_step: DayStep,
         masturbation_progress: Option<f64>,
     ) -> UnderwearStatus {
         let (bra, panty) = match (self.generate_part(rng), self.generate_part(rng)) {
@@ -62,29 +66,35 @@ impl UnderwearConfiguration {
         let no_panty = rng.random::<f64>() < self.no_panty_ratio;
         let no_bp_reason = self.no_wear_reasons.choose(rng).map(|s| &s[..]).unwrap_or_default();
 
-        match (unified, no_bra, no_panty, masturbation_progress) {
+        if matches!(masturbation_progress, Some(p) if p >= 0.5) {
             // オナニーの進行度が半分以上なら常に全脱ぎ
-            (_, _, _, Some(progress)) if progress >= 0.5 => UnderwearStatus::NoBraNoPanty {
+            return UnderwearStatus::NoBraNoPanty {
                 reason: self.masturbating_reason.clone(),
-            },
+            };
+        } else if day_step == DayStep::Bathtime {
+            // 風呂なのでもちろん脱ぐ
+            return UnderwearStatus::NoBraNoPanty {
+                reason: self.bathtime_reason.clone(),
+            };
+        }
 
+        match (unified, no_bra, no_panty) {
             // 両方セット
-            (true, false, false, _) => UnderwearStatus::IntegratedDesignBraAndPanty(bra),
+            (true, false, false) => UnderwearStatus::IntegratedDesignBraAndPanty(bra),
             // 両方別々
-            (false, false, false, _) => UnderwearStatus::SeparateBraAndPanty { bra, panty },
-
+            (false, false, false) => UnderwearStatus::SeparateBraAndPanty { bra, panty },
             // ノーブラ
-            (_, false, true, _) => UnderwearStatus::BraOnly {
+            (_, false, true) => UnderwearStatus::BraOnly {
                 bra,
                 no_panty_reason: no_bp_reason.to_string(),
             },
             // ノーパン
-            (_, true, false, _) => UnderwearStatus::PantyOnly {
+            (_, true, false) => UnderwearStatus::PantyOnly {
                 no_bra_reason: no_bp_reason.to_string(),
                 panty,
             },
             // ノーブラノーパン
-            (_, true, true, _) => UnderwearStatus::NoBraNoPanty {
+            (_, true, true) => UnderwearStatus::NoBraNoPanty {
                 reason: no_bp_reason.to_string(),
             },
         }
