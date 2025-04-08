@@ -7,3 +7,4 @@ edition.workspace = true
 
 [dependencies]
 time = { workspace = true }
+serde = { workspace = true }

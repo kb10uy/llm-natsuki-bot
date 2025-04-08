@@ -106,8 +106,11 @@ where
     let Some(config) = config.as_ref() else {
         return Ok(());
     };
+    println!("{config:?}");
+    let transformed_config = config.clone().try_into()?;
+    println!("{transformed_config:?}");
 
-    let simple_function = F::configure(config.clone().try_into()?).await?;
+    let simple_function = F::configure(transformed_config).await?;
     natsuki.add_simple_function(simple_function).await;
     info!("simple function configured: {}", F::NAME);
 

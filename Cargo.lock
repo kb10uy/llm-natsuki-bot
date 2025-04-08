@@ -1685,6 +1685,7 @@ dependencies = [
 name = "lnb-daily-private"
 version = "0.5.0"
 dependencies = [
+ "serde",
  "time",
 ]
 

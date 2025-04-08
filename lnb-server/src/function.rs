@@ -12,8 +12,12 @@ pub use image_generator::ImageGenerator;
 pub use local_info::LocalInfo;
 pub use self_info::SelfInfo;
 
+use std::fmt::Debug;
+
 use lnb_core::{error::FunctionError, interface::function::simple::SimpleFunction};
 use serde::de::DeserializeOwned;
+use time::Time;
+use toml::value::Datetime as TomlDateTime;
 
 pub trait ConfigurableSimpleFunction: SimpleFunction
 where
@@ -23,8 +27,15 @@ where
     const NAME: &'static str;
 
     /// Configuration type.
-    type Configuration: DeserializeOwned;
+    type Configuration: Debug + DeserializeOwned;
 
     /// Configures new instance.
     async fn configure(config: Self::Configuration) -> Result<Self, FunctionError>;
+}
+
+fn extract_time_from_toml(toml_datetime: TomlDateTime) -> Result<Time, FunctionError> {
+    let toml_time = toml_datetime
+        .time
+        .ok_or_else(|| FunctionError::by_external("time part not defined"))?;
+    Ok(Time::from_hms(toml_time.hour, toml_time.minute, toml_time.second).expect("invalid time"))
 }

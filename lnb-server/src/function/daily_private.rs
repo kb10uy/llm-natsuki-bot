@@ -1,4 +1,4 @@
-use crate::function::ConfigurableSimpleFunction;
+use crate::function::{ConfigurableSimpleFunction, extract_time_from_toml};
 
 use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
@@ -6,16 +6,19 @@ use lnb_core::{
     interface::function::simple::{SimpleFunction, SimpleFunctionDescriptor, SimpleFunctionResponse},
     model::schema::DescribedSchema,
 };
-use lnb_daily_private::Configuration;
+use lnb_daily_private::{Configuration, DayStep};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use time::{OffsetDateTime, Time};
-use toml::value::Time as TomlTime;
+use time::{Duration, OffsetDateTime, PrimitiveDateTime};
+use toml::value::Datetime as TomlDateTime;
 
+// TOML は Time だけを書けるが toml::Time は from str しかできないので TomlDateTime で拾う
 #[derive(Debug, Clone, Deserialize)]
 pub struct DailyPrivateConfig {
-    night_start: TomlTime,
-    morning_start: TomlTime,
+    morning_start: TomlDateTime,
+    morning_preparation_minutes: usize,
+    night_start: TomlDateTime,
+    bathtime_minutes: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -27,6 +30,7 @@ struct ClothesDesign {
 #[derive(Debug, Clone, Serialize)]
 struct DailyPrivateInfo {
     asked_at: OffsetDateTime,
+    current_status: DayStep,
     bra_design: ClothesDesign,
     panty_design: ClothesDesign,
     menstruation_cycle: usize,
@@ -44,25 +48,12 @@ impl ConfigurableSimpleFunction for DailyPrivate {
     type Configuration = DailyPrivateConfig;
 
     async fn configure(config: DailyPrivateConfig) -> Result<Self, FunctionError> {
-        let night_start_at = Time::from_hms_nano(
-            config.night_start.hour,
-            config.night_start.minute,
-            config.night_start.second,
-            config.night_start.nanosecond,
-        )
-        .map_err(FunctionError::by_serialization)?;
-        let daytime_start_at = Time::from_hms_nano(
-            config.morning_start.hour,
-            config.morning_start.minute,
-            config.morning_start.second,
-            config.morning_start.nanosecond,
-        )
-        .map_err(FunctionError::by_serialization)?;
-
         Ok(DailyPrivate {
             configuration: Configuration {
-                night_start_at,
-                daytime_start_at,
+                daytime_start_at: extract_time_from_toml(config.morning_start)?,
+                morning_preparation: Duration::minutes(config.morning_preparation_minutes as i64),
+                night_start_at: extract_time_from_toml(config.night_start)?,
+                bathtime_duration: Duration::minutes(config.bathtime_minutes as i64),
             },
         })
     }
@@ -74,8 +65,11 @@ impl SimpleFunction for DailyPrivate {
             name: "daily_private".to_string(),
             description: r#"
                 この bot 自身のその日のプライベートな事情を取得します。
-                これには下着の色や月経、その日のセルフプレジャーの回数が含まれます。
-                これらについてユーザーから訊かれた場合、LLM による生成ではなくこの function のレスポンスをもとに回答してください。
+                これらについてユーザーから訊かれた場合、この function のレスポンスをもとに適切に回答してください。
+                - 下着の色
+                - 生理周期
+                - その日のセルフプレジャーの回数
+                - 今の行動状態
             "#
             .to_string(),
             parameters: DescribedSchema::object("parameters", "引数", vec![]),
@@ -90,11 +84,13 @@ impl SimpleFunction for DailyPrivate {
 impl DailyPrivate {
     async fn get_daily_info(&self) -> Result<SimpleFunctionResponse, FunctionError> {
         let now = OffsetDateTime::now_local().map_err(FunctionError::by_external)?;
-        let logical_date = self.configuration.logical_date(now);
-        let day_step = self.configuration.determine_day_step(now);
+        let local_now = PrimitiveDateTime::new(now.date(), now.time());
+        let logical_date = self.configuration.logical_date(local_now);
+        let day_step = self.configuration.determine_day_step(local_now);
 
         let info = DailyPrivateInfo {
             asked_at: now,
+            current_status: day_step,
             bra_design: ClothesDesign {
                 color: "青".to_string(),
                 pattern: "しましま".to_string(),
