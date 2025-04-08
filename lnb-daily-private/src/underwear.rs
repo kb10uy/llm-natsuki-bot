@@ -1,4 +1,4 @@
-use crate::day_routine::DayStep;
+use crate::{day_routine::DayStep, menstruation::MenstruationAbsorbent};
 
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -19,21 +19,26 @@ pub struct UnderwearConfiguration {
 #[serde(rename_all = "snake_case", tag = "status", content = "details")]
 pub enum UnderwearStatus {
     /// セットの下着を着ている
-    IntegratedDesignBraAndPanty(UnderwearPart),
+    IntegratedDesignBraAndPanty { design: UnderwearDesign, is_sanitary: bool },
 
     /// 別々のを着ている
-    SeparateBraAndPanty { bra: UnderwearPart, panty: UnderwearPart },
+    SeparateBraAndPanty {
+        bra_design: UnderwearDesign,
+        panty_design: UnderwearDesign,
+        is_sanitary: bool,
+    },
 
     /// ノーパン
     BraOnly {
-        bra: UnderwearPart,
+        bra_design: UnderwearDesign,
         no_panty_reason: String,
     },
 
     /// ノーブラ
     PantyOnly {
         no_bra_reason: String,
-        panty: UnderwearPart,
+        panty_design: UnderwearDesign,
+        is_sanitary: bool,
     },
 
     /// ノーガード
@@ -41,9 +46,9 @@ pub enum UnderwearStatus {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct UnderwearPart {
+pub struct UnderwearDesign {
     pub color: String,
-    pub design: String,
+    pub pattern: String,
 }
 
 impl UnderwearConfiguration {
@@ -51,9 +56,10 @@ impl UnderwearConfiguration {
         &self,
         rng: &mut R,
         day_step: DayStep,
+        absorbent: &Option<MenstruationAbsorbent>,
         masturbation_progress: Option<f64>,
     ) -> UnderwearStatus {
-        let (bra, panty) = match (self.generate_part(rng), self.generate_part(rng)) {
+        let (bra_design, panty_design) = match (self.generate_part(rng), self.generate_part(rng)) {
             (Some(c1), Some(c2)) => (c1, c2),
             _ => {
                 return UnderwearStatus::NoBraNoPanty {
@@ -79,20 +85,29 @@ impl UnderwearConfiguration {
             };
         }
 
+        let is_sanitary = matches!(absorbent, Some(MenstruationAbsorbent::Pad { .. }));
         match (unified, no_bra, no_panty) {
             // 両方セット
-            (true, false, false) => UnderwearStatus::IntegratedDesignBraAndPanty(bra),
+            (true, false, false) => UnderwearStatus::IntegratedDesignBraAndPanty {
+                design: bra_design,
+                is_sanitary,
+            },
             // 両方別々
-            (false, false, false) => UnderwearStatus::SeparateBraAndPanty { bra, panty },
+            (false, false, false) => UnderwearStatus::SeparateBraAndPanty {
+                bra_design,
+                panty_design,
+                is_sanitary,
+            },
             // ノーブラ
             (_, false, true) => UnderwearStatus::BraOnly {
-                bra,
+                bra_design,
                 no_panty_reason: no_bp_reason.to_string(),
             },
             // ノーパン
             (_, true, false) => UnderwearStatus::PantyOnly {
                 no_bra_reason: no_bp_reason.to_string(),
-                panty,
+                panty_design,
+                is_sanitary,
             },
             // ノーブラノーパン
             (_, true, true) => UnderwearStatus::NoBraNoPanty {
@@ -101,12 +116,12 @@ impl UnderwearConfiguration {
         }
     }
 
-    fn generate_part<R: RngCore + ?Sized>(&self, rng: &mut R) -> Option<UnderwearPart> {
+    fn generate_part<R: RngCore + ?Sized>(&self, rng: &mut R) -> Option<UnderwearDesign> {
         let color = self.separate_colors.choose(rng)?;
         let design = self.separate_designs.choose(rng)?;
-        Some(UnderwearPart {
+        Some(UnderwearDesign {
             color: color.clone(),
-            design: design.clone(),
+            pattern: design.clone(),
         })
     }
 }

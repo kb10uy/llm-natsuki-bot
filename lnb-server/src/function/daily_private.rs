@@ -46,9 +46,9 @@ struct DailyPrivateInfo {
 pub struct DailyPrivate {
     rng_salt: String,
     day_routine: DayRoutineConfiguration,
-    underwear: UnderwearConfiguration,
-    masturbation: MasturbationConfiguration,
     menstruation: MenstruationConfiguration,
+    masturbation: MasturbationConfiguration,
+    underwear: UnderwearConfiguration,
 }
 
 impl ConfigurableSimpleFunction for DailyPrivate {
@@ -100,6 +100,7 @@ impl DailyPrivate {
         let now = OffsetDateTime::now_local().map_err(FunctionError::by_external)?;
         let local_now = PrimitiveDateTime::new(now.date(), now.time());
         let logical_date = self.day_routine.logical_date(local_now);
+        let logical_day_start = self.day_routine.day_part_start(logical_date);
         let day_progress = self.day_routine.logical_day_progress(local_now);
         let day_step = self.day_routine.determine_day_step(local_now);
         info!(
@@ -120,14 +121,18 @@ impl DailyPrivate {
             StdRng::from_seed(hasher.finalize().into())
         };
 
-        // 下着
-        let underwear_status = self.underwear.generate_status(&mut daily_rng, day_step, None);
-        info!("underwear status: {underwear_status:?}");
+        // 生理周期
+        let menstruation_cycles = self.menstruation.calculate_cycle_starting_ordinals(&mut annual_rng);
+        let menstruation_status =
+            self.menstruation
+                .construct_status(&mut daily_rng, &menstruation_cycles, logical_date.ordinal());
+        info!("menstruation: {menstruation_status:?}");
 
         // オナニー
         let masturbation_ranges = self.masturbation.calculate_daily_playing_ranges(&mut daily_rng);
-        let masturbation_status = self.masturbation.construct_status(&masturbation_ranges, day_progress);
-        let logical_day_start = self.day_routine.day_part_start(logical_date);
+        let (masturbation_status, current_play) = self
+            .masturbation
+            .construct_status_progress(&masturbation_ranges, day_progress);
         let masturbation_times: Vec<_> = masturbation_ranges
             .iter()
             .map(|mr| {
@@ -137,24 +142,23 @@ impl DailyPrivate {
             })
             .collect();
         info!(
-            "masturbation: playing {}, {} completed",
-            masturbation_status.playing_now, masturbation_status.completed_count
+            "masturbation: {} completed (current play: {current_play:?})",
+            masturbation_status.completed_count
         );
         info!("masturbation planned: {masturbation_times:?}");
 
-        // 生理周期
-        let menstruation_cycles = self.menstruation.calculate_cycle_starting_ordinals(&mut annual_rng);
-        let menstruation_status =
-            self.menstruation
-                .construct_status(&mut daily_rng, &menstruation_cycles, logical_date.ordinal());
-        info!("menstruation: {menstruation_status:?}");
+        // 下着
+        let underwear_status =
+            self.underwear
+                .generate_status(&mut daily_rng, day_step, &menstruation_status.absorbent, current_play);
+        info!("underwear status: {underwear_status:?}");
 
         let info = DailyPrivateInfo {
             asked_at: now.format(&Rfc3339).map_err(FunctionError::by_serialization)?,
             current_status: day_step,
-            underwear_status,
-            masturbation_status,
             menstruation_status,
+            masturbation_status,
+            underwear_status,
         };
         Ok(SimpleFunctionResponse {
             result: serde_json::to_value(&info).map_err(FunctionError::by_serialization)?,

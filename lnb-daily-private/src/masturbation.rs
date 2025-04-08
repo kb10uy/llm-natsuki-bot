@@ -40,12 +40,25 @@ impl MasturbationConfiguration {
         ranges
     }
 
-    pub fn construct_status(&self, ranges: &[Range<f64>], day_progress: f64) -> MasturbationStatus {
+    pub fn construct_status_progress(
+        &self,
+        ranges: &[Range<f64>],
+        day_progress: f64,
+    ) -> (MasturbationStatus, Option<f64>) {
         let completed_count = ranges.iter().filter(|mr| day_progress >= mr.end).count();
-        let playing_now = ranges.iter().any(|mr| mr.contains(&day_progress));
-        MasturbationStatus {
-            completed_count,
-            playing_now,
-        }
+        let current_play = ranges
+            .iter()
+            .filter_map(|mr| {
+                mr.contains(&day_progress)
+                    .then_some((day_progress - mr.start) / (mr.end - mr.start))
+            })
+            .next();
+        (
+            MasturbationStatus {
+                completed_count,
+                playing_now: current_play.is_some(),
+            },
+            current_play,
+        )
     }
 }
