@@ -9,6 +9,7 @@ use lnb_core::{
 use lnb_daily_private::{
     day_routine::{DayRoutineConfiguration, DayStep},
     masturbation::{MasturbationConfiguration, MasturbationStatus},
+    menstruation::{MenstruationConfiguration, MenstruationStatus},
     underwear::{UnderwearConfiguration, UnderwearStatus},
 };
 use rand::prelude::*;
@@ -29,6 +30,7 @@ pub struct DailyPrivateConfig {
     bathtime_minutes: usize,
     underwear: UnderwearConfiguration,
     masturbation: MasturbationConfiguration,
+    menstruation: MenstruationConfiguration,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -37,7 +39,7 @@ struct DailyPrivateInfo {
     current_status: DayStep,
     underwear_status: UnderwearStatus,
     masturbation_status: MasturbationStatus,
-    menstruation_cycle: usize,
+    menstruation_status: MenstruationStatus,
 }
 
 #[derive(Debug)]
@@ -46,6 +48,7 @@ pub struct DailyPrivate {
     day_routine: DayRoutineConfiguration,
     underwear: UnderwearConfiguration,
     masturbation: MasturbationConfiguration,
+    menstruation: MenstruationConfiguration,
 }
 
 impl ConfigurableSimpleFunction for DailyPrivate {
@@ -64,6 +67,7 @@ impl ConfigurableSimpleFunction for DailyPrivate {
             },
             underwear: config.underwear.clone(),
             masturbation: config.masturbation.clone(),
+            menstruation: config.menstruation.clone(),
         })
     }
 }
@@ -98,18 +102,31 @@ impl DailyPrivate {
         let logical_date = self.day_routine.logical_date(local_now);
         let day_progress = self.day_routine.logical_day_progress(local_now);
         let day_step = self.day_routine.determine_day_step(local_now);
+        info!(
+            "logical date: {logical_date}, day progress: {:.2}%, step: {day_step:?}",
+            day_progress * 100.0
+        );
 
         let mut daily_rng = {
             let mut hasher = Sha256::new();
             hasher.update(&self.rng_salt);
-            hasher.update(logical_date.ordinal().to_le_bytes());
+            hasher.update(logical_date.to_julian_day().to_le_bytes());
+            StdRng::from_seed(hasher.finalize().into())
+        };
+        let mut annual_rng = {
+            let mut hasher = Sha256::new();
+            hasher.update(&self.rng_salt);
+            hasher.update(logical_date.year().to_le_bytes());
             StdRng::from_seed(hasher.finalize().into())
         };
 
+        // 下着
         let underwear_status = self.underwear.generate_status(&mut daily_rng, day_step, None);
-        let masturbation_ranges = self.masturbation.get_playing_ranges(&mut daily_rng);
-        let masturbation_status = self.masturbation.construct_status(&masturbation_ranges, day_progress);
+        info!("underwear status: {underwear_status:?}");
 
+        // オナニー
+        let masturbation_ranges = self.masturbation.calculate_daily_playing_ranges(&mut daily_rng);
+        let masturbation_status = self.masturbation.construct_status(&masturbation_ranges, day_progress);
         let logical_day_start = self.day_routine.day_part_start(logical_date);
         let masturbation_times: Vec<_> = masturbation_ranges
             .iter()
@@ -120,22 +137,24 @@ impl DailyPrivate {
             })
             .collect();
         info!(
-            "logical date: {logical_date}, day progress: {:.2}%, step: {day_step:?}",
-            day_progress * 100.0
-        );
-        info!("underwear status: {underwear_status:?}");
-        info!(
             "masturbation: playing {}, {} completed",
             masturbation_status.playing_now, masturbation_status.completed_count
         );
         info!("masturbation planned: {masturbation_times:?}");
+
+        // 生理周期
+        let menstruation_cycles = self.menstruation.calculate_cycle_starting_ordinals(&mut annual_rng);
+        let menstruation_status =
+            self.menstruation
+                .construct_status(&mut daily_rng, &menstruation_cycles, logical_date.ordinal());
+        info!("menstruation: {menstruation_status:?}");
 
         let info = DailyPrivateInfo {
             asked_at: now.format(&Rfc3339).map_err(FunctionError::by_serialization)?,
             current_status: day_step,
             underwear_status,
             masturbation_status,
-            menstruation_cycle: 1,
+            menstruation_status,
         };
         Ok(SimpleFunctionResponse {
             result: serde_json::to_value(&info).map_err(FunctionError::by_serialization)?,

@@ -21,7 +21,7 @@ pub struct MasturbationStatus {
 }
 
 impl MasturbationConfiguration {
-    pub fn get_playing_ranges<R: RngCore + ?Sized>(&self, rng: &mut R) -> Vec<Range<f64>> {
+    pub fn calculate_daily_playing_ranges<R: RngCore + ?Sized>(&self, rng: &mut R) -> Vec<Range<f64>> {
         let count_distr = Poisson::new(self.daily_count_lambda).expect("invalid range");
         let duration_distr = {
             let (mu, sigma) = self.duration_minutes_mu_sigma;
