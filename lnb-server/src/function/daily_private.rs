@@ -8,6 +8,7 @@ use lnb_core::{
 };
 use lnb_daily_private::{
     day_routine::{DayRoutineConfiguration, DayStep},
+    masturbation::{MasturbationConfiguration, MasturbationStatus},
     underwear::{UnderwearConfiguration, UnderwearStatus},
 };
 use rand::prelude::*;
@@ -16,6 +17,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use time::{Duration, OffsetDateTime, PrimitiveDateTime, format_description::well_known::Rfc3339};
 use toml::value::Datetime as TomlDateTime;
+use tracing::info;
 
 // TOML は Time だけを書けるが toml::Time は from str しかできないので TomlDateTime で拾う
 #[derive(Debug, Clone, Deserialize)]
@@ -26,6 +28,7 @@ pub struct DailyPrivateConfig {
     night_start: TomlDateTime,
     bathtime_minutes: usize,
     underwear: UnderwearConfiguration,
+    masturbation: MasturbationConfiguration,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -33,8 +36,8 @@ struct DailyPrivateInfo {
     asked_at: String,
     current_status: DayStep,
     underwear_status: UnderwearStatus,
+    masturbation_status: MasturbationStatus,
     menstruation_cycle: usize,
-    self_pleasure_count: usize,
 }
 
 #[derive(Debug)]
@@ -42,6 +45,7 @@ pub struct DailyPrivate {
     rng_salt: String,
     day_routine: DayRoutineConfiguration,
     underwear: UnderwearConfiguration,
+    masturbation: MasturbationConfiguration,
 }
 
 impl ConfigurableSimpleFunction for DailyPrivate {
@@ -59,6 +63,7 @@ impl ConfigurableSimpleFunction for DailyPrivate {
                 bathtime_duration: Duration::minutes(config.bathtime_minutes as i64),
             },
             underwear: config.underwear.clone(),
+            masturbation: config.masturbation.clone(),
         })
     }
 }
@@ -91,7 +96,12 @@ impl DailyPrivate {
         let now = OffsetDateTime::now_local().map_err(FunctionError::by_external)?;
         let local_now = PrimitiveDateTime::new(now.date(), now.time());
         let logical_date = self.day_routine.logical_date(local_now);
+        let day_progress = self.day_routine.logical_day_progress(local_now);
         let day_step = self.day_routine.determine_day_step(local_now);
+        info!(
+            "logical date: {logical_date}, day progress: {:.2}%, step: {day_step:?}",
+            day_progress * 100.0
+        );
 
         let mut daily_rng = {
             let mut hasher = Sha256::new();
@@ -100,12 +110,23 @@ impl DailyPrivate {
             StdRng::from_seed(hasher.finalize().into())
         };
 
+        let underwear_status = self.underwear.generate_status(&mut daily_rng, day_step, None);
+        info!("underwear status: {underwear_status:?}");
+        let masturbation_ranges = self.masturbation.get_playing_ranges(&mut daily_rng);
+        let masturbation_status = self.masturbation.construct_status(&masturbation_ranges, day_progress);
+        info!(
+            "masturbation: playing {}, {} completed, {} planned total today",
+            masturbation_status.playing_now,
+            masturbation_status.completed_count,
+            masturbation_ranges.len()
+        );
+
         let info = DailyPrivateInfo {
             asked_at: now.format(&Rfc3339).map_err(FunctionError::by_serialization)?,
             current_status: day_step,
-            underwear_status: self.underwear.generate_status(&mut daily_rng, day_step, None),
+            underwear_status,
+            masturbation_status,
             menstruation_cycle: 1,
-            self_pleasure_count: 2,
         };
         Ok(SimpleFunctionResponse {
             result: serde_json::to_value(&info).map_err(FunctionError::by_serialization)?,

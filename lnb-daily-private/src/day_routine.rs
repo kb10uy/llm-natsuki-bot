@@ -60,7 +60,9 @@ impl DayRoutineConfiguration {
 
     /// 論理今日が進んだ割合を計算する。
     pub fn logical_day_progress(&self, datetime: PrimitiveDateTime) -> f64 {
-        let logical_day_start = datetime.replace_date(self.logical_date(datetime));
+        let logical_day_start = datetime
+            .replace_date(self.logical_date(datetime))
+            .replace_time(self.daytime_start_at);
         let progress_duration = datetime - logical_day_start;
         progress_duration.as_seconds_f64() / Duration::DAY.as_seconds_f64()
     }

@@ -7,5 +7,6 @@ edition.workspace = true
 
 [dependencies]
 rand = { workspace = true }
+rand_distr = { workspace = true }
 serde = { workspace = true }
 time = { workspace = true }

@@ -1,7 +1,7 @@
+use crate::day_routine::DayStep;
+
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
-
-use crate::day_routine::DayStep;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct UnderwearConfiguration {
