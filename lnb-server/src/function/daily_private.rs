@@ -98,10 +98,6 @@ impl DailyPrivate {
         let logical_date = self.day_routine.logical_date(local_now);
         let day_progress = self.day_routine.logical_day_progress(local_now);
         let day_step = self.day_routine.determine_day_step(local_now);
-        info!(
-            "logical date: {logical_date}, day progress: {:.2}%, step: {day_step:?}",
-            day_progress * 100.0
-        );
 
         let mut daily_rng = {
             let mut hasher = Sha256::new();
@@ -111,15 +107,28 @@ impl DailyPrivate {
         };
 
         let underwear_status = self.underwear.generate_status(&mut daily_rng, day_step, None);
-        info!("underwear status: {underwear_status:?}");
         let masturbation_ranges = self.masturbation.get_playing_ranges(&mut daily_rng);
         let masturbation_status = self.masturbation.construct_status(&masturbation_ranges, day_progress);
+
+        let logical_day_start = self.day_routine.day_part_start(logical_date);
+        let masturbation_times: Vec<_> = masturbation_ranges
+            .iter()
+            .map(|mr| {
+                let start = logical_day_start + (mr.start * Duration::DAY);
+                let end = logical_day_start + (mr.end * Duration::DAY);
+                format!("({start} ~ {end})")
+            })
+            .collect();
         info!(
-            "masturbation: playing {}, {} completed, {} planned total today",
-            masturbation_status.playing_now,
-            masturbation_status.completed_count,
-            masturbation_ranges.len()
+            "logical date: {logical_date}, day progress: {:.2}%, step: {day_step:?}",
+            day_progress * 100.0
         );
+        info!("underwear status: {underwear_status:?}");
+        info!(
+            "masturbation: playing {}, {} completed",
+            masturbation_status.playing_now, masturbation_status.completed_count
+        );
+        info!("masturbation planned: {masturbation_times:?}");
 
         let info = DailyPrivateInfo {
             asked_at: now.format(&Rfc3339).map_err(FunctionError::by_serialization)?,

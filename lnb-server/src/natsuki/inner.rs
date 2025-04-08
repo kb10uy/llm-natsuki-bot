@@ -181,7 +181,6 @@ impl NatsukiInner {
                 continue;
             };
             let result = simple_function.call(&tool_calling.id, tool_calling.arguments).await?;
-            println!("{}", serde_json::to_string_pretty(&result.result).expect("testing"));
             responses.push(FunctionResponseMessage {
                 id: tool_calling.id,
                 name: tool_calling.name,
