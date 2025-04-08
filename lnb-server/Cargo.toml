@@ -7,6 +7,7 @@ edition.workspace = true
 
 [dependencies]
 lnb-core = { workspace = true }
+lnb-daily-private = { workspace = true }
 lnb-mastodon-client = { workspace = true }
 lnb-discord-client = { workspace = true }
 

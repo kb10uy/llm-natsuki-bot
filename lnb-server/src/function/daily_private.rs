@@ -6,15 +6,37 @@ use lnb_core::{
     interface::function::simple::{SimpleFunction, SimpleFunctionDescriptor, SimpleFunctionResponse},
     model::schema::DescribedSchema,
 };
+use lnb_daily_private::Configuration;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use time::OffsetDateTime;
+use time::{OffsetDateTime, Time};
+use toml::value::Time as TomlTime;
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct DailyPrivateConfig {}
+pub struct DailyPrivateConfig {
+    night_start: TomlTime,
+    morning_start: TomlTime,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct ClothesDesign {
+    color: String,
+    pattern: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct DailyPrivateInfo {
+    asked_at: OffsetDateTime,
+    bra_design: ClothesDesign,
+    panty_design: ClothesDesign,
+    menstruation_cycle: usize,
+    self_pleasure_count: usize,
+}
 
 #[derive(Debug)]
-pub struct DailyPrivate {}
+pub struct DailyPrivate {
+    configuration: Configuration,
+}
 
 impl ConfigurableSimpleFunction for DailyPrivate {
     const NAME: &'static str = stringify!(DailyPrivate);
@@ -22,7 +44,27 @@ impl ConfigurableSimpleFunction for DailyPrivate {
     type Configuration = DailyPrivateConfig;
 
     async fn configure(config: DailyPrivateConfig) -> Result<Self, FunctionError> {
-        Ok(DailyPrivate {})
+        let night_start_at = Time::from_hms_nano(
+            config.night_start.hour,
+            config.night_start.minute,
+            config.night_start.second,
+            config.night_start.nanosecond,
+        )
+        .map_err(FunctionError::by_serialization)?;
+        let daytime_start_at = Time::from_hms_nano(
+            config.morning_start.hour,
+            config.morning_start.minute,
+            config.morning_start.second,
+            config.morning_start.nanosecond,
+        )
+        .map_err(FunctionError::by_serialization)?;
+
+        Ok(DailyPrivate {
+            configuration: Configuration {
+                night_start_at,
+                daytime_start_at,
+            },
+        })
     }
 }
 
@@ -46,12 +88,10 @@ impl SimpleFunction for DailyPrivate {
 }
 
 impl DailyPrivate {
-    pub fn new() -> DailyPrivate {
-        DailyPrivate {}
-    }
-
     async fn get_daily_info(&self) -> Result<SimpleFunctionResponse, FunctionError> {
         let now = OffsetDateTime::now_local().map_err(FunctionError::by_external)?;
+        let logical_date = self.configuration.logical_date(now);
+        let day_step = self.configuration.determine_day_step(now);
 
         let info = DailyPrivateInfo {
             asked_at: now,
@@ -71,19 +111,4 @@ impl DailyPrivate {
             attachments: vec![],
         })
     }
-}
-
-#[derive(Debug, Clone, Serialize)]
-struct ClothesDesign {
-    color: String,
-    pattern: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-struct DailyPrivateInfo {
-    asked_at: OffsetDateTime,
-    bra_design: ClothesDesign,
-    panty_design: ClothesDesign,
-    menstruation_cycle: usize,
-    self_pleasure_count: usize,
 }

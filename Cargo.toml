@@ -5,6 +5,7 @@ members = [
   "lnb-server",
   "lnb-mastodon-client",
   "lnb-discord-client",
+  "lnb-daily-private",
 ]
 
 [workspace.package]
@@ -15,6 +16,7 @@ edition = "2024"
 
 [workspace.dependencies]
 lnb-core = { path = "./lnb-core" }
+lnb-daily-private = { path = "./lnb-daily-private" }
 lnb-mastodon-client = { path = "./lnb-mastodon-client" }
 lnb-discord-client = { path = "./lnb-discord-client" }
 

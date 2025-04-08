@@ -1,0 +1,9 @@
+[package]
+name = "lnb-daily-private"
+version.workspace = true
+description.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[dependencies]
+time = { workspace = true }
