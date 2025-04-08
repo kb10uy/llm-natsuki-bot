@@ -23,20 +23,21 @@ pub struct MasturbationStatus {
 impl MasturbationConfiguration {
     pub fn get_playing_ranges<R: RngCore + ?Sized>(&self, rng: &mut R) -> Vec<Range<f64>> {
         let count_distr = Poisson::new(self.daily_count_lambda).expect("invalid range");
-        let timing_distr = StandardUniform;
         let duration_distr = {
             let (mu, sigma) = self.duration_minutes_mu_sigma;
             Normal::new(mu, sigma).expect("invalid distribution")
         };
 
         let daily_total = count_distr.sample(rng).min(TECHNO_BREAK_LIMIT) as usize;
-        (0..daily_total)
+        let mut ranges: Vec<_> = (0..daily_total)
             .map(|_| {
-                let timing = timing_distr.sample(rng);
+                let timing: f64 = StandardUniform.sample(rng);
                 let duration = duration_distr.sample(rng);
                 timing..(timing + duration / MINUTES_PER_DAY)
             })
-            .collect()
+            .collect();
+        ranges.sort_by(|lhs, rhs| lhs.start.partial_cmp(&rhs.start).expect("total order"));
+        ranges
     }
 
     pub fn construct_status(&self, ranges: &[Range<f64>], day_progress: f64) -> MasturbationStatus {
