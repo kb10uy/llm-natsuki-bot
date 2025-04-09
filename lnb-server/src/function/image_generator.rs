@@ -57,8 +57,8 @@ impl SimpleFunction for ImageGenerator {
         SimpleFunctionDescriptor {
             name: "image_generator".to_string(),
             description: r#"
-                プロンプトの入力から、AI を利用して画像を生成します。
-                生成された画像の URL は返答文に含めないでください。
+                ユーザーからの要望に基づき、プロンプトの入力から AI を利用して画像を生成します。生成された画像の URL は返答文に含めないでください。
+                ユーザーから明示的に画像生成の要求があるとき以外は決してこのツールを呼ばないでください。
             "#
             .to_string(),
             parameters: DescribedSchema::object(
