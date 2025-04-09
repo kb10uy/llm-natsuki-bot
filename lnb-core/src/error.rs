@@ -60,6 +60,9 @@ pub enum ServerError {
 /// LLM 層のエラー。
 #[derive(Debug, ThisError)]
 pub enum LlmError {
+    #[error("model definition not found: {0}")]
+    ModelNotFound(String),
+
     #[error("communication failed: {0}")]
     Communication(#[source] ErasedError),
 
