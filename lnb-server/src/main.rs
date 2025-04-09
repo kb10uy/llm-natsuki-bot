@@ -9,7 +9,9 @@ mod storage;
 use crate::{
     bang_command::initialize_bang_command,
     config::AppConfig,
-    function::{ConfigurableFunction, ExchangeRate, GetIllustUrl, ImageGenerator, LocalInfo, SelfInfo},
+    function::{
+        ConfigurableSimpleFunction, DailyPrivate, ExchangeRate, GetIllustUrl, ImageGenerator, LocalInfo, SelfInfo,
+    },
     llm::initialize_llm,
     natsuki::Natsuki,
     storage::initialize_storage,
@@ -21,7 +23,7 @@ use anyhow::{Context as _, Result, bail};
 use clap::Parser;
 use config::AppConfigTool;
 use futures::future::join_all;
-use lnb_core::interface::{client::LnbClient, function::simple::SimpleFunction};
+use lnb_core::interface::client::LnbClient;
 use lnb_discord_client::DiscordLnbClient;
 use lnb_mastodon_client::MastodonLnbClient;
 use tokio::{fs::read_to_string, spawn};
@@ -83,8 +85,9 @@ async fn register_simple_functions(tool_config: &AppConfigTool, natsuki: &Natsuk
     natsuki.add_simple_function(LocalInfo::new()?).await;
 
     register_simple_function_config::<ImageGenerator>(&tool_config.image_generator, natsuki).await?;
-    register_simple_function_config::<GetIllustUrl>(&tool_config.get_illust_url, natsuki).await?;
     register_simple_function_config::<ExchangeRate>(&tool_config.exchange_rate, natsuki).await?;
+    register_simple_function_config::<GetIllustUrl>(&tool_config.get_illust_url, natsuki).await?;
+    register_simple_function_config::<DailyPrivate>(&tool_config.daily_private, natsuki).await?;
 
     Ok(())
 }
@@ -97,13 +100,13 @@ async fn register_interceptions(natsuki: &Natsuki) -> Result<()> {
 
 async fn register_simple_function_config<F>(config: &Option<F::Configuration>, natsuki: &Natsuki) -> Result<()>
 where
-    F: SimpleFunction + ConfigurableFunction + 'static,
+    F: ConfigurableSimpleFunction + 'static,
 {
     let Some(config) = config.as_ref() else {
         return Ok(());
     };
 
-    let simple_function = F::create(config).await?;
+    let simple_function = F::configure(config).await?;
     natsuki.add_simple_function(simple_function).await;
     info!("simple function configured: {}", F::NAME);
 

@@ -1,4 +1,4 @@
-use crate::{config::AppConfigToolImageGenerator, function::ConfigurableFunction};
+use crate::ConfigurableSimpleFunction;
 
 use async_openai::{
     Client,
@@ -12,10 +12,17 @@ use lnb_core::{
     interface::function::simple::{SimpleFunction, SimpleFunctionDescriptor, SimpleFunctionResponse},
     model::{conversation::ConversationAttachment, schema::DescribedSchema},
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::info;
 use url::Url;
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ImageGeneratorConfig {
+    pub endpoint: String,
+    pub token: String,
+    pub model: String,
+}
 
 #[derive(Debug)]
 pub struct ImageGenerator {
@@ -23,12 +30,12 @@ pub struct ImageGenerator {
     model: String,
 }
 
-impl ConfigurableFunction for ImageGenerator {
+impl ConfigurableSimpleFunction for ImageGenerator {
     const NAME: &'static str = stringify!(ImageGenerator);
 
-    type Configuration = AppConfigToolImageGenerator;
+    type Configuration = ImageGeneratorConfig;
 
-    async fn create(config: &AppConfigToolImageGenerator) -> Result<ImageGenerator, FunctionError> {
+    async fn configure(config: &ImageGeneratorConfig) -> Result<ImageGenerator, FunctionError> {
         let openai_config = OpenAIConfig::new()
             .with_api_key(&config.token)
             .with_api_base(&config.endpoint);
@@ -50,8 +57,8 @@ impl SimpleFunction for ImageGenerator {
         SimpleFunctionDescriptor {
             name: "image_generator".to_string(),
             description: r#"
-                プロンプトの入力から、AI を利用して画像を生成します。
-                生成された画像の URL は返答文に含めないでください。
+                ユーザーからの要望に基づき、プロンプトの入力から AI を利用して画像を生成します。生成された画像の URL は返答文に含めないでください。
+                ユーザーから明示的に画像生成の要求があるとき以外は決してこのツールを呼ばないでください。
             "#
             .to_string(),
             parameters: DescribedSchema::object(

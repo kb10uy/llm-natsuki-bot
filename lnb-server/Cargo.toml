@@ -7,6 +7,7 @@ edition.workspace = true
 
 [dependencies]
 lnb-core = { workspace = true }
+lnb-daily-private = { workspace = true }
 lnb-mastodon-client = { workspace = true }
 lnb-discord-client = { workspace = true }
 
@@ -20,6 +21,7 @@ reqwest = { workspace = true }
 rmp-serde = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+sha2 = { workspace = true }
 sqlx = { workspace = true }
 time = { workspace = true }
 tokio = { workspace = true }

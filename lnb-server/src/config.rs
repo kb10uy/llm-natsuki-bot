@@ -1,3 +1,5 @@
+use crate::function::{DailyPrivateConfig, ExchangeRateConfig, GetIllustUrlConfig, ImageGeneratorConfig};
+
 use std::{collections::HashMap, path::PathBuf};
 
 use lnb_discord_client::DiscordLnbClientConfig;
@@ -28,29 +30,10 @@ pub struct AppConfigClient {
 /// [tool]
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct AppConfigTool {
-    pub image_generator: Option<AppConfigToolImageGenerator>,
-    pub get_illust_url: Option<AppConfigToolGetIllustUrl>,
-    pub exchange_rate: Option<AppConfigToolExchangeRate>,
-}
-
-/// [tool.image_generator]
-#[derive(Debug, Clone, Deserialize)]
-pub struct AppConfigToolImageGenerator {
-    pub endpoint: String,
-    pub token: String,
-    pub model: String,
-}
-
-/// [tool.get_illust_url]
-#[derive(Debug, Clone, Deserialize)]
-pub struct AppConfigToolGetIllustUrl {
-    pub database_filepath: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct AppConfigToolExchangeRate {
-    pub endpoint: String,
-    pub token: String,
+    pub image_generator: Option<ImageGeneratorConfig>,
+    pub get_illust_url: Option<GetIllustUrlConfig>,
+    pub exchange_rate: Option<ExchangeRateConfig>,
+    pub daily_private: Option<DailyPrivateConfig>,
 }
 
 /// [storage]

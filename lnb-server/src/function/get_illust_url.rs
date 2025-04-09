@@ -1,4 +1,4 @@
-use crate::{config::AppConfigToolGetIllustUrl, function::ConfigurableFunction};
+use crate::function::ConfigurableSimpleFunction;
 
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use lnb_core::{
@@ -7,21 +7,26 @@ use lnb_core::{
     model::schema::DescribedSchema,
 };
 use rand::{rng, seq::IndexedRandom};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sqlx::{SqlitePool, prelude::FromRow};
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct GetIllustUrlConfig {
+    pub database_filepath: String,
+}
 
 #[derive(Debug)]
 pub struct GetIllustUrl {
     pool: SqlitePool,
 }
 
-impl ConfigurableFunction for GetIllustUrl {
+impl ConfigurableSimpleFunction for GetIllustUrl {
     const NAME: &'static str = stringify!(GetIllustUrl);
 
-    type Configuration = AppConfigToolGetIllustUrl;
+    type Configuration = GetIllustUrlConfig;
 
-    async fn create(config: &AppConfigToolGetIllustUrl) -> Result<GetIllustUrl, FunctionError> {
+    async fn configure(config: &GetIllustUrlConfig) -> Result<GetIllustUrl, FunctionError> {
         let pool = SqlitePool::connect(&config.database_filepath)
             .map_err(FunctionError::by_external)
             .await?;
