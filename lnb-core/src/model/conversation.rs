@@ -84,6 +84,14 @@ impl IncompleteConversation {
         Some(last_user)
     }
 
+    /// 元の `Conversation` のうち最後にある `UserMessage` を可変で取得する。
+    pub fn last_user_mut(&mut self) -> Option<&mut UserMessage> {
+        let Message::User(last_user) = self.pushed_messages.last_mut()? else {
+            return None;
+        };
+        Some(last_user)
+    }
+
     /// 最後の `AssistantMessage` に指定された `AssistantMessage` の内容を追加する。
     /// 最後が `AssistantMessage` でなければ受け取ったものをそのまま追加する。
     pub fn push_assistant(&mut self, appending_message: AssistantMessage) {

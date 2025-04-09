@@ -50,11 +50,12 @@ impl BangCommandInterception {
         incomplete: &mut IncompleteConversation,
         user_role: &UserRole,
     ) -> Result<InterceptionStatus, LlmError> {
+        let Some(last_user_message) = incomplete.last_user_mut() else {
+            return Ok(InterceptionStatus::Continue);
+        };
+
         let user_text = {
-            let Some(user_message) = incomplete.last_user() else {
-                return Ok(InterceptionStatus::Continue);
-            };
-            let mut text_contents = user_message.contents.iter().filter_map(|c| match c {
+            let mut text_contents = last_user_message.contents.iter().filter_map(|c| match c {
                 UserMessageContent::Text(t) => Some(t.as_str()),
                 _ => None,
             });
@@ -73,19 +74,22 @@ impl BangCommandInterception {
             }
         };
         debug!("bang command: {command_name} [{rest}]");
+        last_user_message.skip_llm = true;
 
         let commands = self.commands.read().await;
         let Some(command) = commands.get(command_name) else {
             return Ok(self.complete_with(format!("unknown command: {command_name}")));
         };
 
-        let result_message = command.call(context, rest, user_role).await?;
+        let mut result_message = command.call(context, rest, user_role).await?;
+        result_message.skip_llm = true;
         Ok(InterceptionStatus::Complete(result_message))
     }
 
     fn complete_with(&self, text: impl Into<String>) -> InterceptionStatus {
         InterceptionStatus::Complete(AssistantMessage {
             text: text.into(),
+            skip_llm: true,
             ..Default::default()
         })
     }
