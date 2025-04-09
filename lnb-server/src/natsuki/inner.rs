@@ -116,6 +116,7 @@ impl NatsukiInner {
                         text,
                         is_sensitive,
                         language: finished.language,
+                        skip_llm: false,
                     }));
                 }
 
@@ -127,6 +128,7 @@ impl NatsukiInner {
                         text,
                         is_sensitive,
                         language: cut.language,
+                        skip_llm: false,
                     });
                 }
 
@@ -148,6 +150,7 @@ impl NatsukiInner {
                         text: "(filtered)".to_string(),
                         is_sensitive: true,
                         language: None,
+                        skip_llm: false,
                     }));
                 }
             }

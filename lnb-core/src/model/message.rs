@@ -21,11 +21,13 @@ impl Message {
         contents: impl IntoIterator<Item = UserMessageContent>,
         name: Option<String>,
         language: Option<String>,
+        skip_llm: bool,
     ) -> Message {
         Message::User(UserMessage {
             contents: contents.into_iter().collect(),
             name,
             language,
+            skip_llm,
         })
     }
 
@@ -41,11 +43,17 @@ impl Message {
         })
     }
 
-    pub fn new_assistant(text: impl Into<String>, is_sensitive: bool, language: Option<String>) -> Message {
+    pub fn new_assistant(
+        text: impl Into<String>,
+        is_sensitive: bool,
+        language: Option<String>,
+        skip_llm: bool,
+    ) -> Message {
         Message::Assistant(AssistantMessage {
             text: text.into(),
             is_sensitive,
             language,
+            skip_llm,
         })
     }
 }
@@ -55,6 +63,7 @@ pub struct UserMessage {
     pub contents: Vec<UserMessageContent>,
     pub name: Option<String>,
     pub language: Option<String>,
+    pub skip_llm: bool,
 }
 
 impl From<UserMessage> for Message {
@@ -112,6 +121,7 @@ pub struct AssistantMessage {
     pub text: String,
     pub is_sensitive: bool,
     pub language: Option<String>,
+    pub skip_llm: bool,
 }
 
 impl From<AssistantMessage> for Message {

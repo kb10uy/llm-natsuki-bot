@@ -56,8 +56,16 @@ impl IncompleteConversation {
         }
     }
 
-    pub fn messages_with_pushed(&self) -> impl Iterator<Item = &Message> {
-        self.base.messages.iter().chain(self.pushed_messages.iter())
+    pub fn llm_sending_messages(&self) -> impl Iterator<Item = &Message> {
+        self.base
+            .messages
+            .iter()
+            .chain(self.pushed_messages.iter())
+            .filter(|m| match m {
+                Message::User(um) => !um.skip_llm,
+                Message::Assistant(am) => !am.skip_llm,
+                _ => true,
+            })
     }
 
     pub fn extend_messages(&mut self, messages: impl IntoIterator<Item = Message>) {
@@ -85,6 +93,7 @@ impl IncompleteConversation {
         };
         last_assistant.text.push_str(&appending_message.text);
         last_assistant.is_sensitive |= appending_message.is_sensitive;
+        last_assistant.skip_llm &= appending_message.skip_llm;
         if let Some(updated_language) = appending_message.language {
             last_assistant.language = Some(updated_language);
         }
@@ -98,6 +107,7 @@ impl IncompleteConversation {
             Some(Message::Assistant(mut last_assistant)) => {
                 last_assistant.text.push_str(&finished_response.text);
                 last_assistant.is_sensitive |= finished_response.is_sensitive;
+                last_assistant.skip_llm &= finished_response.skip_llm;
                 if let Some(updated_language) = finished_response.language {
                     last_assistant.language = Some(updated_language);
                 }
