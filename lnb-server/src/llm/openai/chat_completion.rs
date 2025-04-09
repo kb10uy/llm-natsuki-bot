@@ -174,7 +174,8 @@ fn transform_choice(choice: ChatChoice) -> Result<LlmUpdate, LlmError> {
         // tool_calls
         Some(FinishReason::ToolCalls) => {
             let Some(tool_calls) = choice.message.tool_calls else {
-                return Err(LlmError::ExpectationMismatch("no tool_calls value".to_string()));
+                // OpenRouter がたまに空で返してくるので見なかったことにする
+                return Ok(LlmUpdate::ToolCalling(vec![]));
             };
             let converted_calls: Result<_, _> = tool_calls
                 .into_iter()
