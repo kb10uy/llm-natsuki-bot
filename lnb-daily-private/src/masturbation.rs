@@ -3,6 +3,7 @@ use std::ops::{Not, Range};
 use rand::prelude::*;
 use rand_distr::{Normal, Poisson, StandardUniform};
 use serde::{Deserialize, Serialize};
+use time::{Date, Weekday};
 
 // 理論上無限回出るので上限を決める
 const TECHNO_BREAK_LIMIT: f64 = 12.0;
@@ -12,6 +13,7 @@ const MINUTES_PER_DAY: f64 = 24.0 * 60.0;
 pub struct MasturbationConfiguration {
     pub duration_minutes_mu_sigma: (f64, f64),
     pub daily_count_lambda: f64,
+    pub holiday_boost_scale: f64,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -24,8 +26,23 @@ pub struct MasturbationStatus {
 }
 
 impl MasturbationConfiguration {
-    pub fn calculate_daily_playing_ranges<R: RngCore + ?Sized>(&self, rng: &mut R) -> Vec<Range<f64>> {
-        let count_distr = Poisson::new(self.daily_count_lambda).expect("invalid range");
+    pub fn calculate_daily_playing_ranges<R: RngCore + ?Sized>(
+        &self,
+        rng: &mut R,
+        bleeding_days: Option<u16>,
+        logical_date: Date,
+    ) -> Vec<Range<f64>> {
+        let total_lambda = {
+            let bleeding_debuff = bleeding_days
+                .map(|days| 1.0 - (1.0 / days.max(1) as f64))
+                .unwrap_or(1.0);
+            let holiday_boost = match logical_date.weekday() {
+                Weekday::Saturday | Weekday::Sunday => 2.0,
+                _ => 1.0,
+            };
+            self.daily_count_lambda * bleeding_debuff * holiday_boost
+        };
+        let count_distr = Poisson::new(total_lambda).expect("invalid range");
         let duration_distr = {
             let (mu, sigma) = self.duration_minutes_mu_sigma;
             Normal::new(mu, sigma).expect("invalid distribution")

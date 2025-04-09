@@ -129,7 +129,11 @@ impl DailyPrivate {
         info!("menstruation: {menstruation_status:?}");
 
         // オナニー
-        let masturbation_ranges = self.masturbation.calculate_daily_playing_ranges(&mut daily_rng);
+        let masturbation_ranges = self.masturbation.calculate_daily_playing_ranges(
+            &mut daily_rng,
+            menstruation_status.bleeding_days,
+            logical_date,
+        );
         let (masturbation_status, current_play) = self
             .masturbation
             .construct_status_progress(&masturbation_ranges, day_progress);
