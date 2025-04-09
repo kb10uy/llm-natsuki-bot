@@ -8,7 +8,7 @@ use time::{Date, Weekday};
 // 理論上無限回出るので上限を決める
 const TECHNO_BREAK_LIMIT: f64 = 12.0;
 const MINUTES_PER_DAY: f64 = 24.0 * 60.0;
-const MIN_LAMBDA: f64 = 0.1;
+const MIN_LAMBDA: f64 = 1.0;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MasturbationConfiguration {
@@ -36,13 +36,12 @@ impl MasturbationConfiguration {
         let total_lambda = {
             let bleeding_debuff = bleeding_days
                 .map(|days| 1.0 - (1.0 / days.max(1) as f64))
-                .unwrap_or(1.0)
-                .min(MIN_LAMBDA);
+                .unwrap_or(1.0);
             let holiday_boost = match logical_date.weekday() {
                 Weekday::Saturday | Weekday::Sunday => self.holiday_boost_scale,
                 _ => 1.0,
             };
-            self.daily_count_lambda * bleeding_debuff * holiday_boost
+            (self.daily_count_lambda * bleeding_debuff * holiday_boost).max(MIN_LAMBDA)
         };
         let count_distr = Poisson::new(total_lambda).expect("invalid range");
         let duration_distr = {
