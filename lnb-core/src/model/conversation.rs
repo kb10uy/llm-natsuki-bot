@@ -1,6 +1,6 @@
 use crate::model::message::{AssistantMessage, Message, UserMessage};
 
-use std::{collections::BTreeSet, mem::swap};
+use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -15,11 +15,18 @@ impl ConversationId {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+pub enum ConversationModel {
+    #[default]
+    Default,
+    Specified(String),
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Conversation {
     id: ConversationId,
     messages: Vec<Message>,
-    model: Option<String>,
+    model: ConversationModel,
 }
 
 impl Conversation {
@@ -27,7 +34,7 @@ impl Conversation {
         Conversation {
             id: ConversationId::new_now(),
             messages: system.into_iter().collect(),
-            model: None,
+            model: ConversationModel::Default,
         }
     }
 
@@ -41,7 +48,7 @@ pub struct IncompleteConversation {
     base: Conversation,
     pushed_messages: Vec<Message>,
     attachments: Vec<ConversationAttachment>,
-    model_override: Option<String>,
+    model_override: Option<ConversationModel>,
 }
 
 impl IncompleteConversation {
@@ -91,10 +98,8 @@ impl IncompleteConversation {
         self.attachments.extend(attachments);
     }
 
-    pub fn set_model_override(&mut self, model: Option<String>) -> Option<String> {
-        let mut swapped = model;
-        swap(&mut self.model_override, &mut swapped);
-        swapped
+    pub fn set_model_override(&mut self, model: ConversationModel) -> Option<ConversationModel> {
+        self.model_override.replace(model)
     }
 
     /// 最後の `AssistantMessage` に指定された `AssistantMessage` の内容を追加する。
@@ -153,7 +158,7 @@ pub struct ConversationUpdate {
     intermediate_messages: Vec<Message>,
     assistant_response: AssistantMessage,
     attachments: Vec<ConversationAttachment>,
-    model_override: Option<String>,
+    model_override: Option<ConversationModel>,
 }
 
 impl ConversationUpdate {
@@ -179,8 +184,8 @@ impl ConversationUpdate {
         &self.attachments
     }
 
-    pub fn model_override(&self) -> Option<&str> {
-        self.model_override.as_deref()
+    pub fn model_override(&self) -> Option<&ConversationModel> {
+        self.model_override.as_ref()
     }
 
     pub fn complete_conversation_with(self, base_conversation: Conversation) -> Conversation {
@@ -193,7 +198,7 @@ impl ConversationUpdate {
 
         // モデル変更を反映
         if let Some(overridden) = self.model_override {
-            completed_conversation.model.replace(overridden);
+            completed_conversation.model = overridden;
         }
 
         completed_conversation
