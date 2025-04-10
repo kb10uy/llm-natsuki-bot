@@ -29,13 +29,18 @@ const TIME_FORMAT: &[BorrowedFormatItem<'static>] = format_description!("[hour]:
 #[derive(Debug, Clone, Deserialize)]
 pub struct DailyPrivateConfig {
     daily_rng_salt: String,
+    day_routine: DailyPrivateConfigDayRoutine,
+    underwear: UnderwearConfiguration,
+    masturbation: MasturbationConfiguration,
+    menstruation: MenstruationConfiguration,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct DailyPrivateConfigDayRoutine {
     morning_start: String,
     morning_preparation_minutes: usize,
     night_start: String,
     bathtime_minutes: usize,
-    underwear: UnderwearConfiguration,
-    masturbation: MasturbationConfiguration,
-    menstruation: MenstruationConfiguration,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -62,16 +67,17 @@ impl ConfigurableSimpleFunction for DailyPrivate {
     type Configuration = DailyPrivateConfig;
 
     async fn configure(config: &DailyPrivateConfig) -> Result<Self, FunctionError> {
+        let day_routine = DayRoutineConfiguration {
+            daytime_start_at: Time::parse(&config.day_routine.morning_start, TIME_FORMAT)
+                .map_err(FunctionError::by_serialization)?,
+            night_start_at: Time::parse(&config.day_routine.night_start, TIME_FORMAT)
+                .map_err(FunctionError::by_serialization)?,
+            morning_preparation: Duration::minutes(config.day_routine.morning_preparation_minutes as i64),
+            bathtime_duration: Duration::minutes(config.day_routine.bathtime_minutes as i64),
+        };
         Ok(DailyPrivate {
             rng_salt: config.daily_rng_salt.clone(),
-            day_routine: DayRoutineConfiguration {
-                daytime_start_at: Time::parse(&config.morning_start, TIME_FORMAT)
-                    .map_err(FunctionError::by_serialization)?,
-                night_start_at: Time::parse(&config.night_start, TIME_FORMAT)
-                    .map_err(FunctionError::by_serialization)?,
-                morning_preparation: Duration::minutes(config.morning_preparation_minutes as i64),
-                bathtime_duration: Duration::minutes(config.bathtime_minutes as i64),
-            },
+            day_routine,
             underwear: config.underwear.clone(),
             masturbation: config.masturbation.clone(),
             menstruation: config.menstruation.clone(),
