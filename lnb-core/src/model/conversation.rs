@@ -157,6 +157,16 @@ pub struct ConversationUpdate {
 }
 
 impl ConversationUpdate {
+    pub fn create_ephemeral(id: ConversationId, user: UserMessage, assistant: AssistantMessage) -> ConversationUpdate {
+        ConversationUpdate {
+            base_conversation_id: id,
+            intermediate_messages: vec![user.into()],
+            assistant_response: assistant,
+            attachments: vec![],
+            model_override: None,
+        }
+    }
+
     pub fn id(&self) -> ConversationId {
         self.base_conversation_id
     }
