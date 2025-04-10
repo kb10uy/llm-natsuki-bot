@@ -1,6 +1,6 @@
-use std::collections::BTreeSet;
-
 use crate::model::message::{AssistantMessage, Message, UserMessage};
+
+use std::{collections::BTreeSet, mem::swap};
 
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -19,6 +19,7 @@ impl ConversationId {
 pub struct Conversation {
     id: ConversationId,
     messages: Vec<Message>,
+    model: Option<String>,
 }
 
 impl Conversation {
@@ -26,16 +27,12 @@ impl Conversation {
         Conversation {
             id: ConversationId::new_now(),
             messages: system.into_iter().collect(),
+            model: None,
         }
     }
 
     pub fn id(&self) -> ConversationId {
         self.id
-    }
-
-    pub fn push_messages(mut self, pushed_messages: impl IntoIterator<Item = Message>) -> Conversation {
-        self.messages.extend(pushed_messages);
-        self
     }
 }
 
@@ -44,6 +41,7 @@ pub struct IncompleteConversation {
     base: Conversation,
     pushed_messages: Vec<Message>,
     attachments: Vec<ConversationAttachment>,
+    model_override: Option<String>,
 }
 
 impl IncompleteConversation {
@@ -53,6 +51,7 @@ impl IncompleteConversation {
             base: conversation,
             pushed_messages,
             attachments: vec![],
+            model_override: None,
         }
     }
 
@@ -66,14 +65,6 @@ impl IncompleteConversation {
                 Message::Assistant(am) => !am.skip_llm,
                 _ => true,
             })
-    }
-
-    pub fn extend_messages(&mut self, messages: impl IntoIterator<Item = Message>) {
-        self.pushed_messages.extend(messages);
-    }
-
-    pub fn extend_attachments(&mut self, attachments: impl IntoIterator<Item = ConversationAttachment>) {
-        self.attachments.extend(attachments);
     }
 
     /// 元の `Conversation` のうち最後にある `UserMessage` を取得する。
@@ -90,6 +81,20 @@ impl IncompleteConversation {
             return None;
         };
         Some(last_user)
+    }
+
+    pub fn extend_messages(&mut self, messages: impl IntoIterator<Item = Message>) {
+        self.pushed_messages.extend(messages);
+    }
+
+    pub fn extend_attachments(&mut self, attachments: impl IntoIterator<Item = ConversationAttachment>) {
+        self.attachments.extend(attachments);
+    }
+
+    pub fn set_model_override(&mut self, model: Option<String>) -> Option<String> {
+        let mut swapped = model;
+        swap(&mut self.model_override, &mut swapped);
+        swapped
     }
 
     /// 最後の `AssistantMessage` に指定された `AssistantMessage` の内容を追加する。
@@ -137,6 +142,7 @@ impl IncompleteConversation {
             intermediate_messages: self.pushed_messages,
             assistant_response,
             attachments: self.attachments,
+            model_override: self.model_override,
         }
     }
 }
@@ -147,6 +153,7 @@ pub struct ConversationUpdate {
     intermediate_messages: Vec<Message>,
     assistant_response: AssistantMessage,
     attachments: Vec<ConversationAttachment>,
+    model_override: Option<String>,
 }
 
 impl ConversationUpdate {
@@ -162,10 +169,24 @@ impl ConversationUpdate {
         &self.attachments
     }
 
-    pub fn into_completing_messages(self) -> Vec<Message> {
-        let mut messages = self.intermediate_messages;
-        messages.push(self.assistant_response.into());
-        messages
+    pub fn model_override(&self) -> Option<&str> {
+        self.model_override.as_deref()
+    }
+
+    pub fn complete_conversation_with(self, base_conversation: Conversation) -> Conversation {
+        debug_assert!(base_conversation.id == self.base_conversation_id);
+        let mut completed_conversation = base_conversation;
+
+        // `Message` 連結
+        completed_conversation.messages.extend(self.intermediate_messages);
+        completed_conversation.messages.push(self.assistant_response.into());
+
+        // モデル変更を反映
+        if let Some(overridden) = self.model_override {
+            completed_conversation.model.replace(overridden);
+        }
+
+        completed_conversation
     }
 }
 

@@ -95,17 +95,18 @@ impl ChatCompletionBackendInner {
     async fn send_conversation(&self, conversation: &IncompleteConversation) -> Result<LlmUpdate, LlmError> {
         let messages: Result<_, _> = conversation.llm_sending_messages().map(transform_message).collect();
         if self.structured_mode {
-            self.send_conversation_structured(messages?).await
+            self.send_conversation_structured(messages?, None).await
         } else {
-            self.send_conversation_normal(messages?).await
+            self.send_conversation_normal(messages?, None).await
         }
     }
 
     async fn send_conversation_normal(
         &self,
         messages: Vec<ChatCompletionRequestMessage>,
+        model_name: Option<&str>,
     ) -> Result<LlmUpdate, LlmError> {
-        let (client, model, enable_tool) = self.create_client_by_name(None).await?;
+        let (client, model, enable_tool) = self.create_client_by_name(model_name).await?;
         // https://github.com/rust-lang/rust-clippy/issues/14578
         #[allow(clippy::unnecessary_lazy_evaluations)]
         let tools: OptionFuture<_> = enable_tool.then(async || self.tools.read().await.clone()).into();
@@ -129,8 +130,9 @@ impl ChatCompletionBackendInner {
     async fn send_conversation_structured(
         &self,
         messages: Vec<ChatCompletionRequestMessage>,
+        model_name: Option<&str>,
     ) -> Result<LlmUpdate, LlmError> {
-        let (client, model, enable_tool) = self.create_client_by_name(None).await?;
+        let (client, model, enable_tool) = self.create_client_by_name(model_name).await?;
         // https://github.com/rust-lang/rust-clippy/issues/14578
         #[allow(clippy::unnecessary_lazy_evaluations)]
         let tools: OptionFuture<_> = enable_tool.then(async || self.tools.read().await.clone()).into();
