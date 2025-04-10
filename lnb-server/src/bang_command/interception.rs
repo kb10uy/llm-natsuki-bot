@@ -8,7 +8,7 @@ use lnb_core::{
         interception::{Interception, InterceptionStatus},
     },
     model::{
-        conversation::{IncompleteConversation, UserRole},
+        conversation::{ConversationModel, IncompleteConversation, UserRole},
         message::{AssistantMessage, UserMessageContent},
     },
 };
@@ -82,8 +82,10 @@ impl BangCommandInterception {
         };
 
         let result_status = command.call(context, rest, user_role).await?;
-        incomplete.set_model_override(result_status.model_update);
-        Ok(InterceptionStatus::Complete(result_status.message))
+        if let Some(model_override) = result_status.model_override {
+            incomplete.set_model_override(model_override);
+        }
+        Ok(result_status.status)
     }
 
     fn complete_with(&self, text: impl Into<String>) -> InterceptionStatus {
@@ -97,8 +99,8 @@ impl BangCommandInterception {
 
 #[derive(Debug, Clone, Default)]
 pub struct BangCommandResponse {
-    pub message: AssistantMessage,
-    pub model_update: Option<String>,
+    pub status: InterceptionStatus,
+    pub model_override: Option<ConversationModel>,
 }
 
 /// `BangCommandInterception` から呼び出されるコマンドの実装。
