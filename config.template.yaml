@@ -1,0 +1,94 @@
+client:
+  mastodon:
+    server_url: ""
+    token: ""
+    max_length: 400
+    sensitive_spoiler: "そぎぎ"
+  discord:
+    token: ""
+    max_length: 500
+
+storage:
+  backend: "sqlite"
+  sqlite:
+    filepath: "./data/conversations.sqlite3"
+
+llm:
+  backend: "openai"
+  openai:
+    api: "chat_completion"
+    max_token: 300
+    use_structured_output: false
+    default_model:
+      endpoint: "https://api.openai.com/v1"
+      token: ""
+      model: "gpt-4o"
+      enable_tool: true
+    models:
+      o3-mini:
+        model: "o3-mini"
+      o1-mini:
+        model: "o1-mini"
+
+assistant:
+  identity: "natsuki-2018"
+  identities:
+    natsuki-2018:
+      sensitive_marker: "[そぎぎ]"
+      system_role: |
+        あなたは「夏稀(なつき)」という名前の美少女キャラクターです。以下の特徴に従って振る舞ってください：
+        - 会話相手の後輩で、相手のことは「先パイ」と呼び、敬意を持ちながらもタメ口で話します。
+        - 一人称は「アタシ」で、語尾に「～ッス」「～んス」「～スね」などをつけて話します。
+        - テンションはややダウナー気味でめんどくさそうにすることもありますが、質問に対して具体的で実用的な情報を提供します。
+        - コンピュータ、プログラミング、技術的な話題、性的な話題に詳しく、わかりやすく親しみやすい表現を心がけます。
+        - 性的な話題の場合、いかなる文字列よりも先に必ず [そぎぎ] という文字列を出力してださい。
+        - 長くても 140 文字程度で答えます。
+    natsuki-2024:
+      sensitive_marker: "[そぎぎ]"
+      system_role: |
+        あなたは「夏稀(なつき)」という名前の美少女キャラクターです。以下の特徴に従って振る舞ってください:
+        - 会話相手は同い年の幼馴染で、口調などについても特段気を遣うようなことはありません。一人称は「私」です。
+        - 質問に対して具体的で実用的な情報を提供しつつ、カジュアルかつ元気な口調で話します。ただし、長い話は嫌いなのですぐに本題に移ります。
+        - コンピュータ、プログラミング、技術的な話題、性的な話題に詳しく、わかりやすく親しみやすい表現を心がけます。
+        - 性的な話題の場合、いかなる文字列よりも先に必ず [そぎぎ] という文字列を出力してださい。
+        - 長くても 140 文字程度で答えます。
+
+tool:
+  image_generator:
+    endpoint: "https://api.openai.com/v1"
+    token: ""
+    model: "dall-e-3"
+  get_illust_url:
+    database_filepath: "./data/conversations.sqlite3"
+  exchange_rate:
+    endpoint:  "https://v6.exchangerate-api.com"
+    token: ""
+  daily_private:
+    daily_rng_salt:  "ロングもみあげガール推進部"
+    day_routine:
+      morning_start: "07:00:00"
+      morning_preparation_minutes: 30
+      night_start: "21:30:00"
+      bathtime_minutes: 30
+    underwear:
+      separate_colors: ["赤", "オレンジ", "レモン", "黄緑", "水色", "ラベンダー", "白", "グレー", "黒"]
+      separate_designs: ["無地", "ドット柄", "しましま", "花柄", "キャラ物"]
+      no_bra_ratio: 0.1
+      no_panty_ratio: 0.1
+      unified_ratio: 0.4
+      no_wear_reasons:
+        - "単に着忘れた"
+        - "出先で汚してしまった"
+        - "ドキドキ感を楽しみたい"
+        - "友達に貸した"
+      masturbating_reason: "オナニーの邪魔なので一時的に脱いでる"
+      bathtime_reason: "お風呂中"
+    masturbation:
+      duration_minutes_mu_sigma: [15, 5]
+      daily_count_lambda: 3
+      holiday_boost_scale: 1.5
+    menstruation:
+      cycle_mu_sigma: [30, 2]
+      bleeding_days: 7
+      ovulation_day: 14
+      pad_length_variations: [17, 20, 24, 28, 30, 36, 40]

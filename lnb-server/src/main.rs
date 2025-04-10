@@ -63,7 +63,7 @@ async fn main() -> Result<()> {
 
 async fn load_config(path: impl AsRef<Path>) -> Result<AppConfig> {
     let config_str = read_to_string(path).await.context("failed to read config file")?;
-    toml::from_str(&config_str).context("failed to parse config")
+    serde_yml::from_str(&config_str).context("failed to parse config")
 }
 
 async fn initialize_natsuki(config: &AppConfig) -> Result<Natsuki> {
