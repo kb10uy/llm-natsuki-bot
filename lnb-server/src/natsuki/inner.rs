@@ -123,8 +123,8 @@ impl NatsukiInner {
 
                 // 続行
                 LlmUpdate::LengthCut(cut) => {
-                    debug!("conversation cut due to length");
                     let (text, is_sensitive) = self.strip_sensitive_text(cut.text, cut.sensitive);
+                    debug!("conversation cut, continuing: {text}");
                     incomplete_conversation.push_assistant(AssistantMessage {
                         text,
                         is_sensitive,

@@ -72,7 +72,6 @@ pub enum AppConfigLlmBackend {
 #[derive(Debug, Clone, Deserialize)]
 pub struct AppConfigLlmOpenai {
     pub api: AppConfigLlmOpenaiApi,
-    pub max_token: usize,
     pub use_structured_output: bool,
     pub default_model: AppConfigLlmOpenaiDefaultModel,
     pub models: HashMap<String, AppConfigLlmOpenaiModel>,
@@ -84,6 +83,7 @@ pub struct AppConfigLlmOpenaiDefaultModel {
     pub token: String,
     pub model: String,
     pub enable_tool: bool,
+    pub max_token: usize,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -92,6 +92,7 @@ pub struct AppConfigLlmOpenaiModel {
     pub token: Option<String>,
     pub model: Option<String>,
     pub enable_tool: Option<bool>,
+    pub max_token: Option<usize>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
