@@ -85,6 +85,7 @@ impl NatsukiInner {
                 .await?;
             match status {
                 InterceptionStatus::Continue => continue,
+                InterceptionStatus::Bypass => break,
                 InterceptionStatus::Complete(message) => {
                     debug!("interceptor reported conversation completion");
                     return Ok(incomplete_conversation.finish(message));
