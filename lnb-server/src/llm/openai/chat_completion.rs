@@ -1,12 +1,12 @@
 use crate::{
-    config::AppConfigLlmOpenai,
+    config::{AppConfigLlmOpenai, AppConfigLlmOpenaiDefaultModel, AppConfigLlmOpenaiModel},
     llm::{
         convert_json_schema,
         openai::{RESPONSE_JSON_SCHEMA, create_openai_client},
     },
 };
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use async_openai::{
     Client,
@@ -20,7 +20,10 @@ use async_openai::{
         ResponseFormat,
     },
 };
-use futures::{FutureExt, TryFutureExt, future::BoxFuture};
+use futures::{
+    FutureExt, TryFutureExt,
+    future::{BoxFuture, OptionFuture},
+};
 use lnb_core::{
     error::LlmError,
     interface::{
@@ -28,7 +31,7 @@ use lnb_core::{
         llm::{Llm, LlmAssistantResponse, LlmUpdate},
     },
     model::{
-        conversation::IncompleteConversation,
+        conversation::{ConversationModel, IncompleteConversation},
         message::{Message, MessageToolCalling, UserMessageContent},
     },
 };
@@ -40,15 +43,12 @@ pub struct ChatCompletionBackend(Arc<ChatCompletionBackendInner>);
 
 impl ChatCompletionBackend {
     pub async fn new(config: &AppConfigLlmOpenai) -> Result<ChatCompletionBackend, LlmError> {
-        let client = create_openai_client(config).await?;
-        let model = config.model.clone();
-
         Ok(ChatCompletionBackend(Arc::new(ChatCompletionBackendInner {
-            client,
             tools: RwLock::new(Vec::new()),
-            model,
             max_token: config.max_token,
             structured_mode: config.use_structured_output,
+            default_model: config.default_model.clone(),
+            models: config.models.clone(),
         })))
     }
 }
@@ -69,11 +69,11 @@ impl Llm for ChatCompletionBackend {
 
 #[derive(Debug)]
 struct ChatCompletionBackendInner {
-    client: Client<OpenAIConfig>,
     tools: RwLock<Vec<ChatCompletionTool>>,
-    model: String,
     max_token: usize,
     structured_mode: bool,
+    default_model: AppConfigLlmOpenaiDefaultModel,
+    models: HashMap<String, AppConfigLlmOpenaiModel>,
 }
 
 impl ChatCompletionBackendInner {
@@ -93,27 +93,35 @@ impl ChatCompletionBackendInner {
     }
 
     async fn send_conversation(&self, conversation: &IncompleteConversation) -> Result<LlmUpdate, LlmError> {
-        let messages: Result<_, _> = conversation.messages_with_pushed().map(transform_message).collect();
+        let messages: Result<_, _> = conversation.llm_sending_messages().map(transform_message).collect();
         if self.structured_mode {
-            self.send_conversation_structured(messages?).await
+            self.send_conversation_structured(messages?, conversation.current_model())
+                .await
         } else {
-            self.send_conversation_normal(messages?).await
+            self.send_conversation_normal(messages?, conversation.current_model())
+                .await
         }
     }
 
     async fn send_conversation_normal(
         &self,
         messages: Vec<ChatCompletionRequestMessage>,
+        model: &ConversationModel,
     ) -> Result<LlmUpdate, LlmError> {
+        let (client, model, enable_tool) = self.create_client_by_name(model).await?;
+        // https://github.com/rust-lang/rust-clippy/issues/14578
+        #[allow(clippy::unnecessary_lazy_evaluations)]
+        let tools: OptionFuture<_> = enable_tool.then(async || self.tools.read().await.clone()).into();
+
         let request = CreateChatCompletionRequest {
+            model,
             messages,
-            tools: Some(self.tools.read().await.clone()),
-            model: self.model.clone(),
+            tools: tools.await,
             max_completion_tokens: Some(self.max_token as u32),
             ..Default::default()
         };
 
-        let openai_response = self.client.chat().create(request).map_err(LlmError::by_backend).await?;
+        let openai_response = client.chat().create(request).map_err(LlmError::by_backend).await?;
         let Some(first_choice) = openai_response.choices.into_iter().next() else {
             return Err(LlmError::NoChoice);
         };
@@ -124,11 +132,17 @@ impl ChatCompletionBackendInner {
     async fn send_conversation_structured(
         &self,
         messages: Vec<ChatCompletionRequestMessage>,
+        model: &ConversationModel,
     ) -> Result<LlmUpdate, LlmError> {
+        let (client, model, enable_tool) = self.create_client_by_name(model).await?;
+        // https://github.com/rust-lang/rust-clippy/issues/14578
+        #[allow(clippy::unnecessary_lazy_evaluations)]
+        let tools: OptionFuture<_> = enable_tool.then(async || self.tools.read().await.clone()).into();
+
         let request = CreateChatCompletionRequest {
+            model,
             messages,
-            tools: Some(self.tools.read().await.clone()),
-            model: self.model.clone(),
+            tools: tools.await,
             response_format: Some(ResponseFormat::JsonSchema {
                 json_schema: RESPONSE_JSON_SCHEMA.clone(),
             }),
@@ -136,12 +150,36 @@ impl ChatCompletionBackendInner {
             ..Default::default()
         };
 
-        let openai_response = self.client.chat().create(request).map_err(LlmError::by_backend).await?;
+        let openai_response = client.chat().create(request).map_err(LlmError::by_backend).await?;
         let Some(first_choice) = openai_response.choices.into_iter().next() else {
             return Err(LlmError::NoChoice);
         };
 
         transform_choice(first_choice)
+    }
+
+    async fn create_client_by_name(
+        &self,
+        model: &ConversationModel,
+    ) -> Result<(Client<OpenAIConfig>, String, bool), LlmError> {
+        if let ConversationModel::Specified(model_name) = model {
+            let Some(overriding_model) = self.models.get(model_name) else {
+                return Err(LlmError::ModelNotFound(model_name.to_string()));
+            };
+            let token = overriding_model.token.as_deref().unwrap_or(&self.default_model.token);
+            let endpoint = overriding_model
+                .endpoint
+                .as_deref()
+                .unwrap_or(&self.default_model.endpoint);
+            let model = overriding_model.model.as_deref().unwrap_or(&self.default_model.model);
+            let enable_tool = overriding_model.enable_tool.unwrap_or(self.default_model.enable_tool);
+
+            let client = create_openai_client(token, endpoint).await?;
+            Ok((client, model.to_string(), enable_tool))
+        } else {
+            let client = create_openai_client(&self.default_model.token, &self.default_model.endpoint).await?;
+            Ok((client, self.default_model.model.clone(), self.default_model.enable_tool))
+        }
     }
 }
 

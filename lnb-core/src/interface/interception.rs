@@ -21,10 +21,14 @@ pub trait Interception: Send + Sync {
     ) -> BoxFuture<'a, Result<InterceptionStatus, LlmError>>;
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum InterceptionStatus {
     /// 処理を続行する(後続の `Llm::send_conversation` が実行される)。
+    #[default]
     Continue,
+
+    /// 処理を続行する(Interception はスキップされるが後続の `Llm::send_conversation` が実行される)。
+    Bypass,
 
     /// 処理を完了する(後続の `Llm::send_conversation` は実行されずすぐに `ConversationUpdate` が構築される)。
     Complete(AssistantMessage),

@@ -85,6 +85,7 @@ impl NatsukiInner {
                 .await?;
             match status {
                 InterceptionStatus::Continue => continue,
+                InterceptionStatus::Bypass => break,
                 InterceptionStatus::Complete(message) => {
                     debug!("interceptor reported conversation completion");
                     return Ok(incomplete_conversation.finish(message));
@@ -116,6 +117,7 @@ impl NatsukiInner {
                         text,
                         is_sensitive,
                         language: finished.language,
+                        skip_llm: false,
                     }));
                 }
 
@@ -127,6 +129,7 @@ impl NatsukiInner {
                         text,
                         is_sensitive,
                         language: cut.language,
+                        skip_llm: false,
                     });
                 }
 
@@ -148,6 +151,7 @@ impl NatsukiInner {
                         text: "(filtered)".to_string(),
                         is_sensitive: true,
                         language: None,
+                        skip_llm: false,
                     }));
                 }
             }
@@ -210,9 +214,7 @@ impl NatsukiInner {
             .fetch_content_by_id(update.id())
             .await?
             .ok_or_else(|| ServerError::ConversationNotFound(update.id()))?;
-        let completing_messages = update.into_completing_messages();
-
-        let updated_conversation = current_conversation.push_messages(completing_messages);
+        let updated_conversation = update.complete_conversation_with(current_conversation);
         self.storage.upsert(&updated_conversation, Some(context_key)).await?;
         Ok(())
     }

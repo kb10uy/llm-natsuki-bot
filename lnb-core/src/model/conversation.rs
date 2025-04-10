@@ -1,6 +1,6 @@
-use std::collections::BTreeSet;
-
 use crate::model::message::{AssistantMessage, Message, UserMessage};
+
+use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -15,10 +15,18 @@ impl ConversationId {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+pub enum ConversationModel {
+    #[default]
+    Default,
+    Specified(String),
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Conversation {
     id: ConversationId,
     messages: Vec<Message>,
+    model: ConversationModel,
 }
 
 impl Conversation {
@@ -26,16 +34,12 @@ impl Conversation {
         Conversation {
             id: ConversationId::new_now(),
             messages: system.into_iter().collect(),
+            model: ConversationModel::Default,
         }
     }
 
     pub fn id(&self) -> ConversationId {
         self.id
-    }
-
-    pub fn push_messages(mut self, pushed_messages: impl IntoIterator<Item = Message>) -> Conversation {
-        self.messages.extend(pushed_messages);
-        self
     }
 }
 
@@ -44,6 +48,7 @@ pub struct IncompleteConversation {
     base: Conversation,
     pushed_messages: Vec<Message>,
     attachments: Vec<ConversationAttachment>,
+    model_override: Option<ConversationModel>,
 }
 
 impl IncompleteConversation {
@@ -53,11 +58,40 @@ impl IncompleteConversation {
             base: conversation,
             pushed_messages,
             attachments: vec![],
+            model_override: None,
         }
     }
 
-    pub fn messages_with_pushed(&self) -> impl Iterator<Item = &Message> {
-        self.base.messages.iter().chain(self.pushed_messages.iter())
+    pub fn llm_sending_messages(&self) -> impl Iterator<Item = &Message> {
+        self.base
+            .messages
+            .iter()
+            .chain(self.pushed_messages.iter())
+            .filter(|m| match m {
+                Message::User(um) => !um.skip_llm,
+                Message::Assistant(am) => !am.skip_llm,
+                _ => true,
+            })
+    }
+
+    pub fn current_model(&self) -> &ConversationModel {
+        self.model_override.as_ref().unwrap_or(&self.base.model)
+    }
+
+    /// 元の `Conversation` のうち最後にある `UserMessage` を取得する。
+    pub fn last_user(&self) -> Option<&UserMessage> {
+        let Some(Message::User(last_user)) = &self.pushed_messages.last() else {
+            return None;
+        };
+        Some(last_user)
+    }
+
+    /// 元の `Conversation` のうち最後にある `UserMessage` を可変で取得する。
+    pub fn last_user_mut(&mut self) -> Option<&mut UserMessage> {
+        let Message::User(last_user) = self.pushed_messages.last_mut()? else {
+            return None;
+        };
+        Some(last_user)
     }
 
     pub fn extend_messages(&mut self, messages: impl IntoIterator<Item = Message>) {
@@ -68,12 +102,8 @@ impl IncompleteConversation {
         self.attachments.extend(attachments);
     }
 
-    /// 元の `Conversation` のうち最後にある `UserMessage` を取得する。
-    pub fn last_user(&self) -> Option<&UserMessage> {
-        let Some(Message::User(last_user)) = &self.pushed_messages.last() else {
-            return None;
-        };
-        Some(last_user)
+    pub fn set_model_override(&mut self, model: ConversationModel) -> Option<ConversationModel> {
+        self.model_override.replace(model)
     }
 
     /// 最後の `AssistantMessage` に指定された `AssistantMessage` の内容を追加する。
@@ -85,6 +115,7 @@ impl IncompleteConversation {
         };
         last_assistant.text.push_str(&appending_message.text);
         last_assistant.is_sensitive |= appending_message.is_sensitive;
+        last_assistant.skip_llm &= appending_message.skip_llm;
         if let Some(updated_language) = appending_message.language {
             last_assistant.language = Some(updated_language);
         }
@@ -98,6 +129,7 @@ impl IncompleteConversation {
             Some(Message::Assistant(mut last_assistant)) => {
                 last_assistant.text.push_str(&finished_response.text);
                 last_assistant.is_sensitive |= finished_response.is_sensitive;
+                last_assistant.skip_llm &= finished_response.skip_llm;
                 if let Some(updated_language) = finished_response.language {
                     last_assistant.language = Some(updated_language);
                 }
@@ -119,6 +151,7 @@ impl IncompleteConversation {
             intermediate_messages: self.pushed_messages,
             assistant_response,
             attachments: self.attachments,
+            model_override: self.model_override,
         }
     }
 }
@@ -129,9 +162,20 @@ pub struct ConversationUpdate {
     intermediate_messages: Vec<Message>,
     assistant_response: AssistantMessage,
     attachments: Vec<ConversationAttachment>,
+    model_override: Option<ConversationModel>,
 }
 
 impl ConversationUpdate {
+    pub fn create_ephemeral(id: ConversationId, user: UserMessage, assistant: AssistantMessage) -> ConversationUpdate {
+        ConversationUpdate {
+            base_conversation_id: id,
+            intermediate_messages: vec![user.into()],
+            assistant_response: assistant,
+            attachments: vec![],
+            model_override: None,
+        }
+    }
+
     pub fn id(&self) -> ConversationId {
         self.base_conversation_id
     }
@@ -144,10 +188,24 @@ impl ConversationUpdate {
         &self.attachments
     }
 
-    pub fn into_completing_messages(self) -> Vec<Message> {
-        let mut messages = self.intermediate_messages;
-        messages.push(self.assistant_response.into());
-        messages
+    pub fn model_override(&self) -> Option<&ConversationModel> {
+        self.model_override.as_ref()
+    }
+
+    pub fn complete_conversation_with(self, base_conversation: Conversation) -> Conversation {
+        debug_assert!(base_conversation.id == self.base_conversation_id);
+        let mut completed_conversation = base_conversation;
+
+        // `Message` 連結
+        completed_conversation.messages.extend(self.intermediate_messages);
+        completed_conversation.messages.push(self.assistant_response.into());
+
+        // モデル変更を反映
+        if let Some(overridden) = self.model_override {
+            completed_conversation.model = overridden;
+        }
+
+        completed_conversation
     }
 }
 

@@ -19,8 +19,8 @@ pub struct ResponsesBackend(Arc<ResponsesBackendInner>);
 
 impl ResponsesBackend {
     pub async fn new(config: &AppConfigLlmOpenai) -> Result<ResponsesBackend, LlmError> {
-        let client = create_openai_client(config).await?;
-        let model = config.model.clone();
+        let client = create_openai_client(&config.default_model.token, &config.default_model.endpoint).await?;
+        let model = config.default_model.model.clone();
 
         Ok(ResponsesBackend(Arc::new(ResponsesBackendInner { client, model })))
     }

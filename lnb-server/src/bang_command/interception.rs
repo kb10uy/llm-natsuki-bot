@@ -8,7 +8,7 @@ use lnb_core::{
         interception::{Interception, InterceptionStatus},
     },
     model::{
-        conversation::{IncompleteConversation, UserRole},
+        conversation::{ConversationModel, IncompleteConversation, UserRole},
         message::{AssistantMessage, UserMessageContent},
     },
 };
@@ -50,11 +50,12 @@ impl BangCommandInterception {
         incomplete: &mut IncompleteConversation,
         user_role: &UserRole,
     ) -> Result<InterceptionStatus, LlmError> {
+        let Some(last_user_message) = incomplete.last_user_mut() else {
+            return Ok(InterceptionStatus::Continue);
+        };
+
         let user_text = {
-            let Some(user_message) = incomplete.last_user() else {
-                return Ok(InterceptionStatus::Continue);
-            };
-            let mut text_contents = user_message.contents.iter().filter_map(|c| match c {
+            let mut text_contents = last_user_message.contents.iter().filter_map(|c| match c {
                 UserMessageContent::Text(t) => Some(t.as_str()),
                 _ => None,
             });
@@ -73,22 +74,33 @@ impl BangCommandInterception {
             }
         };
         debug!("bang command: {command_name} [{rest}]");
+        last_user_message.skip_llm = true;
 
         let commands = self.commands.read().await;
         let Some(command) = commands.get(command_name) else {
             return Ok(self.complete_with(format!("unknown command: {command_name}")));
         };
 
-        let result_message = command.call(context, rest, user_role).await?;
-        Ok(InterceptionStatus::Complete(result_message))
+        let result_status = command.call(context, rest, user_role).await?;
+        if let Some(model_override) = result_status.model_override {
+            incomplete.set_model_override(model_override);
+        }
+        Ok(result_status.status)
     }
 
     fn complete_with(&self, text: impl Into<String>) -> InterceptionStatus {
         InterceptionStatus::Complete(AssistantMessage {
             text: text.into(),
+            skip_llm: true,
             ..Default::default()
         })
     }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct BangCommandResponse {
+    pub status: InterceptionStatus,
+    pub model_override: Option<ConversationModel>,
 }
 
 /// `BangCommandInterception` から呼び出されるコマンドの実装。
@@ -98,7 +110,7 @@ pub trait BangCommand: Send + Sync {
         context: &'a Context,
         rest_text: &'a str,
         user_role: &'a UserRole,
-    ) -> BoxFuture<'a, Result<AssistantMessage, LlmError>>;
+    ) -> BoxFuture<'a, Result<BangCommandResponse, LlmError>>;
 }
 
 impl<T: BangCommand + 'static> From<T> for BoxBangCommand {
@@ -110,10 +122,10 @@ impl<T: BangCommand + 'static> From<T> for BoxBangCommand {
 type BoxedAsyncClosure = Box<
     dyn Send
         + Sync
-        + for<'a> Fn(&'a Context, &'a str, &'a UserRole) -> BoxFuture<'a, Result<AssistantMessage, LlmError>>,
+        + for<'a> Fn(&'a Context, &'a str, &'a UserRole) -> BoxFuture<'a, Result<BangCommandResponse, LlmError>>,
 >;
 type BoxedSyncClosure =
-    Box<dyn Send + Sync + for<'a> Fn(&'a Context, &'a str, &'a UserRole) -> Result<AssistantMessage, LlmError>>;
+    Box<dyn Send + Sync + for<'a> Fn(&'a Context, &'a str, &'a UserRole) -> Result<BangCommandResponse, LlmError>>;
 
 pub struct AsyncClosure(BoxedAsyncClosure);
 pub struct SyncClosure(BoxedSyncClosure);
@@ -124,7 +136,7 @@ impl BangCommand for AsyncClosure {
         context: &'a Context,
         rest_text: &'a str,
         user_role: &'a UserRole,
-    ) -> BoxFuture<'a, Result<AssistantMessage, LlmError>> {
+    ) -> BoxFuture<'a, Result<BangCommandResponse, LlmError>> {
         (self.0)(context, rest_text, user_role)
     }
 }
@@ -135,7 +147,7 @@ impl BangCommand for SyncClosure {
         context: &'a Context,
         rest_text: &'a str,
         user_role: &'a UserRole,
-    ) -> BoxFuture<'a, Result<AssistantMessage, LlmError>> {
+    ) -> BoxFuture<'a, Result<BangCommandResponse, LlmError>> {
         async { (self.0)(context, rest_text, user_role) }.boxed()
     }
 }
@@ -145,7 +157,7 @@ pub fn async_fn_command<F>(f: F) -> AsyncClosure
 where
     F: Send
         + Sync
-        + for<'a> Fn(&'a Context, &'a str, &'a UserRole) -> BoxFuture<'a, Result<AssistantMessage, LlmError>>
+        + for<'a> Fn(&'a Context, &'a str, &'a UserRole) -> BoxFuture<'a, Result<BangCommandResponse, LlmError>>
         + 'static,
 {
     AsyncClosure(Box::new(f))
@@ -154,7 +166,7 @@ where
 #[allow(dead_code)]
 pub fn fn_command<F>(f: F) -> SyncClosure
 where
-    F: Send + Sync + for<'a> Fn(&'a Context, &'a str, &'a UserRole) -> Result<AssistantMessage, LlmError> + 'static,
+    F: Send + Sync + for<'a> Fn(&'a Context, &'a str, &'a UserRole) -> Result<BangCommandResponse, LlmError> + 'static,
 {
     SyncClosure(Box::new(f))
 }
