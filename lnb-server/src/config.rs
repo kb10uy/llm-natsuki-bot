@@ -6,7 +6,7 @@ use lnb_discord_client::DiscordLnbClientConfig;
 use lnb_mastodon_client::MastodonLnbClientConfig;
 use serde::Deserialize;
 
-/// config.toml
+/// config.yaml
 #[derive(Debug, Clone, Deserialize)]
 pub struct AppConfig {
     #[serde(default = "Default::default")]

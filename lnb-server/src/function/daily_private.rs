@@ -1,4 +1,4 @@
-use crate::function::{ConfigurableSimpleFunction, extract_time_from_toml};
+use crate::function::ConfigurableSimpleFunction;
 
 use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
@@ -16,17 +16,22 @@ use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use time::{Duration, OffsetDateTime, PrimitiveDateTime, format_description::well_known::Rfc3339};
-use toml::value::Datetime as TomlDateTime;
+use time::{
+    Duration, OffsetDateTime, PrimitiveDateTime, Time,
+    format_description::{BorrowedFormatItem, well_known::Rfc3339},
+    macros::format_description,
+};
 use tracing::info;
+
+const TIME_FORMAT: &[BorrowedFormatItem<'static>] = format_description!("[hour]:[minute]:[second]");
 
 // TOML は Time だけを書けるが toml::Time は from str しかできないので TomlDateTime で拾う
 #[derive(Debug, Clone, Deserialize)]
 pub struct DailyPrivateConfig {
     daily_rng_salt: String,
-    morning_start: TomlDateTime,
+    morning_start: String,
     morning_preparation_minutes: usize,
-    night_start: TomlDateTime,
+    night_start: String,
     bathtime_minutes: usize,
     underwear: UnderwearConfiguration,
     masturbation: MasturbationConfiguration,
@@ -60,9 +65,11 @@ impl ConfigurableSimpleFunction for DailyPrivate {
         Ok(DailyPrivate {
             rng_salt: config.daily_rng_salt.clone(),
             day_routine: DayRoutineConfiguration {
-                daytime_start_at: extract_time_from_toml(config.morning_start)?,
+                daytime_start_at: Time::parse(&config.morning_start, TIME_FORMAT)
+                    .map_err(FunctionError::by_serialization)?,
+                night_start_at: Time::parse(&config.night_start, TIME_FORMAT)
+                    .map_err(FunctionError::by_serialization)?,
                 morning_preparation: Duration::minutes(config.morning_preparation_minutes as i64),
-                night_start_at: extract_time_from_toml(config.night_start)?,
                 bathtime_duration: Duration::minutes(config.bathtime_minutes as i64),
             },
             underwear: config.underwear.clone(),
