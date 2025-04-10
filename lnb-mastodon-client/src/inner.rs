@@ -11,8 +11,8 @@ use lnb_core::{
     error::ClientError,
     interface::{Context, server::LnbServer},
     model::{
-        conversation::{ConversationAttachment, UserRole},
-        message::{UserMessage, UserMessageContent},
+        conversation::{ConversationAttachment, ConversationUpdate, UserRole},
+        message::{AssistantMessage, UserMessage, UserMessageContent},
     },
 };
 use mastodon_async::{
@@ -24,7 +24,7 @@ use reqwest::Client;
 use tempfile::NamedTempFile;
 use thiserror::Error as ThisError;
 use tokio::{fs::File, io::AsyncWriteExt, spawn};
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 use url::Url;
 
 const CONTEXT_KEY_PREFIX: &str = "mastodon";
@@ -107,7 +107,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         }
 
         // Conversation の検索
-        let context_key = status.in_reply_to_id.map(|si| si.to_string());
+        let context_key = status.in_reply_to_id.as_ref().map(|si| si.to_string());
         let conversation_id = match context_key {
             Some(context) => {
                 info!("restoring conversation with last status ID {context}");
@@ -130,9 +130,9 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         let sanitized_mention_text = sanitize_mention_html_from_mastodon(&status.content);
         let images: Vec<_> = status
             .media_attachments
-            .into_iter()
+            .iter()
             .filter(|a| matches!(a.media_type, MediaType::Image | MediaType::Gifv))
-            .map(|atch| UserMessageContent::ImageUrl(atch.preview_url))
+            .map(|atch| UserMessageContent::ImageUrl(atch.preview_url.clone()))
             .collect();
         info!(
             "[{}] {}: {:?} ({} image(s))",
@@ -153,10 +153,33 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         };
         let conversation_update = self
             .assistant
-            .process_conversation(Context::default(), conversation_id, user_message, UserRole::Normal)
-            .await?;
-        let assistant_message = conversation_update.assistant_response();
-        let attachments = conversation_update.attachments();
+            .process_conversation(
+                Context::default(),
+                conversation_id,
+                user_message.clone(),
+                UserRole::Normal,
+            )
+            .await;
+
+        // 返信処理
+        let recovered_update = match conversation_update {
+            Ok(update) => update,
+            Err(e) => {
+                warn!("reporting conversation error: {e}",);
+                ConversationUpdate::create_ephemeral(
+                    conversation_id,
+                    user_message,
+                    AssistantMessage {
+                        text: e.to_string(),
+                        skip_llm: true,
+                        ..Default::default()
+                    },
+                )
+            }
+        };
+        let assistant_message = recovered_update.assistant_response();
+        let attachments = recovered_update.attachments();
+        let replied_status = self.send_reply(status, assistant_message, attachments).await?;
         info!(
             "夏稀[{}]: {:?} ({} attachment(s))",
             assistant_message.is_sensitive,
@@ -164,6 +187,22 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
             attachments.len()
         );
 
+        // Conversation/history の更新
+        // let updated_conversation = conversation_update.finish();
+        let new_history_id = format!("{CONTEXT_KEY_PREFIX}:{}", replied_status.id);
+        self.assistant
+            .save_conversation(recovered_update, &new_history_id)
+            .await?;
+
+        Ok(())
+    }
+
+    async fn send_reply(
+        &self,
+        in_reply_to_status: Status,
+        assistant_message: &AssistantMessage,
+        attachments: &[ConversationAttachment],
+    ) -> Result<Status, ClientError> {
         // 添付メディア
         let mut attachment_ids = vec![];
         for attachment in attachments {
@@ -183,37 +222,30 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
             sanitized_text = sanitized_text.chars().take(self.max_length).collect();
             sanitized_text.push_str("...(omitted)");
         }
-        let reply_text = format!("@{} {sanitized_text}", status.account.acct);
-        let reply_visibility = match status.visibility {
+        let reply_text = format!("@{} {sanitized_text}", in_reply_to_status.account.acct);
+        let reply_visibility = match in_reply_to_status.visibility {
             Visibility::Public => Visibility::Unlisted,
             otherwise => otherwise,
         };
-        let reply_spoiler = match &status.spoiler_text[..] {
+        let reply_spoiler = match &in_reply_to_status.spoiler_text[..] {
             "" => assistant_message.is_sensitive.then(|| self.sensitive_spoiler.clone()),
-            _ => Some(status.spoiler_text),
+            _ => Some(in_reply_to_status.spoiler_text),
         };
         let reply_status = NewStatus {
             status: Some(reply_text),
             visibility: Some(reply_visibility),
-            in_reply_to_id: Some(status.id.to_string()),
+            in_reply_to_id: Some(in_reply_to_status.id.to_string()),
             spoiler_text: reply_spoiler,
             media_ids: Some(attachment_ids),
             ..Default::default()
         };
+
         let replied_status = self
             .mastodon
             .new_status(reply_status)
             .map_err(ClientError::by_external)
             .await?;
-
-        // Conversation/history の更新
-        // let updated_conversation = conversation_update.finish();
-        let new_history_id = format!("{CONTEXT_KEY_PREFIX}:{}", replied_status.id);
-        self.assistant
-            .save_conversation(conversation_update, &new_history_id)
-            .await?;
-
-        Ok(())
+        Ok(replied_status)
     }
 
     async fn upload_image(&self, url: &Url, description: Option<&str>) -> Result<AttachmentId, ClientError> {
