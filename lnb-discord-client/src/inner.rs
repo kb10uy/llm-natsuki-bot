@@ -8,8 +8,8 @@ use lnb_core::{
     error::ClientError,
     interface::{Context as LnbContext, server::LnbServer},
     model::{
-        conversation::UserRole,
-        message::{UserMessage, UserMessageContent},
+        conversation::{ConversationUpdate, UserRole},
+        message::{AssistantMessage, UserMessage, UserMessageContent},
     },
 };
 use serenity::{
@@ -17,7 +17,7 @@ use serenity::{
     all::{Context, CreateMessage, EventHandler, GatewayIntents, Message as SerenityMessage, Ready, User},
 };
 use tokio::sync::RwLock;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 const CONTEXT_KEY_PREFIX: &str = "discord";
 
@@ -124,10 +124,31 @@ impl<S: LnbServer> DiscordLnbClientInner<S> {
         };
         let conversation_update = self
             .assistant
-            .process_conversation(LnbContext::default(), conversation_id, user_message, UserRole::Normal)
-            .await?;
-        let assistant_message = conversation_update.assistant_response();
-        let attachments = conversation_update.attachments();
+            .process_conversation(
+                LnbContext::default(),
+                conversation_id,
+                user_message.clone(),
+                UserRole::Normal,
+            )
+            .await;
+
+        let recovered_update = match conversation_update {
+            Ok(update) => update,
+            Err(e) => {
+                warn!("reporting conversation error: {e}",);
+                ConversationUpdate::create_ephemeral(
+                    conversation_id,
+                    user_message,
+                    AssistantMessage {
+                        text: e.to_string(),
+                        skip_llm: true,
+                        ..Default::default()
+                    },
+                )
+            }
+        };
+        let assistant_message = recovered_update.assistant_response();
+        let attachments = recovered_update.attachments();
         info!(
             "夏稀[{}]: {:?} ({} attachment(s))",
             assistant_message.is_sensitive,
@@ -137,7 +158,6 @@ impl<S: LnbServer> DiscordLnbClientInner<S> {
         // TODO: attachments
 
         // リプライ
-        // TODO: sanitize_markdown_discord
         let mut sanitized_text = sanitize_markdown_for_discord(&assistant_message.text);
         if sanitized_text.chars().count() > self.max_length {
             sanitized_text = sanitized_text.chars().take(self.max_length).collect();
@@ -156,7 +176,7 @@ impl<S: LnbServer> DiscordLnbClientInner<S> {
         // Conversation/history の更新
         let new_history_id = format!("{CONTEXT_KEY_PREFIX}:{}", replied_message.id);
         self.assistant
-            .save_conversation(conversation_update, &new_history_id)
+            .save_conversation(recovered_update, &new_history_id)
             .await?;
 
         Ok(())
