@@ -31,7 +31,7 @@ use lnb_core::{
         llm::{Llm, LlmAssistantResponse, LlmUpdate},
     },
     model::{
-        conversation::IncompleteConversation,
+        conversation::{ConversationModel, IncompleteConversation},
         message::{Message, MessageToolCalling, UserMessageContent},
     },
 };
@@ -95,18 +95,20 @@ impl ChatCompletionBackendInner {
     async fn send_conversation(&self, conversation: &IncompleteConversation) -> Result<LlmUpdate, LlmError> {
         let messages: Result<_, _> = conversation.llm_sending_messages().map(transform_message).collect();
         if self.structured_mode {
-            self.send_conversation_structured(messages?, None).await
+            self.send_conversation_structured(messages?, conversation.current_model())
+                .await
         } else {
-            self.send_conversation_normal(messages?, None).await
+            self.send_conversation_normal(messages?, conversation.current_model())
+                .await
         }
     }
 
     async fn send_conversation_normal(
         &self,
         messages: Vec<ChatCompletionRequestMessage>,
-        model_name: Option<&str>,
+        model: &ConversationModel,
     ) -> Result<LlmUpdate, LlmError> {
-        let (client, model, enable_tool) = self.create_client_by_name(model_name).await?;
+        let (client, model, enable_tool) = self.create_client_by_name(model).await?;
         // https://github.com/rust-lang/rust-clippy/issues/14578
         #[allow(clippy::unnecessary_lazy_evaluations)]
         let tools: OptionFuture<_> = enable_tool.then(async || self.tools.read().await.clone()).into();
@@ -130,9 +132,9 @@ impl ChatCompletionBackendInner {
     async fn send_conversation_structured(
         &self,
         messages: Vec<ChatCompletionRequestMessage>,
-        model_name: Option<&str>,
+        model: &ConversationModel,
     ) -> Result<LlmUpdate, LlmError> {
-        let (client, model, enable_tool) = self.create_client_by_name(model_name).await?;
+        let (client, model, enable_tool) = self.create_client_by_name(model).await?;
         // https://github.com/rust-lang/rust-clippy/issues/14578
         #[allow(clippy::unnecessary_lazy_evaluations)]
         let tools: OptionFuture<_> = enable_tool.then(async || self.tools.read().await.clone()).into();
@@ -158,9 +160,9 @@ impl ChatCompletionBackendInner {
 
     async fn create_client_by_name(
         &self,
-        model_name: Option<&str>,
+        model: &ConversationModel,
     ) -> Result<(Client<OpenAIConfig>, String, bool), LlmError> {
-        if let Some(model_name) = model_name {
+        if let ConversationModel::Specified(model_name) = model {
             let Some(overriding_model) = self.models.get(model_name) else {
                 return Err(LlmError::ModelNotFound(model_name.to_string()));
             };

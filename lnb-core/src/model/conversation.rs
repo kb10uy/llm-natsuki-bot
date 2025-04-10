@@ -74,6 +74,10 @@ impl IncompleteConversation {
             })
     }
 
+    pub fn current_model(&self) -> &ConversationModel {
+        self.model_override.as_ref().unwrap_or(&self.base.model)
+    }
+
     /// 元の `Conversation` のうち最後にある `UserMessage` を取得する。
     pub fn last_user(&self) -> Option<&UserMessage> {
         let Some(Message::User(last_user)) = &self.pushed_messages.last() else {
