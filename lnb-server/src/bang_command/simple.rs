@@ -1,4 +1,4 @@
-use crate::bang_command::interception::BangCommandResponse;
+use crate::bang_command::BangCommandResponse;
 
 use lnb_core::{
     error::LlmError,
