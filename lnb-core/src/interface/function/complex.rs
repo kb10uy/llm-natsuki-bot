@@ -1,10 +1,16 @@
 use crate::{
     error::FunctionError,
-    interface::function::{FunctionDescriptor, FunctionResponse},
+    interface::{
+        Context,
+        function::{FunctionDescriptor, FunctionResponse},
+    },
+    model::{
+        conversation::{IncompleteConversation, UserRole},
+        message::MessageToolCalling,
+    },
 };
 
 use futures::future::BoxFuture;
-use serde_json::Value;
 
 pub type BoxComplexFunction = Box<dyn ComplexFunction + 'static>;
 
@@ -13,7 +19,13 @@ pub trait ComplexFunction: Send + Sync {
     fn get_descriptor(&self) -> FunctionDescriptor;
 
     /// Function を実行する。
-    fn call<'a>(&'a self, id: &str, params: Value) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>>;
+    fn call<'a>(
+        &'a self,
+        context: &Context,
+        incomplete: &IncompleteConversation,
+        user_role: &UserRole,
+        tool_calling: &MessageToolCalling,
+    ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>>;
 }
 
 impl<T: ComplexFunction + 'static> From<T> for BoxComplexFunction {
