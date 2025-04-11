@@ -61,18 +61,32 @@ tool:
   get_illust_url:
     database_filepath: "./data/conversations.sqlite3"
   exchange_rate:
-    endpoint:  "https://v6.exchangerate-api.com"
+    endpoint: "https://v6.exchangerate-api.com"
     token: ""
   daily_private:
-    daily_rng_salt:  "ロングもみあげガール推進部"
+    daily_rng_salt: "ロングもみあげガール推進部"
     day_routine:
       morning_start: "07:00:00"
       morning_preparation_minutes: 30
       night_start: "21:30:00"
       bathtime_minutes: 30
     underwear:
-      separate_colors: ["赤", "オレンジ", "レモン", "黄緑", "水色", "ラベンダー", "白", "グレー", "黒"]
-      separate_designs: ["無地", "ドット柄", "しましま", "花柄", "キャラ物"]
+      separate_colors:
+        - "赤"
+        - "オレンジ"
+        - "レモン"
+        - "黄緑"
+        - "水色"
+        - "ラベンダー"
+        - "白"
+        - "グレー"
+        - "黒"
+      separate_designs:
+        - "無地"
+        - "ドット柄"
+        - "しましま"
+        - "花柄"
+        - "キャラ物"
       no_bra_ratio: 0.1
       no_panty_ratio: 0.1
       unified_ratio: 0.4
@@ -92,3 +106,25 @@ tool:
       bleeding_days: 7
       ovulation_day: 14
       pad_length_variations: [17, 20, 24, 28, 30, 36, 40]
+    temperature:
+      baseline: 36.5
+      scale: 0.4
+      jitter_mu_sigma: [0.08, 0.02]
+      fourier_coefficients:
+        - [0.000313, 0.0]
+        - [-0.061004, -0.98555]
+        - [-0.090081, 0.049953]
+        - [-0.001516, -0.337377]
+        - [-0.144479, -0.005669]
+        - [-0.064722, -0.179428]
+        - [-0.101811, 0.056815]
+        - [-0.049985, -0.113938]
+        - [-0.056875, 0.02375]
+        - [-0.037529, -0.032299]
+        - [-0.034705, 0.016371]
+        - [-0.046094, -0.036347]
+        - [-0.024271, -0.003169]
+        # - [-0.057365, 0.012551]
+        # - [0.006598, 0.002009]
+        # - [-0.031785, 0.002936]
+      ovulation_t: 0.5
