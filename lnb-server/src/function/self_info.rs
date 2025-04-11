@@ -1,7 +1,7 @@
 use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
     error::FunctionError,
-    interface::function::simple::{SimpleFunction, SimpleFunctionDescriptor, SimpleFunctionResponse},
+    interface::function::{FunctionDescriptor, FunctionResponse, simple::SimpleFunction},
     model::schema::DescribedSchema,
 };
 use serde_json::{Value, json};
@@ -10,8 +10,8 @@ use serde_json::{Value, json};
 pub struct SelfInfo {}
 
 impl SimpleFunction for SelfInfo {
-    fn get_descriptor(&self) -> SimpleFunctionDescriptor {
-        SimpleFunctionDescriptor {
+    fn get_descriptor(&self) -> FunctionDescriptor {
+        FunctionDescriptor {
             name: "self_info".to_string(),
             description: r#"
                 この bot 自身に関する以下の情報を提供する。
@@ -24,7 +24,7 @@ impl SimpleFunction for SelfInfo {
         }
     }
 
-    fn call<'a>(&'a self, _id: &str, _params: Value) -> BoxFuture<'a, Result<SimpleFunctionResponse, FunctionError>> {
+    fn call<'a>(&'a self, _id: &str, _params: Value) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
         async { self.get_info() }.boxed()
     }
 }
@@ -34,8 +34,8 @@ impl SelfInfo {
         SelfInfo {}
     }
 
-    fn get_info(&self) -> Result<SimpleFunctionResponse, FunctionError> {
-        Ok(SimpleFunctionResponse {
+    fn get_info(&self) -> Result<FunctionResponse, FunctionError> {
+        Ok(FunctionResponse {
             result: json!({
                 "bot_version": env!("CARGO_PKG_VERSION"),
                 "bot_commit": env!("GIT_COMMIT_HASH"),

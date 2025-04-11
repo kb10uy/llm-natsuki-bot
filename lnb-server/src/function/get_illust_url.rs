@@ -3,7 +3,7 @@ use crate::function::ConfigurableSimpleFunction;
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use lnb_core::{
     error::FunctionError,
-    interface::function::simple::{SimpleFunction, SimpleFunctionDescriptor, SimpleFunctionResponse},
+    interface::function::{FunctionDescriptor, FunctionResponse, simple::SimpleFunction},
     model::schema::DescribedSchema,
 };
 use rand::{rng, seq::IndexedRandom};
@@ -35,8 +35,8 @@ impl ConfigurableSimpleFunction for GetIllustUrl {
 }
 
 impl SimpleFunction for GetIllustUrl {
-    fn get_descriptor(&self) -> SimpleFunctionDescriptor {
-        SimpleFunctionDescriptor {
+    fn get_descriptor(&self) -> FunctionDescriptor {
+        FunctionDescriptor {
             name: "get_illust_url".to_string(),
             description: r#"
                 この bot 自身をキャラクターとして描写したイラストの URL を取得する。
@@ -51,14 +51,14 @@ impl SimpleFunction for GetIllustUrl {
         }
     }
 
-    fn call<'a>(&'a self, _id: &str, params: Value) -> BoxFuture<'a, Result<SimpleFunctionResponse, FunctionError>> {
+    fn call<'a>(&'a self, _id: &str, params: Value) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
         let count = params["count"].as_u64().unwrap_or(1) as usize;
         async move { self.get_illust_infos(count).await }.boxed()
     }
 }
 
 impl GetIllustUrl {
-    async fn get_illust_infos(&self, count: usize) -> Result<SimpleFunctionResponse, FunctionError> {
+    async fn get_illust_infos(&self, count: usize) -> Result<FunctionResponse, FunctionError> {
         let all_illusts: Vec<SqliteRowIllust> = sqlx::query_as(r#"SELECT url, creator_name, comment FROM illusts;"#)
             .fetch_all(&self.pool)
             .map_err(FunctionError::by_external)
@@ -67,7 +67,7 @@ impl GetIllustUrl {
         let limited_count = count.min(4).min(all_illusts.len());
         let selected_illusts: Vec<_> = all_illusts.choose_multiple(&mut rng(), limited_count).collect();
 
-        Ok(SimpleFunctionResponse {
+        Ok(FunctionResponse {
             result: json!({
                 "illusts": selected_illusts
             }),

@@ -1,6 +1,6 @@
 use crate::{
     error::LlmError,
-    interface::function::simple::SimpleFunctionDescriptor,
+    interface::function::FunctionDescriptor,
     model::{conversation::IncompleteConversation, message::MessageToolCalling},
 };
 
@@ -11,7 +11,7 @@ pub type BoxLlm = Box<dyn Llm + 'static>;
 
 pub trait Llm: Send + Sync {
     /// `SimpleFunction` の追加を告知する。
-    fn add_simple_function(&self, descriptor: SimpleFunctionDescriptor) -> BoxFuture<'_, ()>;
+    fn add_simple_function(&self, descriptor: FunctionDescriptor) -> BoxFuture<'_, ()>;
 
     /// `Conversation` を送信する。
     fn send_conversation<'a>(

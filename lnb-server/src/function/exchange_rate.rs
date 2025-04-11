@@ -6,7 +6,7 @@ use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use lnb_core::{
     APP_USER_AGENT, RFC3339_NUMOFFSET,
     error::FunctionError,
-    interface::function::simple::{SimpleFunction, SimpleFunctionDescriptor, SimpleFunctionResponse},
+    interface::function::{FunctionDescriptor, FunctionResponse, simple::SimpleFunction},
     model::schema::DescribedSchema,
 };
 use reqwest::{Client, ClientBuilder};
@@ -47,9 +47,9 @@ impl ConfigurableSimpleFunction for ExchangeRate {
 }
 
 impl SimpleFunction for ExchangeRate {
-    fn get_descriptor(&self) -> SimpleFunctionDescriptor {
+    fn get_descriptor(&self) -> FunctionDescriptor {
         // TODO: 多分 [(String, String)] を受け取ってこっちで group_by した方が確実
-        SimpleFunctionDescriptor {
+        FunctionDescriptor {
             name: "exchange_rate".to_string(),
             description: "為替相場を取得します。同じ計算元の通貨から複数の計算先を一度に取得できます。".to_string(),
             parameters: DescribedSchema::object(
@@ -67,7 +67,7 @@ impl SimpleFunction for ExchangeRate {
         }
     }
 
-    fn call<'a>(&'a self, _id: &str, params: Value) -> BoxFuture<'a, Result<SimpleFunctionResponse, FunctionError>> {
+    fn call<'a>(&'a self, _id: &str, params: Value) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
         let parameters = match serde_json::from_value(params).map_err(FunctionError::by_serialization) {
             Ok(p) => p,
             Err(err) => return async { Err(FunctionError::Serialization(err.into())) }.boxed(),
@@ -77,7 +77,7 @@ impl SimpleFunction for ExchangeRate {
 }
 
 impl ExchangeRate {
-    async fn get_exchange_rate(&self, parameters: RequestParameters) -> Result<SimpleFunctionResponse, FunctionError> {
+    async fn get_exchange_rate(&self, parameters: RequestParameters) -> Result<FunctionResponse, FunctionError> {
         let response = self
             .client
             .get(format!("{}/latest/{}", self.token_endpoint, parameters.base_code))
@@ -96,7 +96,7 @@ impl ExchangeRate {
             .flat_map(|c| api_response.conversion_rates.get(&c).map(|&r| (c, r)))
             .collect();
 
-        Ok(SimpleFunctionResponse {
+        Ok(FunctionResponse {
             result: json!({
                 "updated_at": updated_at,
                 "base_code": api_response.base_code,

@@ -6,18 +6,18 @@ use crate::{
 use futures::future::BoxFuture;
 use serde_json::Value;
 
-pub type BoxSimpleFunction = Box<dyn SimpleFunction + 'static>;
+pub type BoxComplexFunction = Box<dyn ComplexFunction + 'static>;
 
-pub trait SimpleFunction: Send + Sync {
-    /// この `SimpleFunction` のディスクリプタを返す。
+pub trait ComplexFunction: Send + Sync {
+    /// この `ComplexFunction` のディスクリプタを返す。
     fn get_descriptor(&self) -> FunctionDescriptor;
 
     /// Function を実行する。
     fn call<'a>(&'a self, id: &str, params: Value) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>>;
 }
 
-impl<T: SimpleFunction + 'static> From<T> for BoxSimpleFunction {
-    fn from(value: T) -> BoxSimpleFunction {
+impl<T: ComplexFunction + 'static> From<T> for BoxComplexFunction {
+    fn from(value: T) -> BoxComplexFunction {
         Box::new(value)
     }
 }

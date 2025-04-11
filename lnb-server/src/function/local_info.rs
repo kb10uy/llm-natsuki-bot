@@ -2,7 +2,7 @@ use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
     RFC3339_NUMOFFSET,
     error::FunctionError,
-    interface::function::simple::{SimpleFunction, SimpleFunctionDescriptor, SimpleFunctionResponse},
+    interface::function::{FunctionDescriptor, FunctionResponse, simple::SimpleFunction},
     model::schema::DescribedSchema,
 };
 use serde_json::{Value, json};
@@ -14,8 +14,8 @@ pub struct LocalInfo {
 }
 
 impl SimpleFunction for LocalInfo {
-    fn get_descriptor(&self) -> SimpleFunctionDescriptor {
-        SimpleFunctionDescriptor {
+    fn get_descriptor(&self) -> FunctionDescriptor {
+        FunctionDescriptor {
             name: "local_info".to_string(),
             description: r#"
                 この bot が動作している環境に関する以下の情報を提供する。
@@ -27,7 +27,7 @@ impl SimpleFunction for LocalInfo {
         }
     }
 
-    fn call<'a>(&'a self, _id: &str, _params: Value) -> BoxFuture<'a, Result<SimpleFunctionResponse, FunctionError>> {
+    fn call<'a>(&'a self, _id: &str, _params: Value) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
         async { self.get_info() }.boxed()
     }
 }
@@ -39,9 +39,9 @@ impl LocalInfo {
         })
     }
 
-    fn get_info(&self) -> Result<SimpleFunctionResponse, FunctionError> {
+    fn get_info(&self) -> Result<FunctionResponse, FunctionError> {
         let now = OffsetDateTime::now_local().map_err(FunctionError::by_external)?;
-        Ok(SimpleFunctionResponse {
+        Ok(FunctionResponse {
             result: json!({
                 "time_now": now.format(RFC3339_NUMOFFSET).map_err(FunctionError::by_serialization)?,
                 "bot_started_at": self.started_at.format(RFC3339_NUMOFFSET).map_err(FunctionError::by_serialization)?,

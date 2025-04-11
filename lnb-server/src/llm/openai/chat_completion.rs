@@ -27,7 +27,7 @@ use futures::{
 use lnb_core::{
     error::LlmError,
     interface::{
-        function::simple::SimpleFunctionDescriptor,
+        function::FunctionDescriptor,
         llm::{Llm, LlmAssistantResponse, LlmUpdate},
     },
     model::{
@@ -53,7 +53,7 @@ impl ChatCompletionBackend {
 }
 
 impl Llm for ChatCompletionBackend {
-    fn add_simple_function(&self, descriptor: SimpleFunctionDescriptor) -> BoxFuture<'_, ()> {
+    fn add_simple_function(&self, descriptor: FunctionDescriptor) -> BoxFuture<'_, ()> {
         async { self.0.add_simple_function(descriptor).await }.boxed()
     }
 
@@ -83,7 +83,7 @@ struct FilledModel {
 }
 
 impl ChatCompletionBackendInner {
-    async fn add_simple_function(&self, descriptor: SimpleFunctionDescriptor) {
+    async fn add_simple_function(&self, descriptor: FunctionDescriptor) {
         let tool = ChatCompletionTool {
             function: FunctionObject {
                 name: descriptor.name,
