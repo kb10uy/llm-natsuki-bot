@@ -10,13 +10,13 @@ pub struct MenstruationConfiguration {
     pub pad_length_variations: Vec<usize>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 pub enum MensePhase {
     /// 卵胞期
-    Follicular,
+    Follicular(f64),
 
     /// 黄体期
-    Luteal,
+    Luteal(f64),
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -29,13 +29,15 @@ pub enum MenstruationAbsorbent {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MenstruationStatus {
+    #[serde(skip_serializing)]
     pub phase: MensePhase,
+
     pub bleeding_days: Option<u16>,
     pub absorbent: Option<MenstruationAbsorbent>,
 }
 
 impl MenstruationConfiguration {
-    pub fn calculate_cycle_starting_ordinals<R: RngCore + ?Sized>(&self, annual_rng: &mut R) -> Vec<u16> {
+    pub fn calculate_cycles<R: RngCore + ?Sized>(&self, annual_rng: &mut R) -> Vec<(u16, u16)> {
         let cycle_distr = {
             let (mu, sigma) = self.cycle_mu_sigma;
             Normal::new(mu, sigma).expect("invalid distribution")
@@ -44,8 +46,9 @@ impl MenstruationConfiguration {
         let mut next_starting_ordinal = 1;
         let mut starting_ordinals = vec![];
         while next_starting_ordinal <= 366 {
-            starting_ordinals.push(next_starting_ordinal);
-            next_starting_ordinal += cycle_distr.sample(annual_rng).max(1.0) as u16;
+            let cycle_length = cycle_distr.sample(annual_rng).max(1.0).round_ties_even() as u16;
+            starting_ordinals.push((next_starting_ordinal, cycle_length));
+            next_starting_ordinal += cycle_length;
         }
         starting_ordinals
     }
@@ -53,22 +56,27 @@ impl MenstruationConfiguration {
     pub fn construct_status<R: RngCore + ?Sized>(
         &self,
         rng: &mut R,
-        starting_ordinals: &[u16],
+        cycles: &[(u16, u16)],
         logical_ordinal: u16,
+        day_progress: f64,
     ) -> MenstruationStatus {
-        let starting_ordinal = starting_ordinals
+        let (starting_ordinal, cycle_length) = cycles
             .iter()
-            .filter(|so| logical_ordinal >= **so)
+            .filter(|so| logical_ordinal >= so.0)
             .max()
             .expect("at least one cycle");
         let cycle_days = logical_ordinal - starting_ordinal;
 
         let phase = if cycle_days < self.ovulation_day {
-            MensePhase::Follicular
+            let phase_progress = (cycle_days as f64 + day_progress) / self.ovulation_day as f64;
+            MensePhase::Follicular(phase_progress)
         } else {
-            MensePhase::Luteal
+            let phase_length = (cycle_length - self.ovulation_day).max(1) as f64;
+            let phase_progress = (cycle_days as f64 + day_progress - self.ovulation_day as f64) / phase_length;
+            MensePhase::Luteal(phase_progress)
         };
         let bleeding_days = (cycle_days < self.bleeding_days).then_some(cycle_days + 1);
+
         let absorbent = {
             let length = self.pad_length_variations.choose(rng).unwrap_or(&0);
             let has_wing = rng.random();

@@ -135,10 +135,13 @@ impl DailyPrivate {
         };
 
         // 生理周期
-        let menstruation_cycles = self.menstruation.calculate_cycle_starting_ordinals(&mut annual_rng);
-        let menstruation_status =
-            self.menstruation
-                .construct_status(&mut daily_rng, &menstruation_cycles, logical_date.ordinal());
+        let menstruation_cycles = self.menstruation.calculate_cycles(&mut annual_rng);
+        let menstruation_status = self.menstruation.construct_status(
+            &mut daily_rng,
+            &menstruation_cycles,
+            logical_date.ordinal(),
+            day_progress,
+        );
         info!("menstruation: {menstruation_status:?}");
         info!("menstruation cycles: {menstruation_cycles:?}");
 
