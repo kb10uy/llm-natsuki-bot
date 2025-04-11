@@ -103,8 +103,15 @@ impl Reminder {
         info!("{parameters:?}");
         Ok(FunctionResponse {
             result: json!({
+                "status": "accepted",
+                "remind_at": "",
+                "id": "hogehoge",
+            }),
+            /*
+            result: json!({
                 "error": "this feature is not implemented yet",
             }),
+            */
             ..Default::default()
         })
     }
