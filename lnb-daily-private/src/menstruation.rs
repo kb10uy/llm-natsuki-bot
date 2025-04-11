@@ -45,7 +45,7 @@ impl MenstruationConfiguration {
         let mut starting_ordinals = vec![];
         while next_starting_ordinal <= 366 {
             starting_ordinals.push(next_starting_ordinal);
-            next_starting_ordinal += cycle_distr.sample(annual_rng).min(1.0) as u16;
+            next_starting_ordinal += cycle_distr.sample(annual_rng).max(1.0) as u16;
         }
         starting_ordinals
     }
