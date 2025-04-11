@@ -45,25 +45,26 @@ pub async fn initialize_llm(config: &AppConfigLlm) -> Result<(BoxLlm, &'static s
 }
 
 fn convert_json_schema(schema: &DescribedSchema) -> Value {
+    let type_value = |s| if schema.optional { json!([s, "null"]) } else { json!(s) };
     match &schema.field_type {
         DescribedSchemaType::Integer => json!({
-            "type": "integer",
+            "type": type_value("integer"),
             "description": schema.description,
         }),
         DescribedSchemaType::Float => json!({
-            "type": "float",
+            "type": type_value("float"),
             "description": schema.description,
         }),
         DescribedSchemaType::Boolean => json!({
-            "type": "boolean",
+            "type": type_value("boolean"),
             "description": schema.description,
         }),
         DescribedSchemaType::String => json!({
-            "type": "string",
+            "type": type_value("string"),
             "description": schema.description,
         }),
         DescribedSchemaType::Array(item_type) => json!({
-            "type": "array",
+            "type": type_value("array"),
             "description": schema.description,
             "items": convert_json_schema(item_type),
         }),
@@ -74,7 +75,7 @@ fn convert_json_schema(schema: &DescribedSchema) -> Value {
                 .collect();
             let keys: Vec<_> = properties.keys().cloned().collect();
             json!({
-                "type": "object",
+                "type": type_value("object"),
                 "properties": properties,
                 "required": keys,
                 "additionalProperties": false,

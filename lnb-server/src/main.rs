@@ -10,7 +10,8 @@ use crate::{
     bang_command::initialize_bang_command,
     config::AppConfig,
     function::{
-        ConfigurableSimpleFunction, DailyPrivate, ExchangeRate, GetIllustUrl, ImageGenerator, LocalInfo, SelfInfo,
+        ConfigurableComplexFunction, ConfigurableSimpleFunction, DailyPrivate, ExchangeRate, GetIllustUrl,
+        ImageGenerator, LocalInfo, Reminder, SelfInfo,
     },
     llm::initialize_llm,
     natsuki::Natsuki,
@@ -37,6 +38,7 @@ async fn main() -> Result<()> {
 
     let natsuki = initialize_natsuki(&config).await?;
     register_simple_functions(&config.tool, &natsuki).await?;
+    register_complex_functions(&config.tool, &natsuki).await?;
     register_interceptions(&natsuki).await?;
 
     let mut client_tasks = vec![];
@@ -92,6 +94,12 @@ async fn register_simple_functions(tool_config: &AppConfigTool, natsuki: &Natsuk
     Ok(())
 }
 
+async fn register_complex_functions(tool_config: &AppConfigTool, natsuki: &Natsuki) -> Result<()> {
+    register_complex_function_config::<Reminder>(&tool_config.reminder, natsuki).await?;
+
+    Ok(())
+}
+
 async fn register_interceptions(natsuki: &Natsuki) -> Result<()> {
     let bang_command = initialize_bang_command().await;
     natsuki.apply_interception(bang_command).await;
@@ -109,6 +117,21 @@ where
     let simple_function = F::configure(config).await?;
     natsuki.add_simple_function(simple_function).await;
     info!("simple function configured: {}", F::NAME);
+
+    Ok(())
+}
+
+async fn register_complex_function_config<F>(config: &Option<F::Configuration>, natsuki: &Natsuki) -> Result<()>
+where
+    F: ConfigurableComplexFunction + 'static,
+{
+    let Some(config) = config.as_ref() else {
+        return Ok(());
+    };
+
+    let complex_function = F::configure(config).await?;
+    natsuki.add_complex_function(complex_function).await;
+    info!("complex function configured: {}", F::NAME);
 
     Ok(())
 }

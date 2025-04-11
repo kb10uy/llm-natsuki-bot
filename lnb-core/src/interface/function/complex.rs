@@ -21,10 +21,10 @@ pub trait ComplexFunction: Send + Sync {
     /// Function を実行する。
     fn call<'a>(
         &'a self,
-        context: &Context,
-        incomplete: &IncompleteConversation,
-        user_role: &UserRole,
-        tool_calling: &MessageToolCalling,
+        context: &'a Context,
+        incomplete: &'a IncompleteConversation,
+        user_role: &'a UserRole,
+        tool_calling: &'a MessageToolCalling,
     ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>>;
 }
 

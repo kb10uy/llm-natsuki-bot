@@ -1,4 +1,6 @@
-use crate::function::{DailyPrivateConfig, ExchangeRateConfig, GetIllustUrlConfig, ImageGeneratorConfig};
+use crate::function::{
+    DailyPrivateConfig, ExchangeRateConfig, GetIllustUrlConfig, ImageGeneratorConfig, ReminderConfig,
+};
 
 use std::{collections::HashMap, path::PathBuf};
 
@@ -34,6 +36,7 @@ pub struct AppConfigTool {
     pub get_illust_url: Option<GetIllustUrlConfig>,
     pub exchange_rate: Option<ExchangeRateConfig>,
     pub daily_private: Option<DailyPrivateConfig>,
+    pub reminder: Option<ReminderConfig>,
 }
 
 /// [storage]
