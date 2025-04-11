@@ -10,6 +10,7 @@ use lnb_daily_private::{
     day_routine::{DayRoutineConfiguration, DayStep},
     masturbation::{MasturbationConfiguration, MasturbationStatus},
     menstruation::{MenstruationConfiguration, MenstruationStatus},
+    temperature::TemperatureConfiguration,
     underwear::{UnderwearConfiguration, UnderwearStatus},
 };
 use rand::prelude::*;
@@ -33,6 +34,7 @@ pub struct DailyPrivateConfig {
     underwear: UnderwearConfiguration,
     masturbation: MasturbationConfiguration,
     menstruation: MenstruationConfiguration,
+    temperature: TemperatureConfiguration,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -47,9 +49,10 @@ pub struct DailyPrivateConfigDayRoutine {
 struct DailyPrivateInfo {
     asked_at: String,
     current_status: DayStep,
-    underwear_status: UnderwearStatus,
-    masturbation_status: MasturbationStatus,
     menstruation_status: MenstruationStatus,
+    basal_body_temperature: String,
+    masturbation_status: MasturbationStatus,
+    underwear_status: UnderwearStatus,
 }
 
 #[derive(Debug)]
@@ -57,6 +60,7 @@ pub struct DailyPrivate {
     rng_salt: String,
     day_routine: DayRoutineConfiguration,
     menstruation: MenstruationConfiguration,
+    temperature: TemperatureConfiguration,
     masturbation: MasturbationConfiguration,
     underwear: UnderwearConfiguration,
 }
@@ -81,6 +85,7 @@ impl ConfigurableSimpleFunction for DailyPrivate {
             underwear: config.underwear.clone(),
             masturbation: config.masturbation.clone(),
             menstruation: config.menstruation.clone(),
+            temperature: config.temperature.clone(),
         })
     }
 }
@@ -93,10 +98,11 @@ impl SimpleFunction for DailyPrivate {
                 この bot 自身のその日のプライベートな事情を取得します。
                 以下のいずれかの項目についてユーザーから訊かれた場合、この function のレスポンスをもとに適切に回答してください。
                 訊かれていない項目については答えなくてかまいません。
-                - 下着の色
-                - 生理周期
-                - その日のオナニーの回数
                 - 今の行動状態
+                - 生理周期
+                - 基礎体温
+                - その日のオナニーの回数
+                - 下着の色
             "#
             .to_string(),
             parameters: DescribedSchema::object("parameters", "引数", vec![]),
@@ -145,6 +151,10 @@ impl DailyPrivate {
         info!("menstruation: {menstruation_status:?}");
         info!("menstruation cycles: {menstruation_cycles:?}");
 
+        // 基礎体温
+        let basal_body_temperature = self.temperature.calculate(&mut daily_rng, menstruation_status.phase);
+        info!("basal body temperature: {basal_body_temperature}℃");
+
         // オナニー
         let masturbation_ranges = self.masturbation.calculate_daily_playing_ranges(
             &mut daily_rng,
@@ -178,6 +188,7 @@ impl DailyPrivate {
             asked_at: now.format(&Rfc3339).map_err(FunctionError::by_serialization)?,
             current_status: day_step,
             menstruation_status,
+            basal_body_temperature: format!("{basal_body_temperature:.02}"),
             masturbation_status,
             underwear_status,
         };
