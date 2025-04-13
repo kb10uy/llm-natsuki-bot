@@ -3,11 +3,11 @@ use crate::{
     text::{sanitize_markdown_for_mastodon, sanitize_mention_html_from_mastodon},
 };
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use futures::prelude::*;
 use lnb_core::{
-    APP_USER_AGENT,
+    APP_USER_AGENT, DebugOptionValue,
     error::ClientError,
     interface::{Context, server::LnbServer},
     model::{
@@ -20,14 +20,15 @@ use mastodon_async::{
     entities::{AttachmentId, account::Account, event::Event, notification::Type as NotificationType, status::Status},
     prelude::MediaType,
 };
-use reqwest::Client;
+use reqwest::{Client, header::HeaderMap};
 use tempfile::NamedTempFile;
 use thiserror::Error as ThisError;
-use tokio::{fs::File, io::AsyncWriteExt, spawn};
+use tokio::{fs::File, io::AsyncWriteExt, spawn, time::sleep};
 use tracing::{debug, error, info, warn};
 use url::Url;
 
 const CONTEXT_KEY_PREFIX: &str = "mastodon";
+const RECONNECT_SLEEP: Duration = Duration::from_secs(120);
 
 #[derive(Debug)]
 pub struct MastodonLnbClientInner<S> {
@@ -40,10 +41,15 @@ pub struct MastodonLnbClientInner<S> {
 }
 
 impl<S: LnbServer> MastodonLnbClientInner<S> {
-    pub async fn new(config: &MastodonLnbClientConfig, assistant: S) -> Result<MastodonLnbClientInner<S>, ClientError> {
+    pub async fn new(
+        config: &MastodonLnbClientConfig,
+        debug_options: &HashMap<String, DebugOptionValue>,
+        assistant: S,
+    ) -> Result<MastodonLnbClientInner<S>, ClientError> {
         // Mastodon クライアントと自己アカウント情報
         let http_client = reqwest::ClientBuilder::new()
             .user_agent(APP_USER_AGENT)
+            .default_headers(default_headers(debug_options))
             .build()
             .map_err(ClientError::by_communication)?;
         let mastodon_data = mastodon_async::Data {
@@ -65,20 +71,32 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
     }
 
     pub async fn execute(self: Arc<Self>) -> Result<(), ClientError> {
-        let user_stream = self
-            .mastodon
-            .stream_user()
-            .map_err(ClientError::by_communication)
-            .await?;
-        user_stream
-            .try_for_each(async |(e, _)| {
-                spawn(self.clone().process_event(e));
-                Ok(())
-            })
-            .map_err(ClientError::by_communication)
-            .await?;
+        loop {
+            let user_stream = self
+                .mastodon
+                .stream_user()
+                .map_err(ClientError::by_communication)
+                .await?;
 
-        Ok(())
+            let disconnected_status = user_stream
+                .try_for_each(async |(e, _)| {
+                    spawn(self.clone().process_event(e));
+                    Ok(())
+                })
+                .map_err(ClientError::by_communication)
+                .await;
+
+            match disconnected_status {
+                Ok(()) => {
+                    warn!("user stream disconnected unexpectedly successfully");
+                }
+                Err(e) => {
+                    error!("user stream disconnected: {e}");
+                }
+            }
+            warn!("trying to reconnect user stream, waiting...");
+            sleep(RECONNECT_SLEEP).await;
+        }
     }
 
     async fn process_event(self: Arc<Self>, event: Event) {
@@ -307,4 +325,15 @@ pub enum MastodonClientError {
 
     #[error("unsupported image type: {0}")]
     UnsupportedImageType(String),
+}
+
+fn default_headers(debug_options: &HashMap<String, DebugOptionValue>) -> HeaderMap {
+    let mut headers = HeaderMap::new();
+
+    if let Some(DebugOptionValue::Specified(secs)) = debug_options.get("mastodon_disconnect") {
+        warn!("force disconnection enabled; duration is {secs}");
+        headers.append("X-Disconnect-After", secs.parse().expect("must parse"));
+    }
+
+    headers
 }
