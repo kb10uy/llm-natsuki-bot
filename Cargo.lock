@@ -1681,7 +1681,7 @@ checksum = "23fb14cb19457329c82206317a5663005a4d404783dc74f4252769b0d5f42856"
 
 [[package]]
 name = "lnb-core"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "futures",
  "serde",
@@ -1694,7 +1694,7 @@ dependencies = [
 
 [[package]]
 name = "lnb-daily-private"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "rand 0.9.0",
  "rand_distr",
@@ -1704,7 +1704,7 @@ dependencies = [
 
 [[package]]
 name = "lnb-discord-client"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -1726,7 +1726,7 @@ dependencies = [
 
 [[package]]
 name = "lnb-mastodon-client"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -1750,7 +1750,7 @@ dependencies = [
 
 [[package]]
 name = "lnb-server"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "anyhow",
  "async-openai",
