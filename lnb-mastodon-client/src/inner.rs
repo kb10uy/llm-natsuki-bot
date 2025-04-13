@@ -3,7 +3,7 @@ use crate::{
     text::{sanitize_markdown_for_mastodon, sanitize_mention_html_from_mastodon},
 };
 
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use futures::prelude::*;
 use lnb_core::{
@@ -23,11 +23,12 @@ use mastodon_async::{
 use reqwest::{Client, header::HeaderMap};
 use tempfile::NamedTempFile;
 use thiserror::Error as ThisError;
-use tokio::{fs::File, io::AsyncWriteExt, spawn};
+use tokio::{fs::File, io::AsyncWriteExt, spawn, time::sleep};
 use tracing::{debug, error, info, warn};
 use url::Url;
 
 const CONTEXT_KEY_PREFIX: &str = "mastodon";
+const RECONNECT_SLEEP: Duration = Duration::from_secs(120);
 
 #[derive(Debug)]
 pub struct MastodonLnbClientInner<S> {
@@ -70,20 +71,32 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
     }
 
     pub async fn execute(self: Arc<Self>) -> Result<(), ClientError> {
-        let user_stream = self
-            .mastodon
-            .stream_user()
-            .map_err(ClientError::by_communication)
-            .await?;
-        user_stream
-            .try_for_each(async |(e, _)| {
-                spawn(self.clone().process_event(e));
-                Ok(())
-            })
-            .map_err(ClientError::by_communication)
-            .await?;
+        loop {
+            let user_stream = self
+                .mastodon
+                .stream_user()
+                .map_err(ClientError::by_communication)
+                .await?;
 
-        Ok(())
+            let disconnected_status = user_stream
+                .try_for_each(async |(e, _)| {
+                    spawn(self.clone().process_event(e));
+                    Ok(())
+                })
+                .map_err(ClientError::by_communication)
+                .await;
+
+            match disconnected_status {
+                Ok(()) => {
+                    warn!("user stream disconnected unexpectedly successfully");
+                }
+                Err(e) => {
+                    error!("user stream disconnected: {e}");
+                }
+            }
+            warn!("trying to reconnect user stream, waiting...");
+            sleep(RECONNECT_SLEEP).await;
+        }
     }
 
     async fn process_event(self: Arc<Self>, event: Event) {
