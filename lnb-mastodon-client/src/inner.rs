@@ -3,11 +3,11 @@ use crate::{
     text::{sanitize_markdown_for_mastodon, sanitize_mention_html_from_mastodon},
 };
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use futures::prelude::*;
 use lnb_core::{
-    APP_USER_AGENT,
+    APP_USER_AGENT, DebugOptionValue,
     error::ClientError,
     interface::{Context, server::LnbServer},
     model::{
@@ -20,7 +20,7 @@ use mastodon_async::{
     entities::{AttachmentId, account::Account, event::Event, notification::Type as NotificationType, status::Status},
     prelude::MediaType,
 };
-use reqwest::Client;
+use reqwest::{Client, header::HeaderMap};
 use tempfile::NamedTempFile;
 use thiserror::Error as ThisError;
 use tokio::{fs::File, io::AsyncWriteExt, spawn};
@@ -40,10 +40,15 @@ pub struct MastodonLnbClientInner<S> {
 }
 
 impl<S: LnbServer> MastodonLnbClientInner<S> {
-    pub async fn new(config: &MastodonLnbClientConfig, assistant: S) -> Result<MastodonLnbClientInner<S>, ClientError> {
+    pub async fn new(
+        config: &MastodonLnbClientConfig,
+        debug_options: &HashMap<String, DebugOptionValue>,
+        assistant: S,
+    ) -> Result<MastodonLnbClientInner<S>, ClientError> {
         // Mastodon クライアントと自己アカウント情報
         let http_client = reqwest::ClientBuilder::new()
             .user_agent(APP_USER_AGENT)
+            .default_headers(default_headers(debug_options))
             .build()
             .map_err(ClientError::by_communication)?;
         let mastodon_data = mastodon_async::Data {
@@ -307,4 +312,15 @@ pub enum MastodonClientError {
 
     #[error("unsupported image type: {0}")]
     UnsupportedImageType(String),
+}
+
+fn default_headers(debug_options: &HashMap<String, DebugOptionValue>) -> HeaderMap {
+    let mut headers = HeaderMap::new();
+
+    if let Some(DebugOptionValue::Specified(secs)) = debug_options.get("mastodon_disconnect") {
+        warn!("force disconnection enabled; duration is {secs}");
+        headers.append("X-Disconnect-After", secs.parse().expect("must parse"));
+    }
+
+    headers
 }

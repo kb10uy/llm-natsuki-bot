@@ -3,10 +3,11 @@ mod text;
 
 use crate::inner::MastodonLnbClientInner;
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use futures::{future::BoxFuture, prelude::*};
 use lnb_core::{
+    DebugOptionValue,
     error::ClientError,
     interface::{client::LnbClient, server::LnbServer},
 };
@@ -24,8 +25,12 @@ pub struct MastodonLnbClientConfig {
 pub struct MastodonLnbClient<S>(Arc<MastodonLnbClientInner<S>>);
 
 impl<S: LnbServer> MastodonLnbClient<S> {
-    pub async fn new(config: &MastodonLnbClientConfig, assistant: S) -> Result<MastodonLnbClient<S>, ClientError> {
-        let inner = MastodonLnbClientInner::new(config, assistant).await?;
+    pub async fn new(
+        config: &MastodonLnbClientConfig,
+        debug_options: &HashMap<String, DebugOptionValue>,
+        assistant: S,
+    ) -> Result<MastodonLnbClient<S>, ClientError> {
+        let inner = MastodonLnbClientInner::new(config, debug_options, assistant).await?;
         Ok(MastodonLnbClient(Arc::new(inner)))
     }
 }
