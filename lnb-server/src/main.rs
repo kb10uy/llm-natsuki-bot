@@ -17,7 +17,7 @@ use crate::{
     storage::initialize_storage,
 };
 
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
 use anyhow::{Context as _, Result, bail};
 use clap::Parser;
@@ -33,6 +33,7 @@ use tracing::info;
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let args = cli::Arguments::parse();
+    let debug_options: HashMap<_, _> = args.debug_options.into_iter().collect();
     let config = load_config(args.config).await?;
 
     let natsuki = initialize_natsuki(&config).await?;
@@ -44,7 +45,7 @@ async fn main() -> Result<()> {
     // Mastodon
     if let Some(mastodon_config) = &config.client.mastodon {
         info!("starting Mastodon client");
-        let mastodon_client = MastodonLnbClient::new(mastodon_config, natsuki.clone()).await?;
+        let mastodon_client = MastodonLnbClient::new(mastodon_config, &debug_options, natsuki.clone()).await?;
         let mastodon_task = spawn(mastodon_client.execute());
         client_tasks.push(Box::new(mastodon_task));
     }
