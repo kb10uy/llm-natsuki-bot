@@ -1,8 +1,7 @@
-use crate::error::WorkerError;
-
 use std::{convert::Infallible, time::Duration};
 
-use futures::{FutureExt, future::BoxFuture};
+use futures::{FutureExt, TryFutureExt, future::BoxFuture};
+use lnb_core::error::ReminderError;
 use redis::{AsyncCommands, Client, Value, aio::MultiplexedConnection};
 use serde::{Serialize, de::DeserializeOwned};
 use time::OffsetDateTime;
@@ -22,9 +21,12 @@ pub struct Worker {
 }
 
 impl Worker {
-    pub async fn connect(address: &str) -> Result<Worker, WorkerError> {
-        let client = Client::open(address)?;
-        let connection = client.get_multiplexed_async_connection().await?;
+    pub async fn connect(address: &str) -> Result<Worker, ReminderError> {
+        let client = Client::open(address).map_err(ReminderError::by_internal)?;
+        let connection = client
+            .get_multiplexed_async_connection()
+            .map_err(ReminderError::by_internal)
+            .await?;
 
         Ok(Worker {
             connection,
@@ -32,18 +34,21 @@ impl Worker {
         })
     }
 
-    pub async fn enqueue<T>(&self, job: &T, execute_at: OffsetDateTime) -> Result<(), WorkerError>
+    pub async fn enqueue<T>(&self, job: &T, execute_at: OffsetDateTime) -> Result<(), ReminderError>
     where
         T: Serialize,
     {
         let mut conn = self.connection.clone();
         let score = (execute_at.unix_timestamp_nanos() / 1_000_000_000) as f64;
-        let job_bytes = rmp_serde::to_vec(job).map_err(WorkerError::by_serialization)?;
-        let _: Value = conn.zadd(QUEUE_KEY, job_bytes, score).await?;
+        let job_bytes = rmp_serde::to_vec(job).map_err(ReminderError::by_serialization)?;
+        let _: Value = conn
+            .zadd(QUEUE_KEY, job_bytes, score)
+            .map_err(ReminderError::by_internal)
+            .await?;
         Ok(())
     }
 
-    pub fn run<T>(&self) -> (BoxFuture<'static, Result<(), WorkerError>>, UnboundedReceiver<T>)
+    pub fn run<T>(&self) -> (BoxFuture<'static, Result<(), ReminderError>>, UnboundedReceiver<T>)
     where
         T: 'static + Send + Sync + DeserializeOwned,
     {
@@ -61,7 +66,7 @@ impl Worker {
         (running_future, receiver)
     }
 
-    async fn run_connection<T>(&mut self, send: UnboundedSender<T>) -> Result<Infallible, WorkerError>
+    async fn run_connection<T>(&mut self, send: UnboundedSender<T>) -> Result<Infallible, ReminderError>
     where
         T: Send + Sync + DeserializeOwned,
     {
@@ -71,11 +76,16 @@ impl Worker {
             let target_job_count: isize = self
                 .connection
                 .zcount(QUEUE_KEY, f64::NEG_INFINITY, now_unixtime)
+                .map_err(ReminderError::by_internal)
                 .await?;
-            let jobs: Vec<Vec<u8>> = self.connection.zpopmin(QUEUE_KEY, target_job_count).await?;
+            let jobs: Vec<Vec<u8>> = self
+                .connection
+                .zpopmin(QUEUE_KEY, target_job_count)
+                .map_err(ReminderError::by_internal)
+                .await?;
             for job_bytes in jobs {
-                let job: T = rmp_serde::from_slice(&job_bytes).map_err(WorkerError::by_serialization)?;
-                send.send(job).map_err(|_| WorkerError::CannotPushAnymore)?;
+                let job: T = rmp_serde::from_slice(&job_bytes).map_err(ReminderError::by_serialization)?;
+                send.send(job).map_err(|_| ReminderError::CannotPushAnymore)?;
             }
 
             sleep(self.polling_interval).await;

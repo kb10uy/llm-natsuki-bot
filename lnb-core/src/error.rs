@@ -135,3 +135,26 @@ impl FunctionError {
         FunctionError::External(source.into())
     }
 }
+
+/// Worker のエラー。
+#[derive(Debug, ThisError)]
+pub enum ReminderError {
+    #[error("internal error: {0}")]
+    Internal(#[from] ErasedError),
+
+    #[error("serialization error: {0}")]
+    Serialization(ErasedError),
+
+    #[error("cannot push job anymore")]
+    CannotPushAnymore,
+}
+
+impl ReminderError {
+    pub fn by_internal(source: impl Into<ErasedError>) -> ReminderError {
+        ReminderError::Internal(source.into())
+    }
+
+    pub fn by_serialization(source: impl Into<ErasedError>) -> ReminderError {
+        ReminderError::Serialization(source.into())
+    }
+}

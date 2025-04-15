@@ -6,7 +6,6 @@ members = [
   "lnb-mastodon-client",
   "lnb-discord-client",
   "lnb-daily-private",
-  "lnb-job-queue",
 ]
 
 [workspace.package]
@@ -20,7 +19,6 @@ lnb-core = { path = "./lnb-core" }
 lnb-daily-private = { path = "./lnb-daily-private" }
 lnb-mastodon-client = { path = "./lnb-mastodon-client" }
 lnb-discord-client = { path = "./lnb-discord-client" }
-lnb-job-queue = { path = "./lnb-job-queue" }
 
 anyhow = "1.0.97"
 async-openai = "0.28.0"

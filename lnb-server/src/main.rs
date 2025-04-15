@@ -4,19 +4,19 @@ mod config;
 mod function;
 mod llm;
 mod natsuki;
-mod reminder;
+mod shiyu;
 mod storage;
 
 use crate::{
     bang_command::initialize_bang_command,
-    config::AppConfig,
+    config::{AppConfig, AppConfigTool},
     function::{
         ConfigurableComplexFunction, ConfigurableSimpleFunction, DailyPrivate, ExchangeRate, GetIllustUrl,
         ImageGenerator, LocalInfo, SelfInfo,
     },
     llm::initialize_llm,
     natsuki::Natsuki,
-    reminder::Reminder,
+    shiyu::{Shiyu, ShiyuProvider},
     storage::initialize_storage,
 };
 
@@ -24,7 +24,6 @@ use std::{collections::HashMap, path::Path};
 
 use anyhow::{Context as _, Result, bail};
 use clap::Parser;
-use config::AppConfigTool;
 use futures::future::join_all;
 use lnb_core::interface::client::LnbClient;
 use lnb_discord_client::DiscordLnbClient;
@@ -41,8 +40,18 @@ async fn main() -> Result<()> {
 
     let natsuki = initialize_natsuki(&config).await?;
     register_simple_functions(&config.tool, &natsuki).await?;
-    register_complex_functions(&config.tool, &natsuki).await?;
     register_interceptions(&natsuki).await?;
+
+    // Reminder
+    let shiyu = if let Some(reminder_config) = &config.reminder {
+        info!("enabled Shiyu reminder system");
+        let shiyu_provider = ShiyuProvider::configure(reminder_config).await?;
+        natsuki.add_complex_function(shiyu_provider).await;
+
+        Some(Shiyu::new(reminder_config).await?)
+    } else {
+        None
+    };
 
     let mut client_tasks = vec![];
 
@@ -93,12 +102,6 @@ async fn register_simple_functions(tool_config: &AppConfigTool, natsuki: &Natsuk
     register_simple_function_config::<ExchangeRate>(&tool_config.exchange_rate, natsuki).await?;
     register_simple_function_config::<GetIllustUrl>(&tool_config.get_illust_url, natsuki).await?;
     register_simple_function_config::<DailyPrivate>(&tool_config.daily_private, natsuki).await?;
-
-    Ok(())
-}
-
-async fn register_complex_functions(tool_config: &AppConfigTool, natsuki: &Natsuki) -> Result<()> {
-    register_complex_function_config::<Reminder>(&tool_config.reminder, natsuki).await?;
 
     Ok(())
 }

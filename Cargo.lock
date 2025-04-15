@@ -1735,20 +1735,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lnb-job-queue"
-version = "0.7.2"
-dependencies = [
- "futures",
- "redis",
- "rmp-serde",
- "serde",
- "thiserror 2.0.12",
- "time",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "lnb-mastodon-client"
 version = "0.7.2"
 dependencies = [
@@ -1784,9 +1770,9 @@ dependencies = [
  "lnb-core",
  "lnb-daily-private",
  "lnb-discord-client",
- "lnb-job-queue",
  "lnb-mastodon-client",
  "rand 0.9.0",
+ "redis",
  "reqwest 0.12.15",
  "rmp-serde",
  "serde",

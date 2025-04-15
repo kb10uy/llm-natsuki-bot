@@ -10,7 +10,6 @@ lnb-core = { workspace = true }
 lnb-daily-private = { workspace = true }
 lnb-mastodon-client = { workspace = true }
 lnb-discord-client = { workspace = true }
-lnb-job-queue = { workspace = true }
 
 anyhow = { workspace = true }
 async-openai = { workspace = true }
@@ -18,6 +17,7 @@ bimap = { workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }
 rand = { workspace = true }
+redis = { workspace = true }
 reqwest = { workspace = true }
 rmp-serde = { workspace = true }
 serde = { workspace = true }

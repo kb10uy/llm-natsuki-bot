@@ -1,4 +1,4 @@
-use crate::{function::ConfigurableComplexFunction, reminder::ReminderConfig};
+use crate::{function::ConfigurableComplexFunction, shiyu::ReminderConfig};
 
 use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
@@ -25,26 +25,26 @@ use uuid::Uuid;
 const DATE_FORMAT: &[BorrowedFormatItem<'static>] = format_description!("[year]-[month]-[day]");
 
 #[derive(Debug)]
-pub struct Reminder {
+pub struct ShiyuProvider {
     max_seconds: i64,
 }
 
-impl ConfigurableComplexFunction for Reminder {
-    const NAME: &'static str = stringify!(Reminder);
+impl ConfigurableComplexFunction for ShiyuProvider {
+    const NAME: &'static str = stringify!(ShiyuProvider);
 
     type Configuration = ReminderConfig;
 
-    async fn configure(config: &Self::Configuration) -> Result<Reminder, FunctionError> {
-        Ok(Reminder {
+    async fn configure(config: &Self::Configuration) -> Result<ShiyuProvider, FunctionError> {
+        Ok(ShiyuProvider {
             max_seconds: config.max_seconds,
         })
     }
 }
 
-impl ComplexFunction for Reminder {
+impl ComplexFunction for ShiyuProvider {
     fn get_descriptor(&self) -> FunctionDescriptor {
         FunctionDescriptor {
-            name: "reminder".to_string(),
+            name: "shiyu_provider".to_string(),
             description: r#"
                 ユーザーにリマインダー機能を提供します。
                 - 「いつ」の指定は、基本的にリマインドする内容ではなくリマインドの時刻として解釈してください。
@@ -93,7 +93,7 @@ impl ComplexFunction for Reminder {
     }
 }
 
-impl Reminder {
+impl ShiyuProvider {
     async fn execute(
         &self,
         _context: &Context,
