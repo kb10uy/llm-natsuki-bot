@@ -18,6 +18,8 @@ pub trait Reminder: Send + Sync + 'static {
         remind: Remind,
         remind_at: OffsetDateTime,
     ) -> BoxFuture<'a, Result<Uuid, ReminderError>>;
+
+    fn remove(&self, id: Uuid) -> BoxFuture<'_, Result<(), ReminderError>>;
 }
 
 /// Context で Reminder に送信できることを示す。

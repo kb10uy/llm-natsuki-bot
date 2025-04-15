@@ -9,7 +9,7 @@ use futures::prelude::*;
 use lnb_core::{
     APP_USER_AGENT, DebugOptionValue,
     error::ClientError,
-    interface::{Context, server::LnbServer},
+    interface::{Context, reminder::Remindable, server::LnbServer},
     model::{
         conversation::{ConversationAttachment, ConversationUpdate, UserRole},
         message::{AssistantMessage, UserMessage, UserMessageContent},
@@ -164,6 +164,11 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         contents.extend(images);
 
         // Conversation の更新・呼出し
+        let mut context = Context::default();
+        context.set(Remindable {
+            context: CONTEXT_KEY_PREFIX.to_string(),
+            requester: status.account.acct.clone(),
+        });
         let user_message = UserMessage {
             contents,
             language: status.language.and_then(|l| l.to_639_1()).map(|l| l.to_string()),
@@ -171,12 +176,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         };
         let conversation_update = self
             .assistant
-            .process_conversation(
-                Context::default(),
-                conversation_id,
-                user_message.clone(),
-                UserRole::Normal,
-            )
+            .process_conversation(context, conversation_id, user_message.clone(), UserRole::Normal)
             .await;
 
         // 返信処理

@@ -54,6 +54,7 @@ assistant:
         - 長くても 140 文字程度で答えます。
 
 reminder:
+  redis_address: "redis://localhost:6379"
   max_seconds: 604800 # 1 week
   notification_virtual_text: |
     (これは自動生成されたメッセージで、ユーザーには表示されません)

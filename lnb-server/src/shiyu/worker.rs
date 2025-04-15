@@ -62,6 +62,26 @@ impl Worker {
         Ok(id)
     }
 
+    pub async fn remove(&self, id: Uuid) -> Result<(), ReminderError> {
+        let mut conn = self.connection.clone();
+
+        let id_str = id.to_string();
+
+        // ジョブ本体を削除
+        let _: Value = conn
+            .hdel(JOB_TABLE_KEY, &id_str)
+            .map_err(ReminderError::by_internal)
+            .await?;
+
+        // キューから削除
+        let _: Value = conn
+            .zrem(QUEUE_KEY, &id_str)
+            .map_err(ReminderError::by_internal)
+            .await?;
+
+        Ok(())
+    }
+
     pub fn run<T>(&self) -> (BoxFuture<'static, Result<(), ReminderError>>, UnboundedReceiver<T>)
     where
         T: 'static + Send + Sync + DeserializeOwned,

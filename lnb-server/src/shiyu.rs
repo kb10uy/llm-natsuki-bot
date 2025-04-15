@@ -47,4 +47,8 @@ impl Reminder for Shiyu {
     ) -> BoxFuture<'a, Result<Uuid, ReminderError>> {
         async move { self.0.register(context, remind, remind_at).await }.boxed()
     }
+
+    fn remove(&self, id: Uuid) -> BoxFuture<'_, Result<(), ReminderError>> {
+        async move { self.0.remove(id).await }.boxed()
+    }
 }

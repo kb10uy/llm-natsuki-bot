@@ -46,4 +46,9 @@ impl ShiyuInner {
         let id = self.worker.enqueue(&job, remind_at).await?;
         Ok(id)
     }
+
+    pub async fn remove(&self, id: Uuid) -> Result<(), ReminderError> {
+        self.worker.remove(id).await?;
+        Ok(())
+    }
 }
