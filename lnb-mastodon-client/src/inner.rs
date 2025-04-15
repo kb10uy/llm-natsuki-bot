@@ -101,7 +101,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
 
     async fn process_event(self: Arc<Self>, event: Event) {
         let processed = match event {
-            Event::Update(status) => self.process_status(status).await,
+            // Event::Update(status) => self.process_status(status).await,
             Event::Notification(notification) => match notification.notification_type {
                 NotificationType::Mention => match notification.status {
                     Some(status) => self.process_status(status).await,
