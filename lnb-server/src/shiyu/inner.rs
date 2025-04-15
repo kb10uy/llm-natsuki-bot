@@ -1,7 +1,8 @@
 use crate::shiyu::{ReminderConfig, worker::Worker};
 
-use lnb_core::error::ReminderError;
+use lnb_core::{error::ReminderError, interface::reminder::Remind};
 use serde::{Deserialize, Serialize};
+use time::OffsetDateTime;
 
 #[derive(Debug, Clone)]
 pub struct ShiyuInner {
@@ -11,7 +12,7 @@ pub struct ShiyuInner {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ShiyuJob {
     context: String,
-    text: String,
+    remind: Remind,
 }
 
 impl ShiyuInner {
@@ -22,7 +23,20 @@ impl ShiyuInner {
     }
 
     pub async fn run(&self) -> Result<(), ReminderError> {
-        let (task, receiver) = self.worker.run();
+        Ok(())
+    }
+
+    pub async fn register(
+        &self,
+        context: &str,
+        remind: Remind,
+        remind_at: OffsetDateTime,
+    ) -> Result<(), ReminderError> {
+        let job = ShiyuJob {
+            context: context.to_string(),
+            remind,
+        };
+        self.worker.enqueue(&job, remind_at).await?;
         Ok(())
     }
 }

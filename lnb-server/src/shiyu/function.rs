@@ -1,11 +1,12 @@
-use crate::{function::ConfigurableComplexFunction, shiyu::ReminderConfig};
+use crate::shiyu::ReminderConfig;
 
-use futures::{FutureExt, future::BoxFuture};
+use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use lnb_core::{
     error::FunctionError,
     interface::{
         Context,
         function::{FunctionDescriptor, FunctionResponse, complex::ComplexFunction},
+        reminder::{Remind, Reminder},
     },
     model::{
         conversation::{IncompleteConversation, UserRole},
@@ -24,21 +25,9 @@ use uuid::Uuid;
 
 const DATE_FORMAT: &[BorrowedFormatItem<'static>] = format_description!("[year]-[month]-[day]");
 
-#[derive(Debug)]
 pub struct ShiyuProvider {
+    reminder: Box<dyn Reminder>,
     max_seconds: i64,
-}
-
-impl ConfigurableComplexFunction for ShiyuProvider {
-    const NAME: &'static str = stringify!(ShiyuProvider);
-
-    type Configuration = ReminderConfig;
-
-    async fn configure(config: &Self::Configuration) -> Result<ShiyuProvider, FunctionError> {
-        Ok(ShiyuProvider {
-            max_seconds: config.max_seconds,
-        })
-    }
 }
 
 impl ComplexFunction for ShiyuProvider {
@@ -94,6 +83,13 @@ impl ComplexFunction for ShiyuProvider {
 }
 
 impl ShiyuProvider {
+    pub async fn new(config: &ReminderConfig, reminder: impl Reminder) -> Result<ShiyuProvider, FunctionError> {
+        Ok(ShiyuProvider {
+            reminder: Box::new(reminder),
+            max_seconds: config.max_seconds,
+        })
+    }
+
     async fn execute(
         &self,
         _context: &Context,
@@ -125,13 +121,23 @@ impl ShiyuProvider {
 
     async fn register(&self, remind_at: OffsetDateTime, content: String) -> Result<FunctionResponse, FunctionError> {
         let id = Uuid::now_v7();
-        let remind_at = remind_at.format(&Rfc3339).map_err(FunctionError::by_serialization)?;
 
-        info!("reminder registered: [{content}] at {remind_at} / {id}");
+        let remind = Remind {
+            id,
+            requester: "unknown".to_string(),
+            content: content.clone(),
+        };
+        self.reminder
+            .register("mastodon", remind, remind_at)
+            .map_err(FunctionError::by_external)
+            .await?;
+
+        let remind_at_str = remind_at.format(&Rfc3339).map_err(FunctionError::by_serialization)?;
+        info!("reminder registered: [{content}] at {remind_at_str} / {id}");
         Ok(FunctionResponse {
             result: serde_json::to_value(ReminderResponse::Registered {
                 id: id.to_string(),
-                remind_at,
+                remind_at: remind_at_str,
             })
             .map_err(FunctionError::by_serialization)?,
             ..Default::default()

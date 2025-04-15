@@ -3,15 +3,16 @@ mod inner;
 mod worker;
 
 pub use function::ShiyuProvider;
-use time::OffsetDateTime;
 
 use std::sync::Arc;
 
+use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
     error::ReminderError,
     interface::reminder::{Remind, Reminder},
 };
 use serde::Deserialize;
+use time::OffsetDateTime;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ReminderConfig {
@@ -33,7 +34,12 @@ impl Shiyu {
 }
 
 impl Reminder for Shiyu {
-    fn register(&self, remind: Remind, remind_at: OffsetDateTime) -> Result<(), ReminderError> {
-        todo!()
+    fn register<'a>(
+        &'a self,
+        context: &'a str,
+        remind: Remind,
+        remind_at: OffsetDateTime,
+    ) -> BoxFuture<'a, Result<(), ReminderError>> {
+        async move { self.0.register(context, remind, remind_at).await }.boxed()
     }
 }

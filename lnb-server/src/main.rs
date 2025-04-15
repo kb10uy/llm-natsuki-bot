@@ -11,8 +11,7 @@ use crate::{
     bang_command::initialize_bang_command,
     config::{AppConfig, AppConfigTool},
     function::{
-        ConfigurableComplexFunction, ConfigurableSimpleFunction, DailyPrivate, ExchangeRate, GetIllustUrl,
-        ImageGenerator, LocalInfo, SelfInfo,
+        ConfigurableSimpleFunction, DailyPrivate, ExchangeRate, GetIllustUrl, ImageGenerator, LocalInfo, SelfInfo,
     },
     llm::initialize_llm,
     natsuki::Natsuki,
@@ -45,10 +44,10 @@ async fn main() -> Result<()> {
     // Reminder
     let shiyu = if let Some(reminder_config) = &config.reminder {
         info!("enabled Shiyu reminder system");
-        let shiyu_provider = ShiyuProvider::configure(reminder_config).await?;
+        let shiyu = Shiyu::new(reminder_config).await?;
+        let shiyu_provider = ShiyuProvider::new(reminder_config, shiyu.clone()).await?;
         natsuki.add_complex_function(shiyu_provider).await;
-
-        Some(Shiyu::new(reminder_config).await?)
+        Some(shiyu)
     } else {
         None
     };
@@ -123,21 +122,6 @@ where
     let simple_function = F::configure(config).await?;
     natsuki.add_simple_function(simple_function).await;
     info!("simple function configured: {}", F::NAME);
-
-    Ok(())
-}
-
-async fn register_complex_function_config<F>(config: &Option<F::Configuration>, natsuki: &Natsuki) -> Result<()>
-where
-    F: ConfigurableComplexFunction + 'static,
-{
-    let Some(config) = config.as_ref() else {
-        return Ok(());
-    };
-
-    let complex_function = F::configure(config).await?;
-    natsuki.add_complex_function(complex_function).await;
-    info!("complex function configured: {}", F::NAME);
 
     Ok(())
 }

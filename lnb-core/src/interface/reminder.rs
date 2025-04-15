@@ -1,14 +1,29 @@
 use crate::error::ReminderError;
 
+use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
+use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Remind {
+    pub id: Uuid,
     pub requester: String,
     pub content: String,
 }
 
-pub trait Reminder {
-    fn register(&self, remind: Remind, remind_at: OffsetDateTime) -> Result<(), ReminderError>;
+pub trait Reminder: Send + Sync + 'static {
+    fn register<'a>(
+        &'a self,
+        context: &'a str,
+        remind: Remind,
+        remind_at: OffsetDateTime,
+    ) -> BoxFuture<'a, Result<(), ReminderError>>;
+}
+
+/// Context で Reminder に送信できることを示す。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Remindable {
+    pub context: String,
+    pub requester: String,
 }
