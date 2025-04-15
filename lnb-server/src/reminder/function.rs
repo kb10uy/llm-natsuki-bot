@@ -1,4 +1,4 @@
-use crate::function::ConfigurableComplexFunction;
+use crate::{function::ConfigurableComplexFunction, reminder::ReminderConfig};
 
 use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
@@ -26,11 +26,6 @@ const DATE_FORMAT: &[BorrowedFormatItem<'static>] = format_description!("[year]-
 
 #[derive(Debug)]
 pub struct Reminder {
-    max_seconds: i64,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ReminderConfig {
     max_seconds: i64,
 }
 
@@ -68,10 +63,6 @@ impl ComplexFunction for Reminder {
                             リマインドする絶対時刻(RFC3339形式)。ユーザーが明示的に時刻を指定しなかった場合は日付のみを指定してください。
                             相対時刻指定の場合は無視してください。
                         "#,
-                    ).as_nullable(),
-                    DescribedSchema::integer(
-                        "remind_in",
-                        "リマインドするまでの時間(合計秒数)。絶対時刻指定の場合は無視してください。",
                     ).as_nullable(),
                     DescribedSchema::string(
                         "cancel",
@@ -113,9 +104,7 @@ impl Reminder {
         }
 
         let now = OffsetDateTime::now_local().map_err(FunctionError::by_external)?;
-        let complete_remind_at = if let Some(seconds) = parameters.remind_in {
-            now + Duration::seconds(seconds)
-        } else if let Some(remind_at) = parameters.remind_at {
+        let complete_remind_at = if let Some(remind_at) = parameters.remind_at {
             if let Ok(full_datetime) = OffsetDateTime::parse(&remind_at, &Rfc3339) {
                 full_datetime
             } else if let Ok(date) = Date::parse(&remind_at, DATE_FORMAT) {
@@ -170,7 +159,6 @@ impl Reminder {
 #[derive(Debug, Clone, Deserialize)]
 struct ReminderParameters {
     remind_at: Option<String>,
-    remind_in: Option<i64>,
     cancel: Option<String>,
     content: String,
 }

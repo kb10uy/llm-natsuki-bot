@@ -1,5 +1,6 @@
-use crate::function::{
-    DailyPrivateConfig, ExchangeRateConfig, GetIllustUrlConfig, ImageGeneratorConfig, ReminderConfig,
+use crate::{
+    function::{DailyPrivateConfig, ExchangeRateConfig, GetIllustUrlConfig, ImageGeneratorConfig},
+    reminder::ReminderConfig,
 };
 
 use std::{collections::HashMap, path::PathBuf};

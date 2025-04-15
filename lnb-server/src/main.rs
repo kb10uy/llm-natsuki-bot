@@ -4,6 +4,7 @@ mod config;
 mod function;
 mod llm;
 mod natsuki;
+mod reminder;
 mod storage;
 
 use crate::{
@@ -11,10 +12,11 @@ use crate::{
     config::AppConfig,
     function::{
         ConfigurableComplexFunction, ConfigurableSimpleFunction, DailyPrivate, ExchangeRate, GetIllustUrl,
-        ImageGenerator, LocalInfo, Reminder, SelfInfo,
+        ImageGenerator, LocalInfo, SelfInfo,
     },
     llm::initialize_llm,
     natsuki::Natsuki,
+    reminder::Reminder,
     storage::initialize_storage,
 };
 

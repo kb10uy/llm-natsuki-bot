@@ -10,6 +10,7 @@ lnb-core = { workspace = true }
 lnb-daily-private = { workspace = true }
 lnb-mastodon-client = { workspace = true }
 lnb-discord-client = { workspace = true }
+lnb-job-queue = { workspace = true }
 
 anyhow = { workspace = true }
 async-openai = { workspace = true }

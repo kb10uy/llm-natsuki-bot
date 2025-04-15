@@ -3,7 +3,6 @@ mod exchange_rate;
 mod get_illust_url;
 mod image_generator;
 mod local_info;
-mod reminder;
 mod self_info;
 
 pub use daily_private::{DailyPrivate, DailyPrivateConfig};
@@ -11,7 +10,6 @@ pub use exchange_rate::{ExchangeRate, ExchangeRateConfig};
 pub use get_illust_url::{GetIllustUrl, GetIllustUrlConfig};
 pub use image_generator::{ImageGenerator, ImageGeneratorConfig};
 pub use local_info::LocalInfo;
-pub use reminder::{Reminder, ReminderConfig};
 pub use self_info::SelfInfo;
 
 use std::fmt::Debug;
