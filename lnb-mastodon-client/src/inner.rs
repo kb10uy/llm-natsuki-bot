@@ -72,13 +72,13 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
 
     pub async fn execute(self: Arc<Self>) -> Result<(), ClientError> {
         loop {
-            let user_stream = self
+            let notification_stream = self
                 .mastodon
-                .stream_user()
+                .stream_notifications()
                 .map_err(ClientError::by_communication)
                 .await?;
 
-            let disconnected_status = user_stream
+            let disconnected_status = notification_stream
                 .try_for_each(async |(e, _)| {
                     spawn(self.clone().process_event(e));
                     Ok(())
