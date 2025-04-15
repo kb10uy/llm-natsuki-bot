@@ -23,7 +23,10 @@ use std::{collections::HashMap, path::Path};
 
 use anyhow::{Context as _, Result, bail};
 use clap::Parser;
-use futures::future::join_all;
+use futures::{
+    FutureExt,
+    future::{join, join_all, ready},
+};
 use lnb_core::interface::client::LnbClient;
 use lnb_discord_client::DiscordLnbClient;
 use lnb_mastodon_client::MastodonLnbClient;
@@ -44,7 +47,7 @@ async fn main() -> Result<()> {
     // Reminder
     let shiyu = if let Some(reminder_config) = &config.reminder {
         info!("enabled Shiyu reminder system");
-        let shiyu = Shiyu::new(reminder_config).await?;
+        let shiyu = Shiyu::new(reminder_config, natsuki.clone()).await?;
         let shiyu_provider = ShiyuProvider::new(reminder_config, shiyu.clone()).await?;
         natsuki.add_complex_function(shiyu_provider).await;
         Some(shiyu)
@@ -70,7 +73,19 @@ async fn main() -> Result<()> {
         client_tasks.push(Box::new(discord_task));
     }
 
-    join_all(client_tasks).await;
+    let shiyu_task = if let Some(shiyu) = shiyu {
+        shiyu.run().boxed()
+    } else {
+        ready(Ok(())).boxed()
+    };
+
+    let (shiyu_result, client_results) = join(shiyu_task, join_all(client_tasks)).await;
+    for client_join in client_results {
+        let client_result = client_join?;
+        client_result?;
+    }
+    shiyu_result?;
+
     Ok(())
 }
 

@@ -1,11 +1,16 @@
 use crate::shiyu::{ReminderConfig, worker::Worker};
 
-use lnb_core::{error::ReminderError, interface::reminder::Remind};
+use futures::future::BoxFuture;
+use lnb_core::{
+    error::ReminderError,
+    interface::{reminder::Remind, server::LnbServer},
+};
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
+use uuid::Uuid;
 
-#[derive(Debug, Clone)]
 pub struct ShiyuInner {
+    server: Box<dyn LnbServer>,
     worker: Worker,
 }
 
@@ -16,14 +21,16 @@ struct ShiyuJob {
 }
 
 impl ShiyuInner {
-    pub async fn new(config: &ReminderConfig) -> Result<ShiyuInner, ReminderError> {
+    pub async fn new(config: &ReminderConfig, server: impl LnbServer) -> Result<ShiyuInner, ReminderError> {
+        let server = Box::new(server);
         let worker = Worker::connect(&config.redis_address).await?;
 
-        Ok(ShiyuInner { worker })
+        Ok(ShiyuInner { server, worker })
     }
 
-    pub async fn run(&self) -> Result<(), ReminderError> {
-        Ok(())
+    pub fn run(&self) -> BoxFuture<'static, Result<(), ReminderError>> {
+        let (task, receiver) = self.worker.run::<ShiyuJob>();
+        task
     }
 
     pub async fn register(
@@ -31,12 +38,12 @@ impl ShiyuInner {
         context: &str,
         remind: Remind,
         remind_at: OffsetDateTime,
-    ) -> Result<(), ReminderError> {
+    ) -> Result<Uuid, ReminderError> {
         let job = ShiyuJob {
             context: context.to_string(),
             remind,
         };
-        self.worker.enqueue(&job, remind_at).await?;
-        Ok(())
+        let id = self.worker.enqueue(&job, remind_at).await?;
+        Ok(id)
     }
 }

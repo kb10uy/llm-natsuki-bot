@@ -7,7 +7,6 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Remind {
-    pub id: Uuid,
     pub requester: String,
     pub content: String,
 }
@@ -18,7 +17,7 @@ pub trait Reminder: Send + Sync + 'static {
         context: &'a str,
         remind: Remind,
         remind_at: OffsetDateTime,
-    ) -> BoxFuture<'a, Result<(), ReminderError>>;
+    ) -> BoxFuture<'a, Result<Uuid, ReminderError>>;
 }
 
 /// Context で Reminder に送信できることを示す。

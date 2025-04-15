@@ -3,6 +3,9 @@ mod inner;
 mod worker;
 
 pub use function::ShiyuProvider;
+use uuid::Uuid;
+
+use crate::natsuki::Natsuki;
 
 use std::sync::Arc;
 
@@ -21,16 +24,18 @@ pub struct ReminderConfig {
     notification_virtual_text: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Shiyu(Arc<inner::ShiyuInner>);
 
 impl Shiyu {
-    pub async fn new(config: &ReminderConfig) -> Result<Shiyu, ReminderError> {
-        let inner = inner::ShiyuInner::new(config).await?;
+    pub async fn new(config: &ReminderConfig, natsuki: Natsuki) -> Result<Shiyu, ReminderError> {
+        let inner = inner::ShiyuInner::new(config, natsuki).await?;
         Ok(Shiyu(Arc::new(inner)))
     }
 
-    pub async fn run(&self) {}
+    pub fn run(&self) -> BoxFuture<'static, Result<(), ReminderError>> {
+        self.0.run()
+    }
 }
 
 impl Reminder for Shiyu {
@@ -39,7 +44,7 @@ impl Reminder for Shiyu {
         context: &'a str,
         remind: Remind,
         remind_at: OffsetDateTime,
-    ) -> BoxFuture<'a, Result<(), ReminderError>> {
+    ) -> BoxFuture<'a, Result<Uuid, ReminderError>> {
         async move { self.0.register(context, remind, remind_at).await }.boxed()
     }
 }

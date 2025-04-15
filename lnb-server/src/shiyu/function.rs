@@ -6,7 +6,7 @@ use lnb_core::{
     interface::{
         Context,
         function::{FunctionDescriptor, FunctionResponse, complex::ComplexFunction},
-        reminder::{Remind, Reminder},
+        reminder::{Remind, Remindable, Reminder},
     },
     model::{
         conversation::{IncompleteConversation, UserRole},
@@ -21,7 +21,6 @@ use time::{
     macros::format_description,
 };
 use tracing::{info, warn};
-use uuid::Uuid;
 
 const DATE_FORMAT: &[BorrowedFormatItem<'static>] = format_description!("[year]-[month]-[day]");
 
@@ -92,9 +91,13 @@ impl ShiyuProvider {
 
     async fn execute(
         &self,
-        _context: &Context,
+        context: &Context,
         parameters: ReminderParameters,
     ) -> Result<FunctionResponse, FunctionError> {
+        let Some(remindable) = context.get::<Remindable>() else {
+            return self.error(ReminderResponse::UnsupportedPlatform).await;
+        };
+
         if let Some(cancel_id) = parameters.cancel {
             return self.cancel(cancel_id).await;
         }
@@ -116,28 +119,30 @@ impl ShiyuProvider {
             return self.error(ReminderResponse::DueLimitExceeded).await;
         }
 
-        self.register(complete_remind_at, parameters.content).await
+        self.register(remindable, complete_remind_at, parameters.content).await
     }
 
-    async fn register(&self, remind_at: OffsetDateTime, content: String) -> Result<FunctionResponse, FunctionError> {
-        let id = Uuid::now_v7();
-
+    async fn register(
+        &self,
+        remindable: &Remindable,
+        remind_at: OffsetDateTime,
+        content: String,
+    ) -> Result<FunctionResponse, FunctionError> {
         let remind = Remind {
-            id,
-            requester: "unknown".to_string(),
+            requester: remindable.requester.clone(),
             content: content.clone(),
         };
-        self.reminder
-            .register("mastodon", remind, remind_at)
+        let id = self
+            .reminder
+            .register(&remindable.context, remind, remind_at)
             .map_err(FunctionError::by_external)
             .await?;
 
-        let remind_at_str = remind_at.format(&Rfc3339).map_err(FunctionError::by_serialization)?;
-        info!("reminder registered: [{content}] at {remind_at_str} / {id}");
+        info!("reminder registered: [{id}] {remindable:?}: {content} @ {remind_at}");
         Ok(FunctionResponse {
             result: serde_json::to_value(ReminderResponse::Registered {
                 id: id.to_string(),
-                remind_at: remind_at_str,
+                remind_at: remind_at.format(&Rfc3339).map_err(FunctionError::by_serialization)?,
             })
             .map_err(FunctionError::by_serialization)?,
             ..Default::default()
@@ -176,4 +181,5 @@ enum ReminderResponse {
     Cancelled { id: String },
     DueLimitExceeded,
     InvalidRequest,
+    UnsupportedPlatform,
 }

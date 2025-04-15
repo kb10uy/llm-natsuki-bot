@@ -10,8 +10,10 @@ use tokio::{
     time::sleep,
 };
 use tracing::{error, info};
+use uuid::Uuid;
 
 const QUEUE_KEY: &str = "lnb_queue";
+const JOB_TABLE_KEY: &str = "lnb_jobs";
 const DISCONNECTION_RETRY_INTERVAL: Duration = Duration::from_secs(5);
 
 #[derive(Debug, Clone)]
@@ -34,18 +36,30 @@ impl Worker {
         })
     }
 
-    pub async fn enqueue<T>(&self, job: &T, execute_at: OffsetDateTime) -> Result<(), ReminderError>
+    pub async fn enqueue<T>(&self, job: &T, execute_at: OffsetDateTime) -> Result<Uuid, ReminderError>
     where
         T: Serialize,
     {
         let mut conn = self.connection.clone();
-        let score = (execute_at.unix_timestamp_nanos() / 1_000_000_000) as f64;
+
+        let id = Uuid::new_v4();
+        let id_str = id.to_string();
+
+        // ジョブ本体を登録
         let job_bytes = rmp_serde::to_vec(job).map_err(ReminderError::by_serialization)?;
         let _: Value = conn
-            .zadd(QUEUE_KEY, job_bytes, score)
+            .hset(JOB_TABLE_KEY, &id_str, job_bytes)
             .map_err(ReminderError::by_internal)
             .await?;
-        Ok(())
+
+        // キューに時刻とのマッピングを登録
+        let score = (execute_at.unix_timestamp_nanos() / 1_000_000_000) as f64;
+        let _: Value = conn
+            .zadd(QUEUE_KEY, &id_str, score)
+            .map_err(ReminderError::by_internal)
+            .await?;
+
+        Ok(id)
     }
 
     pub fn run<T>(&self) -> (BoxFuture<'static, Result<(), ReminderError>>, UnboundedReceiver<T>)
