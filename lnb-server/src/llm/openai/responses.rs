@@ -7,7 +7,7 @@ use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
     error::LlmError,
     interface::{
-        function::simple::SimpleFunctionDescriptor,
+        function::FunctionDescriptor,
         llm::{Llm, LlmUpdate},
     },
     model::conversation::IncompleteConversation,
@@ -27,7 +27,7 @@ impl ResponsesBackend {
 }
 
 impl Llm for ResponsesBackend {
-    fn add_simple_function(&self, _descriptor: SimpleFunctionDescriptor) -> BoxFuture<'_, ()> {
+    fn add_simple_function(&self, _descriptor: FunctionDescriptor) -> BoxFuture<'_, ()> {
         todo!()
     }
 

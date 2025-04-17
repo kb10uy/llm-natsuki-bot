@@ -9,7 +9,7 @@ use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
     APP_USER_AGENT,
     error::FunctionError,
-    interface::function::simple::{SimpleFunction, SimpleFunctionDescriptor, SimpleFunctionResponse},
+    interface::function::{FunctionDescriptor, FunctionResponse, simple::SimpleFunction},
     model::{conversation::ConversationAttachment, schema::DescribedSchema},
 };
 use serde::{Deserialize, Serialize};
@@ -53,8 +53,8 @@ impl ConfigurableSimpleFunction for ImageGenerator {
 }
 
 impl SimpleFunction for ImageGenerator {
-    fn get_descriptor(&self) -> SimpleFunctionDescriptor {
-        SimpleFunctionDescriptor {
+    fn get_descriptor(&self) -> FunctionDescriptor {
+        FunctionDescriptor {
             name: "image_generator".to_string(),
             description: r#"
                 ユーザーからの要望に基づき、プロンプトの入力から AI を利用して画像を生成します。生成された画像の URL は返答文に含めないでください。
@@ -72,14 +72,14 @@ impl SimpleFunction for ImageGenerator {
         }
     }
 
-    fn call<'a>(&'a self, _id: &str, params: Value) -> BoxFuture<'a, Result<SimpleFunctionResponse, FunctionError>> {
+    fn call<'a>(&'a self, _id: &str, params: Value) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
         let prompt = params["prompt"].as_str().unwrap_or_default().to_string();
         async move { self.generate(prompt.to_string()).await }.boxed()
     }
 }
 
 impl ImageGenerator {
-    async fn generate(&self, prompt: String) -> Result<SimpleFunctionResponse, FunctionError> {
+    async fn generate(&self, prompt: String) -> Result<FunctionResponse, FunctionError> {
         if prompt.is_empty() {
             return make_error_value("prompt is empty");
         }
@@ -111,15 +111,15 @@ impl ImageGenerator {
             url: image_url,
             description: Some(revised_prompt),
         };
-        Ok(SimpleFunctionResponse {
+        Ok(FunctionResponse {
             result: serde_json::to_value(function_response).map_err(FunctionError::by_serialization)?,
             attachments: vec![attachment],
         })
     }
 }
 
-fn make_error_value(message: &str) -> Result<SimpleFunctionResponse, FunctionError> {
-    Ok(SimpleFunctionResponse {
+fn make_error_value(message: &str) -> Result<FunctionResponse, FunctionError> {
+    Ok(FunctionResponse {
         result: serde_json::to_value(GenerationError {
             error: message.to_string(),
         })

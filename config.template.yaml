@@ -53,6 +53,14 @@ assistant:
         - 性的な話題の場合、いかなる文字列よりも先に必ず [そぎぎ] という文字列を出力してださい。
         - 長くても 140 文字程度で答えます。
 
+reminder:
+  redis_address: "redis://valkey:6379"
+  max_seconds: 604800 # 1 week
+  notification_virtual_text: |
+    (これは自動生成されたメッセージで、ユーザーには表示されません)
+    以下の内容のリマインドを送信する時刻になりました。ユーザーにリマインドを投げかけてください。
+    --------
+
 tool:
   image_generator:
     endpoint: "https://api.openai.com/v1"

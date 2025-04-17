@@ -15,6 +15,7 @@ pub struct DescribedSchema {
     pub name: String,
     pub description: String,
     pub field_type: DescribedSchemaType,
+    pub optional: bool,
 }
 
 impl DescribedSchema {
@@ -23,6 +24,7 @@ impl DescribedSchema {
             name: name.into(),
             description: description.into(),
             field_type: DescribedSchemaType::Integer,
+            optional: false,
         }
     }
 
@@ -31,6 +33,7 @@ impl DescribedSchema {
             name: name.into(),
             description: description.into(),
             field_type: DescribedSchemaType::Float,
+            optional: false,
         }
     }
 
@@ -39,6 +42,7 @@ impl DescribedSchema {
             name: name.into(),
             description: description.into(),
             field_type: DescribedSchemaType::Boolean,
+            optional: false,
         }
     }
 
@@ -51,6 +55,7 @@ impl DescribedSchema {
             name: name.into(),
             description: description.into(),
             field_type: DescribedSchemaType::Array(Box::new(item_schema)),
+            optional: false,
         }
     }
 
@@ -59,6 +64,7 @@ impl DescribedSchema {
             name: name.into(),
             description: description.into(),
             field_type: DescribedSchemaType::String,
+            optional: false,
         }
     }
 
@@ -71,6 +77,12 @@ impl DescribedSchema {
             name: name.into(),
             description: description.into(),
             field_type: DescribedSchemaType::Object(fields.into_iter().collect()),
+            optional: false,
         }
+    }
+
+    pub fn as_nullable(mut self) -> DescribedSchema {
+        self.optional = true;
+        self
     }
 }

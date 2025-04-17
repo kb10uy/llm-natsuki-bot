@@ -3,7 +3,7 @@ use crate::function::ConfigurableSimpleFunction;
 use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
     error::FunctionError,
-    interface::function::simple::{SimpleFunction, SimpleFunctionDescriptor, SimpleFunctionResponse},
+    interface::function::{FunctionDescriptor, FunctionResponse, simple::SimpleFunction},
     model::schema::DescribedSchema,
 };
 use lnb_daily_private::{
@@ -91,8 +91,8 @@ impl ConfigurableSimpleFunction for DailyPrivate {
 }
 
 impl SimpleFunction for DailyPrivate {
-    fn get_descriptor(&self) -> SimpleFunctionDescriptor {
-        SimpleFunctionDescriptor {
+    fn get_descriptor(&self) -> FunctionDescriptor {
+        FunctionDescriptor {
             name: "daily_private".to_string(),
             description: r#"
                 この bot 自身のその日のプライベートな事情を取得します。
@@ -109,13 +109,13 @@ impl SimpleFunction for DailyPrivate {
         }
     }
 
-    fn call<'a>(&'a self, _id: &str, _params: Value) -> BoxFuture<'a, Result<SimpleFunctionResponse, FunctionError>> {
+    fn call<'a>(&'a self, _id: &str, _params: Value) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
         async move { self.get_daily_info().await }.boxed()
     }
 }
 
 impl DailyPrivate {
-    async fn get_daily_info(&self) -> Result<SimpleFunctionResponse, FunctionError> {
+    async fn get_daily_info(&self) -> Result<FunctionResponse, FunctionError> {
         let now = OffsetDateTime::now_local().map_err(FunctionError::by_external)?;
         let local_now = PrimitiveDateTime::new(now.date(), now.time());
         let logical_date = self.day_routine.logical_date(local_now);
@@ -192,7 +192,7 @@ impl DailyPrivate {
             masturbation_status,
             underwear_status,
         };
-        Ok(SimpleFunctionResponse {
+        Ok(FunctionResponse {
             result: serde_json::to_value(&info).map_err(FunctionError::by_serialization)?,
             attachments: vec![],
         })

@@ -10,3 +10,14 @@ services:
       RUST_LOG: "warn,lnb_server=info,lnb_mastodon_client=info,lnb_discord_client=info"
     volumes:
       - "./data:/data"
+    depends_on:
+      - "valkey"
+
+  valkey:
+    image: "mirror.gcr.io/valkey/valkey:8.1-alpine"
+    environment:
+      VALKEY_EXTRA_FLAGS: "--save 60 1 --loglevel warning"
+    volumes:
+      - "./data/valkey:/data"
+    expose:
+      - 6379

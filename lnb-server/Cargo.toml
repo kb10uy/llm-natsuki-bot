@@ -17,6 +17,7 @@ bimap = { workspace = true }
 clap = { workspace = true }
 futures = { workspace = true }
 rand = { workspace = true }
+redis = { workspace = true }
 reqwest = { workspace = true }
 rmp-serde = { workspace = true }
 serde = { workspace = true }

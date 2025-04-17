@@ -1,5 +1,5 @@
 use crate::{
-    MastodonLnbClientConfig,
+    CONTEXT_KEY_PREFIX, MastodonLnbClientConfig,
     text::{sanitize_markdown_for_mastodon, sanitize_mention_html_from_mastodon},
 };
 
@@ -9,7 +9,7 @@ use futures::prelude::*;
 use lnb_core::{
     APP_USER_AGENT, DebugOptionValue,
     error::ClientError,
-    interface::{Context, server::LnbServer},
+    interface::{Context, reminder::RemindableContext, server::LnbServer},
     model::{
         conversation::{ConversationAttachment, ConversationUpdate, UserRole},
         message::{AssistantMessage, UserMessage, UserMessageContent},
@@ -21,13 +21,13 @@ use mastodon_async::{
     prelude::MediaType,
 };
 use reqwest::{Client, header::HeaderMap};
+use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 use thiserror::Error as ThisError;
 use tokio::{fs::File, io::AsyncWriteExt, spawn, time::sleep};
 use tracing::{debug, error, info, warn};
 use url::Url;
 
-const CONTEXT_KEY_PREFIX: &str = "mastodon";
 const RECONNECT_SLEEP: Duration = Duration::from_secs(120);
 
 #[derive(Debug)]
@@ -72,13 +72,13 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
 
     pub async fn execute(self: Arc<Self>) -> Result<(), ClientError> {
         loop {
-            let user_stream = self
+            let notification_stream = self
                 .mastodon
-                .stream_user()
+                .stream_notifications()
                 .map_err(ClientError::by_communication)
                 .await?;
 
-            let disconnected_status = user_stream
+            let disconnected_status = notification_stream
                 .try_for_each(async |(e, _)| {
                     spawn(self.clone().process_event(e));
                     Ok(())
@@ -164,6 +164,15 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         contents.extend(images);
 
         // Conversation の更新・呼出し
+        let mut context = Context::default();
+        context.set(RemindableContext {
+            context: CONTEXT_KEY_PREFIX.to_string(),
+            requester: serde_json::to_string(&RemindRequester {
+                acct: status.account.acct.clone(),
+                visibility: status.visibility,
+            })
+            .map_err(ClientError::by_external)?,
+        });
         let user_message = UserMessage {
             contents,
             language: status.language.and_then(|l| l.to_639_1()).map(|l| l.to_string()),
@@ -171,12 +180,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         };
         let conversation_update = self
             .assistant
-            .process_conversation(
-                Context::default(),
-                conversation_id,
-                user_message.clone(),
-                UserRole::Normal,
-            )
+            .process_conversation(context, conversation_id, user_message.clone(), UserRole::Normal)
             .await;
 
         // 返信処理
@@ -197,7 +201,9 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         };
         let assistant_message = recovered_update.assistant_response();
         let attachments = recovered_update.attachments();
-        let replied_status = self.send_reply(status, assistant_message, attachments).await?;
+        let replied_status = self
+            .send_reply(ReplyType::Status(status), assistant_message, attachments)
+            .await?;
         info!(
             "夏稀[{}]: {:?} ({} attachment(s))",
             assistant_message.is_sensitive,
@@ -217,7 +223,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
 
     async fn send_reply(
         &self,
-        in_reply_to_status: Status,
+        reply_type: ReplyType,
         assistant_message: &AssistantMessage,
         attachments: &[ConversationAttachment],
     ) -> Result<Status, ClientError> {
@@ -240,19 +246,17 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
             sanitized_text = sanitized_text.chars().take(self.max_length).collect();
             sanitized_text.push_str("...(omitted)");
         }
-        let reply_text = format!("@{} {sanitized_text}", in_reply_to_status.account.acct);
-        let reply_visibility = match in_reply_to_status.visibility {
-            Visibility::Public => Visibility::Unlisted,
-            otherwise => otherwise,
-        };
-        let reply_spoiler = match &in_reply_to_status.spoiler_text[..] {
-            "" => assistant_message.is_sensitive.then(|| self.sensitive_spoiler.clone()),
-            _ => Some(in_reply_to_status.spoiler_text),
-        };
+        let reply_text = format!("@{} {sanitized_text}", reply_type.acct());
+        let reply_spoiler = reply_type
+            .present_spoiler()
+            .or(assistant_message
+                .is_sensitive
+                .then_some(self.sensitive_spoiler.as_str()))
+            .map(|s| s.to_string());
         let reply_status = NewStatus {
             status: Some(reply_text),
-            visibility: Some(reply_visibility),
-            in_reply_to_id: Some(in_reply_to_status.id.to_string()),
+            visibility: Some(reply_type.visilibity()),
+            in_reply_to_id: reply_type.in_reply_to_id(),
             spoiler_text: reply_spoiler,
             media_ids: Some(attachment_ids),
             ..Default::default()
@@ -315,6 +319,73 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         drop(restored_tempfile);
 
         Ok(uploaded_attachment.id)
+    }
+
+    pub async fn remind(&self, requester: String, update: ConversationUpdate) -> Result<(), ClientError> {
+        let remind_requester = serde_json::from_str(&requester).map_err(ClientError::by_external)?;
+        let assistant_message = update.assistant_response();
+        let attachments = update.attachments();
+        let replied_status = self
+            .send_reply(ReplyType::Remind(remind_requester), assistant_message, attachments)
+            .await?;
+        info!(
+            "夏稀[{}]: {:?} ({} attachment(s))",
+            assistant_message.is_sensitive,
+            assistant_message.text,
+            attachments.len()
+        );
+
+        // Conversation/history の更新
+        let new_history_id = format!("{CONTEXT_KEY_PREFIX}:{}", replied_status.id);
+        self.assistant.save_conversation(update, &new_history_id).await?;
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct RemindRequester {
+    acct: String,
+    visibility: Visibility,
+}
+
+#[derive(Debug)]
+enum ReplyType {
+    Status(Status),
+    Remind(RemindRequester),
+}
+
+impl ReplyType {
+    pub fn in_reply_to_id(&self) -> Option<String> {
+        match self {
+            ReplyType::Status(status) => Some(status.id.to_string()),
+            ReplyType::Remind(_) => None,
+        }
+    }
+
+    pub fn acct(&self) -> &str {
+        match self {
+            ReplyType::Status(status) => &status.account.acct,
+            ReplyType::Remind(requester) => &requester.acct,
+        }
+    }
+
+    pub fn visilibity(&self) -> Visibility {
+        let original_visibility = match self {
+            ReplyType::Status(status) => status.visibility,
+            ReplyType::Remind(requester) => requester.visibility,
+        };
+        match original_visibility {
+            Visibility::Public => Visibility::Unlisted,
+            otherwise => otherwise,
+        }
+    }
+
+    pub fn present_spoiler(&self) -> Option<&str> {
+        match self {
+            ReplyType::Status(status) if !status.spoiler_text[..].trim().is_empty() => Some(&status.spoiler_text),
+            _ => None,
+        }
     }
 }
 

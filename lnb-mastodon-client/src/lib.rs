@@ -8,10 +8,13 @@ use std::{collections::HashMap, sync::Arc};
 use futures::{future::BoxFuture, prelude::*};
 use lnb_core::{
     DebugOptionValue,
-    error::ClientError,
-    interface::{client::LnbClient, server::LnbServer},
+    error::{ClientError, ReminderError},
+    interface::{client::LnbClient, reminder::Remindable, server::LnbServer},
+    model::conversation::ConversationUpdate,
 };
 use serde::Deserialize;
+
+const CONTEXT_KEY_PREFIX: &str = "mastodon";
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct MastodonLnbClientConfig {
@@ -21,7 +24,7 @@ pub struct MastodonLnbClientConfig {
     pub max_length: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MastodonLnbClient<S>(Arc<MastodonLnbClientInner<S>>);
 
 impl<S: LnbServer> MastodonLnbClient<S> {
@@ -38,9 +41,29 @@ impl<S: LnbServer> MastodonLnbClient<S> {
 impl<S: LnbServer> LnbClient for MastodonLnbClient<S> {
     fn execute(&self) -> BoxFuture<'static, Result<(), ClientError>> {
         let cloned_inner = self.0.clone();
-        async {
+        async move {
             cloned_inner.execute().await?;
             Ok(())
+        }
+        .boxed()
+    }
+}
+
+impl<S: LnbServer> Remindable for MastodonLnbClient<S> {
+    fn get_context(&self) -> String {
+        CONTEXT_KEY_PREFIX.to_string()
+    }
+
+    fn remind(
+        &self,
+        requester: String,
+        remind_conversation: ConversationUpdate,
+    ) -> BoxFuture<'_, Result<(), ReminderError>> {
+        async move {
+            self.0
+                .remind(requester, remind_conversation)
+                .map_err(ReminderError::by_internal)
+                .await
         }
         .boxed()
     }

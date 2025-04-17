@@ -4,16 +4,18 @@ mod config;
 mod function;
 mod llm;
 mod natsuki;
+mod shiyu;
 mod storage;
 
 use crate::{
     bang_command::initialize_bang_command,
-    config::AppConfig,
+    config::{AppConfig, AppConfigTool},
     function::{
         ConfigurableSimpleFunction, DailyPrivate, ExchangeRate, GetIllustUrl, ImageGenerator, LocalInfo, SelfInfo,
     },
     llm::initialize_llm,
     natsuki::Natsuki,
+    shiyu::{Shiyu, ShiyuProvider},
     storage::initialize_storage,
 };
 
@@ -21,8 +23,10 @@ use std::{collections::HashMap, path::Path};
 
 use anyhow::{Context as _, Result, bail};
 use clap::Parser;
-use config::AppConfigTool;
-use futures::future::join_all;
+use futures::{
+    FutureExt,
+    future::{join, join_all, ready},
+};
 use lnb_core::interface::client::LnbClient;
 use lnb_discord_client::DiscordLnbClient;
 use lnb_mastodon_client::MastodonLnbClient;
@@ -40,6 +44,17 @@ async fn main() -> Result<()> {
     register_simple_functions(&config.tool, &natsuki).await?;
     register_interceptions(&natsuki).await?;
 
+    // Reminder
+    let shiyu = if let Some(reminder_config) = &config.reminder {
+        info!("enabled Shiyu reminder system");
+        let shiyu = Shiyu::new(reminder_config).await?;
+        let shiyu_provider = ShiyuProvider::new(reminder_config, shiyu.clone()).await?;
+        natsuki.add_complex_function(shiyu_provider).await;
+        Some(shiyu)
+    } else {
+        None
+    };
+
     let mut client_tasks = vec![];
 
     // Mastodon
@@ -48,6 +63,10 @@ async fn main() -> Result<()> {
         let mastodon_client = MastodonLnbClient::new(mastodon_config, &debug_options, natsuki.clone()).await?;
         let mastodon_task = spawn(mastodon_client.execute());
         client_tasks.push(Box::new(mastodon_task));
+
+        if let Some(shiyu) = shiyu.as_ref() {
+            shiyu.register_remindable(mastodon_client.clone()).await;
+        }
     }
 
     // Discord
@@ -58,7 +77,19 @@ async fn main() -> Result<()> {
         client_tasks.push(Box::new(discord_task));
     }
 
-    join_all(client_tasks).await;
+    let shiyu_task = if let Some(shiyu) = shiyu {
+        shiyu.run(natsuki.clone()).boxed()
+    } else {
+        ready(Ok(())).boxed()
+    };
+
+    let (shiyu_result, client_results) = join(shiyu_task, join_all(client_tasks)).await;
+    for client_join in client_results {
+        let client_result = client_join?;
+        client_result?;
+    }
+    shiyu_result?;
+
     Ok(())
 }
 

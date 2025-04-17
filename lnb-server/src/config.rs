@@ -1,4 +1,7 @@
-use crate::function::{DailyPrivateConfig, ExchangeRateConfig, GetIllustUrlConfig, ImageGeneratorConfig};
+use crate::{
+    function::{DailyPrivateConfig, ExchangeRateConfig, GetIllustUrlConfig, ImageGeneratorConfig},
+    shiyu::ReminderConfig,
+};
 
 use std::{collections::HashMap, path::PathBuf};
 
@@ -18,6 +21,7 @@ pub struct AppConfig {
     pub llm: AppConfigLlm,
     pub storage: AppConfigStorage,
     pub assistant: AppConfigAssistant,
+    pub reminder: Option<ReminderConfig>,
 }
 
 /// [client]
