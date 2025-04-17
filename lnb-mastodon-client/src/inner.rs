@@ -9,7 +9,7 @@ use futures::prelude::*;
 use lnb_core::{
     APP_USER_AGENT, DebugOptionValue,
     error::ClientError,
-    interface::{Context, reminder::Remindable, server::LnbServer},
+    interface::{Context, reminder::RemindableContext, server::LnbServer},
     model::{
         conversation::{ConversationAttachment, ConversationUpdate, UserRole},
         message::{AssistantMessage, UserMessage, UserMessageContent},
@@ -165,7 +165,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
 
         // Conversation の更新・呼出し
         let mut context = Context::default();
-        context.set(Remindable {
+        context.set(RemindableContext {
             context: CONTEXT_KEY_PREFIX.to_string(),
             requester: status.account.acct.clone(),
         });

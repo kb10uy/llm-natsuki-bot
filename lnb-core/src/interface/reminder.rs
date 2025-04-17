@@ -1,4 +1,4 @@
-use crate::error::ReminderError;
+use crate::{error::ReminderError, model::conversation::ConversationUpdate};
 
 use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
@@ -24,7 +24,13 @@ pub trait Reminder: Send + Sync + 'static {
 
 /// Context で Reminder に送信できることを示す。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Remindable {
+pub struct RemindableContext {
     pub context: String,
     pub requester: String,
+}
+
+/// Reminder を送信可能なクライアントが実装する。
+pub trait Remindable: Send + Sync + 'static {
+    fn get_context(&self) -> String;
+    fn remind(&self, requester: String, remind_conversation: ConversationUpdate) -> Result<(), ReminderError>;
 }

@@ -9,7 +9,7 @@ use tokio::{
     sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel},
     time::sleep,
 };
-use tracing::{error, info};
+use tracing::{debug, error, info, trace};
 use uuid::Uuid;
 
 const QUEUE_KEY: &str = "lnb_queue";
@@ -52,8 +52,8 @@ impl Worker {
             .map_err(ReminderError::by_internal)
             .await?;
 
-        // キューに時刻とのマッピングを登録
-        let score = (execute_at.unix_timestamp_nanos() / 1_000_000_000) as f64;
+        // キューに時刻(unixtime)とのマッピングを登録
+        let score = (execute_at.unix_timestamp_nanos() / 1_000_000) as f64 / 1000.0;
         let _: Value = conn
             .zadd(QUEUE_KEY, &id_str, score)
             .map_err(ReminderError::by_internal)
@@ -106,18 +106,27 @@ impl Worker {
     {
         info!("connection established");
         loop {
-            let now_unixtime = (OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000_000_000) as f64;
+            let now_unixtime = (OffsetDateTime::now_utc().unix_timestamp_nanos() / 1_000_000) as f64 / 1000.0;
             let target_job_count: isize = self
                 .connection
                 .zcount(QUEUE_KEY, f64::NEG_INFINITY, now_unixtime)
                 .map_err(ReminderError::by_internal)
                 .await?;
-            let jobs: Vec<Vec<u8>> = self
+            trace!("pulling {target_job_count} jobs");
+
+            let job_ids: Vec<(String, f64)> = self
                 .connection
                 .zpopmin(QUEUE_KEY, target_job_count)
                 .map_err(ReminderError::by_internal)
                 .await?;
-            for job_bytes in jobs {
+            for (job_id, _target_time) in job_ids {
+                debug!("pulling {job_id}");
+                let job_bytes: Vec<u8> = self
+                    .connection
+                    .hget(JOB_TABLE_KEY, &job_id)
+                    .map_err(ReminderError::by_internal)
+                    .await?;
+                debug!("sending {job_id}");
                 let job: T = rmp_serde::from_slice(&job_bytes).map_err(ReminderError::by_serialization)?;
                 send.send(job).map_err(|_| ReminderError::CannotPushAnymore)?;
             }

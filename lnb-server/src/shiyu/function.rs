@@ -6,7 +6,7 @@ use lnb_core::{
     interface::{
         Context,
         function::{FunctionDescriptor, FunctionResponse, complex::ComplexFunction},
-        reminder::{Remind, Remindable, Reminder},
+        reminder::{Remind, RemindableContext, Reminder},
     },
     model::{
         conversation::{IncompleteConversation, UserRole},
@@ -92,7 +92,7 @@ impl ShiyuProvider {
         context: &Context,
         parameters: ReminderParameters,
     ) -> Result<FunctionResponse, FunctionError> {
-        let Some(remindable) = context.get::<Remindable>() else {
+        let Some(remindable) = context.get::<RemindableContext>() else {
             return self.error(ReminderResponse::UnsupportedPlatform).await;
         };
 
@@ -122,7 +122,7 @@ impl ShiyuProvider {
 
     async fn register(
         &self,
-        remindable: &Remindable,
+        remindable: &RemindableContext,
         remind_at: OffsetDateTime,
         content: String,
     ) -> Result<FunctionResponse, FunctionError> {

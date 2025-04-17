@@ -3,19 +3,20 @@ mod inner;
 mod worker;
 
 pub use function::ShiyuProvider;
-use uuid::Uuid;
-
-use crate::natsuki::Natsuki;
 
 use std::sync::Arc;
 
 use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
     error::ReminderError,
-    interface::reminder::{Remind, Reminder},
+    interface::{
+        reminder::{Remind, Reminder},
+        server::LnbServer,
+    },
 };
 use serde::Deserialize;
 use time::OffsetDateTime;
+use uuid::Uuid;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ReminderConfig {
@@ -28,13 +29,13 @@ pub struct ReminderConfig {
 pub struct Shiyu(Arc<inner::ShiyuInner>);
 
 impl Shiyu {
-    pub async fn new(config: &ReminderConfig, natsuki: Natsuki) -> Result<Shiyu, ReminderError> {
-        let inner = inner::ShiyuInner::new(config, natsuki).await?;
+    pub async fn new(config: &ReminderConfig) -> Result<Shiyu, ReminderError> {
+        let inner = inner::ShiyuInner::new(config).await?;
         Ok(Shiyu(Arc::new(inner)))
     }
 
-    pub fn run(&self) -> BoxFuture<'static, Result<(), ReminderError>> {
-        self.0.run()
+    pub fn run(&self, server: impl LnbServer) -> BoxFuture<'static, Result<(), ReminderError>> {
+        self.0.run(server)
     }
 }
 

@@ -47,7 +47,7 @@ async fn main() -> Result<()> {
     // Reminder
     let shiyu = if let Some(reminder_config) = &config.reminder {
         info!("enabled Shiyu reminder system");
-        let shiyu = Shiyu::new(reminder_config, natsuki.clone()).await?;
+        let shiyu = Shiyu::new(reminder_config).await?;
         let shiyu_provider = ShiyuProvider::new(reminder_config, shiyu.clone()).await?;
         natsuki.add_complex_function(shiyu_provider).await;
         Some(shiyu)
@@ -74,7 +74,7 @@ async fn main() -> Result<()> {
     }
 
     let shiyu_task = if let Some(shiyu) = shiyu {
-        shiyu.run().boxed()
+        shiyu.run(natsuki.clone()).boxed()
     } else {
         ready(Ok(())).boxed()
     };
