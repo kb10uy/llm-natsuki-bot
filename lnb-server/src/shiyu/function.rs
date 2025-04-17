@@ -136,7 +136,10 @@ impl ShiyuProvider {
             .map_err(FunctionError::by_external)
             .await?;
 
-        info!("reminder registered: [{id}] {remindable:?}: {content} @ {remind_at}");
+        info!(
+            "reminder registered: [{id}] ({} / {}): {content} @ {remind_at}",
+            remindable.context, remindable.requester
+        );
         Ok(FunctionResponse {
             result: serde_json::to_value(ReminderResponse::Registered {
                 id: id.to_string(),

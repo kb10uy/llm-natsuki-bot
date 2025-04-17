@@ -108,7 +108,10 @@ impl ShiyuDispatcher {
         let virtual_text: Arc<str> = self.notification_virtual_text.into();
 
         while let Some(job) = self.receiver.recv().await {
-            info!("sending reminder: [{}] {:?}", job.context, job.remind);
+            info!(
+                "sending reminder: ({} / {}) {}",
+                job.context, job.remind.requester, job.remind.content
+            );
             let remindable = {
                 let locked = self.remindables.read().await;
                 let Some(remindable) = locked.get(&job.context) else {

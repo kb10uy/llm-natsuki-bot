@@ -21,6 +21,7 @@ use mastodon_async::{
     prelude::MediaType,
 };
 use reqwest::{Client, header::HeaderMap};
+use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 use thiserror::Error as ThisError;
 use tokio::{fs::File, io::AsyncWriteExt, spawn, time::sleep};
@@ -166,7 +167,11 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         let mut context = Context::default();
         context.set(RemindableContext {
             context: CONTEXT_KEY_PREFIX.to_string(),
-            requester: status.account.acct.clone(),
+            requester: serde_json::to_string(&RemindRequester {
+                acct: status.account.acct.clone(),
+                visibility: status.visibility,
+            })
+            .map_err(ClientError::by_external)?,
         });
         let user_message = UserMessage {
             contents,
@@ -317,10 +322,11 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
     }
 
     pub async fn remind(&self, requester: String, update: ConversationUpdate) -> Result<(), ClientError> {
+        let remind_requester = serde_json::from_str(&requester).map_err(ClientError::by_external)?;
         let assistant_message = update.assistant_response();
         let attachments = update.attachments();
         let replied_status = self
-            .send_reply(ReplyType::Remind(requester), assistant_message, attachments)
+            .send_reply(ReplyType::Remind(remind_requester), assistant_message, attachments)
             .await?;
         info!(
             "夏稀[{}]: {:?} ({} attachment(s))",
@@ -337,10 +343,16 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct RemindRequester {
+    acct: String,
+    visibility: Visibility,
+}
+
 #[derive(Debug)]
 enum ReplyType {
     Status(Status),
-    Remind(String),
+    Remind(RemindRequester),
 }
 
 impl ReplyType {
@@ -354,18 +366,18 @@ impl ReplyType {
     pub fn acct(&self) -> &str {
         match self {
             ReplyType::Status(status) => &status.account.acct,
-            ReplyType::Remind(acct) => acct,
+            ReplyType::Remind(requester) => &requester.acct,
         }
     }
 
     pub fn visilibity(&self) -> Visibility {
-        match self {
-            ReplyType::Status(status) => match status.visibility {
-                Visibility::Public => Visibility::Unlisted,
-                otherwise => otherwise,
-            },
-            // TODO: 元のコンテキストを保持できるようにする
-            ReplyType::Remind(_) => Visibility::Unlisted,
+        let original_visibility = match self {
+            ReplyType::Status(status) => status.visibility,
+            ReplyType::Remind(requester) => requester.visibility,
+        };
+        match original_visibility {
+            Visibility::Public => Visibility::Unlisted,
+            otherwise => otherwise,
         }
     }
 
