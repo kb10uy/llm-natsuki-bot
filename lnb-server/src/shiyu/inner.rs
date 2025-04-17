@@ -2,23 +2,39 @@ use std::{collections::HashMap, sync::Arc};
 
 use crate::shiyu::{ReminderConfig, worker::Worker};
 
-use futures::{FutureExt, future::BoxFuture, select};
+use futures::{FutureExt, TryFutureExt, future::BoxFuture, select};
 use lnb_core::{
     error::ReminderError,
     interface::{
+        Context,
         reminder::{Remind, Remindable},
         server::LnbServer,
+    },
+    model::{
+        conversation::UserRole,
+        message::{UserMessage, UserMessageContent},
     },
 };
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
-use tokio::sync::{RwLock, mpsc::UnboundedReceiver};
+use tokio::{
+    spawn,
+    sync::{RwLock, mpsc::UnboundedReceiver},
+};
 use tracing::{info, warn};
 use uuid::Uuid;
 
 pub struct ShiyuInner {
     worker: Worker,
     remindables: Arc<RwLock<HashMap<String, Arc<dyn Remindable>>>>,
+    notification_virtual_text: String,
+}
+
+struct ShiyuDispatcher {
+    receiver: UnboundedReceiver<ShiyuJob>,
+    server: Arc<dyn LnbServer>,
+    remindables: Arc<RwLock<HashMap<String, Arc<dyn Remindable>>>>,
+    notification_virtual_text: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,6 +50,7 @@ impl ShiyuInner {
         Ok(ShiyuInner {
             worker,
             remindables: Arc::new(RwLock::new(HashMap::new())),
+            notification_virtual_text: config.notification_virtual_text.clone(),
         })
     }
 
@@ -45,8 +62,18 @@ impl ShiyuInner {
     }
 
     pub fn run(&self, server: impl LnbServer) -> BoxFuture<'static, Result<(), ReminderError>> {
+        // worker
         let (worker_task, receiver) = self.worker.run::<ShiyuJob>();
-        let dispatcher_task = ShiyuInner::run_dispatcher(server, self.remindables.clone(), receiver);
+
+        // dispatcher
+        let dispatcher = ShiyuDispatcher {
+            server: Arc::new(server),
+            remindables: self.remindables.clone(),
+            receiver,
+            notification_virtual_text: self.notification_virtual_text.clone(),
+        };
+        let dispatcher_task = dispatcher.run();
+
         async move {
             select! {
                 wr = worker_task.fuse() => wr,
@@ -74,16 +101,16 @@ impl ShiyuInner {
         self.worker.remove(id).await?;
         Ok(())
     }
+}
 
-    async fn run_dispatcher(
-        server: impl LnbServer,
-        remindables: Arc<RwLock<HashMap<String, Arc<dyn Remindable>>>>,
-        mut receiver: UnboundedReceiver<ShiyuJob>,
-    ) -> Result<(), ReminderError> {
-        while let Some(job) = receiver.recv().await {
+impl ShiyuDispatcher {
+    async fn run(mut self) -> Result<(), ReminderError> {
+        let virtual_text: Arc<str> = self.notification_virtual_text.into();
+
+        while let Some(job) = self.receiver.recv().await {
             info!("sending reminder: [{}] {:?}", job.context, job.remind);
             let remindable = {
-                let locked = remindables.read().await;
+                let locked = self.remindables.read().await;
                 let Some(remindable) = locked.get(&job.context) else {
                     warn!("unknown context: {}", job.context);
                     continue;
@@ -91,8 +118,36 @@ impl ShiyuInner {
                 remindable.clone()
             };
 
-            // remindable.remind(job.context, remind_conversation);
+            spawn(ShiyuDispatcher::send_remind(
+                self.server.clone(),
+                remindable,
+                job.remind,
+                virtual_text.clone(),
+            ));
         }
+        Ok(())
+    }
+
+    async fn send_remind(
+        server: Arc<dyn LnbServer>,
+        remindable: Arc<dyn Remindable>,
+        remind: Remind,
+        virtual_text: Arc<str>,
+    ) -> Result<(), ReminderError> {
+        let conversation_id = server.new_conversation().map_err(ReminderError::by_internal).await?;
+        let text = format!("{}\n{}", virtual_text, remind.content);
+        let user_message = UserMessage {
+            contents: vec![UserMessageContent::Text(text)],
+            ..Default::default()
+        };
+        let update = server
+            .process_conversation(Context::default(), conversation_id, user_message, UserRole::Normal)
+            .map_err(ReminderError::by_internal)
+            .await?;
+        remindable
+            .remind(remind.requester, update)
+            .map_err(ReminderError::by_internal)
+            .await?;
         Ok(())
     }
 }

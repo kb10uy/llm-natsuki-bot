@@ -1,5 +1,5 @@
 use crate::{
-    MastodonLnbClientConfig,
+    CONTEXT_KEY_PREFIX, MastodonLnbClientConfig,
     text::{sanitize_markdown_for_mastodon, sanitize_mention_html_from_mastodon},
 };
 
@@ -27,7 +27,6 @@ use tokio::{fs::File, io::AsyncWriteExt, spawn, time::sleep};
 use tracing::{debug, error, info, warn};
 use url::Url;
 
-const CONTEXT_KEY_PREFIX: &str = "mastodon";
 const RECONNECT_SLEEP: Duration = Duration::from_secs(120);
 
 #[derive(Debug)]
@@ -197,7 +196,9 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         };
         let assistant_message = recovered_update.assistant_response();
         let attachments = recovered_update.attachments();
-        let replied_status = self.send_reply(status, assistant_message, attachments).await?;
+        let replied_status = self
+            .send_reply(ReplyType::Status(status), assistant_message, attachments)
+            .await?;
         info!(
             "夏稀[{}]: {:?} ({} attachment(s))",
             assistant_message.is_sensitive,
@@ -217,7 +218,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
 
     async fn send_reply(
         &self,
-        in_reply_to_status: Status,
+        reply_type: ReplyType,
         assistant_message: &AssistantMessage,
         attachments: &[ConversationAttachment],
     ) -> Result<Status, ClientError> {
@@ -240,19 +241,17 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
             sanitized_text = sanitized_text.chars().take(self.max_length).collect();
             sanitized_text.push_str("...(omitted)");
         }
-        let reply_text = format!("@{} {sanitized_text}", in_reply_to_status.account.acct);
-        let reply_visibility = match in_reply_to_status.visibility {
-            Visibility::Public => Visibility::Unlisted,
-            otherwise => otherwise,
-        };
-        let reply_spoiler = match &in_reply_to_status.spoiler_text[..] {
-            "" => assistant_message.is_sensitive.then(|| self.sensitive_spoiler.clone()),
-            _ => Some(in_reply_to_status.spoiler_text),
-        };
+        let reply_text = format!("@{} {sanitized_text}", reply_type.acct());
+        let reply_spoiler = reply_type
+            .present_spoiler()
+            .or(assistant_message
+                .is_sensitive
+                .then_some(self.sensitive_spoiler.as_str()))
+            .map(|s| s.to_string());
         let reply_status = NewStatus {
             status: Some(reply_text),
-            visibility: Some(reply_visibility),
-            in_reply_to_id: Some(in_reply_to_status.id.to_string()),
+            visibility: Some(reply_type.visilibity()),
+            in_reply_to_id: reply_type.in_reply_to_id(),
             spoiler_text: reply_spoiler,
             media_ids: Some(attachment_ids),
             ..Default::default()
@@ -315,6 +314,66 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         drop(restored_tempfile);
 
         Ok(uploaded_attachment.id)
+    }
+
+    pub async fn remind(&self, requester: String, update: ConversationUpdate) -> Result<(), ClientError> {
+        let assistant_message = update.assistant_response();
+        let attachments = update.attachments();
+        let replied_status = self
+            .send_reply(ReplyType::Remind(requester), assistant_message, attachments)
+            .await?;
+        info!(
+            "夏稀[{}]: {:?} ({} attachment(s))",
+            assistant_message.is_sensitive,
+            assistant_message.text,
+            attachments.len()
+        );
+
+        // Conversation/history の更新
+        let new_history_id = format!("{CONTEXT_KEY_PREFIX}:{}", replied_status.id);
+        self.assistant.save_conversation(update, &new_history_id).await?;
+
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+enum ReplyType {
+    Status(Status),
+    Remind(String),
+}
+
+impl ReplyType {
+    pub fn in_reply_to_id(&self) -> Option<String> {
+        match self {
+            ReplyType::Status(status) => Some(status.id.to_string()),
+            ReplyType::Remind(_) => None,
+        }
+    }
+
+    pub fn acct(&self) -> &str {
+        match self {
+            ReplyType::Status(status) => &status.account.acct,
+            ReplyType::Remind(acct) => acct,
+        }
+    }
+
+    pub fn visilibity(&self) -> Visibility {
+        match self {
+            ReplyType::Status(status) => match status.visibility {
+                Visibility::Public => Visibility::Unlisted,
+                otherwise => otherwise,
+            },
+            // TODO: 元のコンテキストを保持できるようにする
+            ReplyType::Remind(_) => Visibility::Unlisted,
+        }
+    }
+
+    pub fn present_spoiler(&self) -> Option<&str> {
+        match self {
+            ReplyType::Status(status) if !status.spoiler_text[..].trim().is_empty() => Some(&status.spoiler_text),
+            _ => None,
+        }
     }
 }
 

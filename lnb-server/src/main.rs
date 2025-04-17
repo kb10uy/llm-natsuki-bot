@@ -63,6 +63,10 @@ async fn main() -> Result<()> {
         let mastodon_client = MastodonLnbClient::new(mastodon_config, &debug_options, natsuki.clone()).await?;
         let mastodon_task = spawn(mastodon_client.execute());
         client_tasks.push(Box::new(mastodon_task));
+
+        if let Some(shiyu) = shiyu.as_ref() {
+            shiyu.register_remindable(mastodon_client.clone()).await;
+        }
     }
 
     // Discord

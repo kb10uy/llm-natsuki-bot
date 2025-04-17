@@ -32,5 +32,9 @@ pub struct RemindableContext {
 /// Reminder を送信可能なクライアントが実装する。
 pub trait Remindable: Send + Sync + 'static {
     fn get_context(&self) -> String;
-    fn remind(&self, requester: String, remind_conversation: ConversationUpdate) -> Result<(), ReminderError>;
+    fn remind(
+        &self,
+        requester: String,
+        remind_conversation: ConversationUpdate,
+    ) -> BoxFuture<'_, Result<(), ReminderError>>;
 }

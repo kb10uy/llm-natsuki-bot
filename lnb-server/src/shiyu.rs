@@ -10,7 +10,7 @@ use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
     error::ReminderError,
     interface::{
-        reminder::{Remind, Reminder},
+        reminder::{Remind, Remindable, Reminder},
         server::LnbServer,
     },
 };
@@ -32,6 +32,10 @@ impl Shiyu {
     pub async fn new(config: &ReminderConfig) -> Result<Shiyu, ReminderError> {
         let inner = inner::ShiyuInner::new(config).await?;
         Ok(Shiyu(Arc::new(inner)))
+    }
+
+    pub async fn register_remindable(&self, remindable: impl Remindable) {
+        self.0.register_remindable(remindable).await;
     }
 
     pub fn run(&self, server: impl LnbServer) -> BoxFuture<'static, Result<(), ReminderError>> {
