@@ -10,6 +10,9 @@ services:
       RUST_LOG: "warn,lnb_server=info,lnb_mastodon_client=info,lnb_discord_client=info"
     volumes:
       - "./data:/data"
+    depends_on:
+      - "valkey"
+
   valkey:
     image: "mirror.gcr.io/valkey/valkey:8.1-alpine"
     environment:
