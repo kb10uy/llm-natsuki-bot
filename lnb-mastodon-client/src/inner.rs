@@ -11,7 +11,7 @@ use lnb_core::{
     error::ClientError,
     interface::{Context, reminder::RemindableContext, server::LnbServer},
     model::{
-        conversation::{ConversationAttachment, ConversationUpdate, UserRole},
+        conversation::{ConversationAttachment, ConversationId, ConversationUpdate, UserRole},
         message::{AssistantMessage, UserMessage, UserMessageContent},
     },
 };
@@ -29,6 +29,7 @@ use tracing::{debug, error, info, warn};
 use url::Url;
 
 const RECONNECT_SLEEP: Duration = Duration::from_secs(120);
+const PREVIOUS_STATUS_SEPARATOR: &str = "\n-------\n";
 
 #[derive(Debug)]
 pub struct MastodonLnbClientInner<S> {
@@ -125,24 +126,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         }
 
         // Conversation の検索
-        let context_key = status.in_reply_to_id.as_ref().map(|si| si.to_string());
-        let conversation_id = match context_key {
-            Some(context) => {
-                info!("restoring conversation with last status ID {context}");
-                let context_key = format!("{CONTEXT_KEY_PREFIX}:{context}");
-                match self.assistant.restore_conversation(&context_key).await? {
-                    Some(c) => c,
-                    None => {
-                        info!("conversation has been lost, creating new one");
-                        self.assistant.new_conversation().await?
-                    }
-                }
-            }
-            None => {
-                info!("creating new conversation");
-                self.assistant.new_conversation().await?
-            }
-        };
+        let (conversation_id, previous_text) = self.get_conversation(&status).await?;
 
         // パース
         let sanitized_mention_text = sanitize_mention_html_from_mastodon(&status.content);
@@ -160,7 +144,12 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
             images.len()
         );
 
-        let mut contents = vec![UserMessageContent::Text(sanitized_mention_text)];
+        let user_text = if let Some(prev) = previous_text {
+            format!("{prev}{PREVIOUS_STATUS_SEPARATOR}{sanitized_mention_text}")
+        } else {
+            sanitized_mention_text
+        };
+        let mut contents = vec![UserMessageContent::Text(user_text)];
         contents.extend(images);
 
         // Conversation の更新・呼出し
@@ -219,6 +208,33 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
             .await?;
 
         Ok(())
+    }
+
+    async fn get_conversation(&self, status: &Status) -> Result<(ConversationId, Option<String>), ClientError> {
+        let Some(status_id) = status.in_reply_to_id.clone() else {
+            info!("creating new conversation");
+            let id = self.assistant.new_conversation().await?;
+            return Ok((id, None));
+        };
+
+        match self.assistant.restore_conversation(status_id.as_ref()).await? {
+            Some(id) => {
+                info!("conversation {status_id} restored");
+                Ok((id, None))
+            }
+            None => {
+                info!("unknown conversation detected; fetching in_reply_to status {status_id}");
+                let previous_text = match self.mastodon.get_status(&status_id).await {
+                    Ok(previous) => Some(sanitize_mention_html_from_mastodon(&previous.content)),
+                    Err(e) => {
+                        warn!("failed to fetch previous status: {e}");
+                        None
+                    }
+                };
+                let id = self.assistant.new_conversation().await?;
+                Ok((id, previous_text))
+            }
+        }
     }
 
     async fn send_reply(
