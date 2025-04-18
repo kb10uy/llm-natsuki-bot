@@ -214,6 +214,8 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
 
                 if has_unknown_mention {
                     // 他人に言及されているので待つ
+                    debug!("waiting for fetching unknown ancestors of {}", mentioned_status.id);
+
                     // 意思表示としてふぁぼる
                     self.mastodon
                         .favourite(&mentioned_status.id)
