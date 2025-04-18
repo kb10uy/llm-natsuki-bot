@@ -144,7 +144,12 @@ impl ShiyuDispatcher {
             ..Default::default()
         };
         let update = server
-            .process_conversation(Context::default(), conversation_id, user_message, UserRole::Normal)
+            .process_conversation(
+                Context::default(),
+                conversation_id,
+                vec![user_message.into()],
+                UserRole::Normal,
+            )
             .map_err(ReminderError::by_internal)
             .await?;
         remindable

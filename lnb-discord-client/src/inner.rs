@@ -127,7 +127,7 @@ impl<S: LnbServer> DiscordLnbClientInner<S> {
             .process_conversation(
                 LnbContext::default(),
                 conversation_id,
-                user_message.clone(),
+                vec![user_message.clone().into()],
                 UserRole::Normal,
             )
             .await;

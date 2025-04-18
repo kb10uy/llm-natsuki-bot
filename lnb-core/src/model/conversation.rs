@@ -52,11 +52,10 @@ pub struct IncompleteConversation {
 }
 
 impl IncompleteConversation {
-    pub fn start(conversation: Conversation, user_message: UserMessage) -> IncompleteConversation {
-        let pushed_messages = vec![user_message.into()];
+    pub fn start(conversation: Conversation) -> IncompleteConversation {
         IncompleteConversation {
             base: conversation,
-            pushed_messages,
+            pushed_messages: vec![],
             attachments: vec![],
             model_override: None,
         }

@@ -169,7 +169,12 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         };
         let conversation_update = self
             .assistant
-            .process_conversation(context, conversation_id, user_message.clone(), UserRole::Normal)
+            .process_conversation(
+                context,
+                conversation_id,
+                vec![user_message.clone().into()],
+                UserRole::Normal,
+            )
             .await;
 
         // 返信処理
