@@ -9,7 +9,7 @@ use regex::Regex;
 use url::Url;
 
 static RE_HEAD_MENTION: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r#"^\s*\[@.+?\]\(.+?\)\s*"#).expect("invalid regex"));
+    LazyLock::new(|| Regex::new(r#"^\s*(\[@.+?\]\(.+?\)\s*)+"#).expect("invalid regex"));
 
 pub fn sanitize_mention_html_from_mastodon(mention_html: &str) -> String {
     let content_markdown = parse_html(mention_html);
