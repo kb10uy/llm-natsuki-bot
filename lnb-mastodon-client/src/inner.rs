@@ -3,7 +3,7 @@ use crate::{
     text::{sanitize_markdown_for_mastodon, sanitize_mention_html_from_mastodon},
 };
 
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, iter::once, sync::Arc, time::Duration};
 
 use futures::prelude::*;
 use lnb_core::{
@@ -12,7 +12,7 @@ use lnb_core::{
     interface::{Context, reminder::RemindableContext, server::LnbServer},
     model::{
         conversation::{ConversationAttachment, ConversationId, ConversationUpdate, UserRole},
-        message::{AssistantMessage, UserMessage, UserMessageContent},
+        message::{AssistantMessage, Message, UserMessage, UserMessageContent},
     },
 };
 use mastodon_async::{
@@ -29,7 +29,6 @@ use tracing::{debug, error, info, warn};
 use url::Url;
 
 const RECONNECT_SLEEP: Duration = Duration::from_secs(120);
-const PREVIOUS_STATUS_SEPARATOR: &str = "\n-------\n";
 
 #[derive(Debug)]
 pub struct MastodonLnbClientInner<S> {
@@ -126,55 +125,13 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         }
 
         // Conversation の検索
-        let (conversation_id, previous_text) = self.get_conversation(&status).await?;
-
-        // パース
-        let sanitized_mention_text = sanitize_mention_html_from_mastodon(&status.content);
-        let images: Vec<_> = status
-            .media_attachments
-            .iter()
-            .filter(|a| matches!(a.media_type, MediaType::Image | MediaType::Gifv))
-            .map(|atch| UserMessageContent::ImageUrl(atch.preview_url.clone()))
-            .collect();
-        info!(
-            "[{}] {}: {:?} ({} image(s))",
-            status.id,
-            status.account.acct,
-            sanitized_mention_text,
-            images.len()
-        );
-
-        let user_text = if let Some(prev) = previous_text {
-            format!("{prev}{PREVIOUS_STATUS_SEPARATOR}{sanitized_mention_text}")
-        } else {
-            sanitized_mention_text
-        };
-        let mut contents = vec![UserMessageContent::Text(user_text)];
-        contents.extend(images);
+        let (conversation_id, new_messages) = self.get_conversation(&status).await?;
 
         // Conversation の更新・呼出し
-        let mut context = Context::default();
-        context.set(RemindableContext {
-            context: CONTEXT_KEY_PREFIX.to_string(),
-            requester: serde_json::to_string(&RemindRequester {
-                acct: status.account.acct.clone(),
-                visibility: status.visibility,
-            })
-            .map_err(ClientError::by_external)?,
-        });
-        let user_message = UserMessage {
-            contents,
-            language: status.language.and_then(|l| l.to_639_1()).map(|l| l.to_string()),
-            ..Default::default()
-        };
+        let context = create_context(&status)?;
         let conversation_update = self
             .assistant
-            .process_conversation(
-                context,
-                conversation_id,
-                vec![user_message.clone().into()],
-                UserRole::Normal,
-            )
+            .process_conversation(context, conversation_id, new_messages.clone(), UserRole::Normal)
             .await;
 
         // 返信処理
@@ -184,7 +141,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
                 warn!("reporting conversation error: {e}",);
                 ConversationUpdate::create_ephemeral(
                     conversation_id,
-                    user_message,
+                    new_messages,
                     AssistantMessage {
                         text: e.to_string(),
                         skip_llm: true,
@@ -215,30 +172,75 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         Ok(())
     }
 
-    async fn get_conversation(&self, status: &Status) -> Result<(ConversationId, Option<String>), ClientError> {
+    async fn get_conversation(&self, status: &Status) -> Result<(ConversationId, Vec<Message>), ClientError> {
         let Some(status_id) = status.in_reply_to_id.clone() else {
             info!("creating new conversation");
             let id = self.assistant.new_conversation().await?;
-            return Ok((id, None));
+            let user_message = self.transform_status(status);
+            return Ok((id, vec![user_message]));
         };
 
         match self.assistant.restore_conversation(status_id.as_ref()).await? {
             Some(id) => {
                 info!("conversation {status_id} restored");
-                Ok((id, None))
+                let user_message = self.transform_status(status);
+                Ok((id, vec![user_message]))
             }
             None => {
                 info!("unknown conversation detected; fetching in_reply_to status {status_id}");
-                let previous_text = match self.mastodon.get_status(&status_id).await {
-                    Ok(previous) => Some(sanitize_mention_html_from_mastodon(&previous.content)),
-                    Err(e) => {
-                        warn!("failed to fetch previous status: {e}");
-                        None
-                    }
-                };
                 let id = self.assistant.new_conversation().await?;
-                Ok((id, previous_text))
+                let new_messages = {
+                    let previous = match self.mastodon.get_status(&status_id).await {
+                        Ok(previous) => Some(self.transform_status(&previous)),
+                        Err(e) => {
+                            warn!("failed to fetch previous status: {e}");
+                            None
+                        }
+                    };
+                    let current = self.transform_status(status);
+                    previous.into_iter().chain(once(current)).collect()
+                };
+                Ok((id, new_messages))
             }
+        }
+    }
+
+    fn transform_status(&self, status: &Status) -> Message {
+        let sanitized_mention_text = sanitize_mention_html_from_mastodon(&status.content);
+        let language = status.language.and_then(|l| l.to_639_1()).map(|l| l.to_string());
+
+        if status.account.id == self.self_account.id {
+            AssistantMessage {
+                text: sanitized_mention_text,
+                language,
+                ..Default::default()
+            }
+            .into()
+        } else {
+            let contents = {
+                let images: Vec<_> = status
+                    .media_attachments
+                    .iter()
+                    .filter(|a| matches!(a.media_type, MediaType::Image | MediaType::Gifv))
+                    .map(|atch| UserMessageContent::ImageUrl(atch.preview_url.clone()))
+                    .collect();
+                info!(
+                    "[{}] {}: {:?} ({} image(s))",
+                    status.id,
+                    status.account.acct,
+                    sanitized_mention_text,
+                    images.len()
+                );
+                let mut contents = vec![UserMessageContent::Text(sanitized_mention_text)];
+                contents.extend(images);
+                contents
+            };
+            UserMessage {
+                contents,
+                language,
+                ..Default::default()
+            }
+            .into()
         }
     }
 
@@ -362,6 +364,19 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
 
         Ok(())
     }
+}
+
+fn create_context(status: &Status) -> Result<Context, ClientError> {
+    let mut context = Context::default();
+    context.set(RemindableContext {
+        context: CONTEXT_KEY_PREFIX.to_string(),
+        requester: serde_json::to_string(&RemindRequester {
+            acct: status.account.acct.clone(),
+            visibility: status.visibility,
+        })
+        .map_err(ClientError::by_external)?,
+    });
+    Ok(context)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
