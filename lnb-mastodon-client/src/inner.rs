@@ -163,7 +163,6 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         );
 
         // Conversation/history の更新
-        // let updated_conversation = conversation_update.finish();
         let new_history_id = format!("{CONTEXT_KEY_PREFIX}:{}", replied_status.id);
         self.assistant
             .save_conversation(recovered_update, &new_history_id)
@@ -187,18 +186,27 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
                 Ok((id, vec![user_message]))
             }
             None => {
-                info!("unknown conversation detected; fetching in_reply_to status {status_id}");
                 let id = self.assistant.new_conversation().await?;
                 let new_messages = {
-                    let previous = match self.mastodon.get_status(&status_id).await {
-                        Ok(previous) => Some(self.transform_status(&previous)),
+                    let ancestors = match self.mastodon.get_context(&status_id).await {
+                        Ok(mstdn_context) => {
+                            info!(
+                                "unknown conversation detected; restoring {} statuses from context",
+                                mstdn_context.ancestors.len()
+                            );
+                            mstdn_context
+                                .ancestors
+                                .into_iter()
+                                .map(|s| self.transform_status(&s))
+                                .collect()
+                        }
                         Err(e) => {
-                            warn!("failed to fetch previous status: {e}");
-                            None
+                            warn!("failed to fetch context: {e}");
+                            vec![]
                         }
                     };
                     let current = self.transform_status(status);
-                    previous.into_iter().chain(once(current)).collect()
+                    ancestors.into_iter().chain(once(current)).collect()
                 };
                 Ok((id, new_messages))
             }
@@ -231,9 +239,9 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
                     sanitized_mention_text,
                     images.len()
                 );
-                let mut contents = vec![UserMessageContent::Text(sanitized_mention_text)];
-                contents.extend(images);
-                contents
+                once(UserMessageContent::Text(sanitized_mention_text))
+                    .chain(images)
+                    .collect()
             };
             UserMessage {
                 contents,
