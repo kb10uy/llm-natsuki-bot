@@ -4,6 +4,7 @@ client:
     token: ""
     max_length: 400
     sensitive_spoiler: "そぎぎ"
+    remote_fetch_delay_seconds: 5
   discord:
     token: ""
     max_length: 500

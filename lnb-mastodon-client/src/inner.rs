@@ -17,7 +17,9 @@ use lnb_core::{
 };
 use mastodon_async::{
     Mastodon, NewStatus, Visibility,
-    entities::{AttachmentId, account::Account, event::Event, notification::Type as NotificationType, status::Status},
+    entities::{
+        AttachmentId, StatusId, account::Account, event::Event, notification::Type as NotificationType, status::Status,
+    },
     prelude::MediaType,
 };
 use reqwest::{Client, header::HeaderMap};
@@ -38,6 +40,7 @@ pub struct MastodonLnbClientInner<S> {
     self_account: Account,
     sensitive_spoiler: String,
     max_length: usize,
+    remote_fetch_delay: Duration,
 }
 
 impl<S: LnbServer> MastodonLnbClientInner<S> {
@@ -67,6 +70,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
             self_account,
             sensitive_spoiler: config.sensitive_spoiler.clone(),
             max_length: config.max_length,
+            remote_fetch_delay: Duration::from_secs(config.remote_fetch_delay_seconds as u64),
         })
     }
 
@@ -172,6 +176,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         self.assistant
             .save_conversation(recovered_update, &new_history_id)
             .await?;
+        debug!("saved conversation {}", replied_status.id);
 
         Ok(())
     }
@@ -180,44 +185,72 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
     /// * in_reply_to があり、会話を復元できる場合はその ID を返す。
     /// * in_reply_to がない場合は新しい `Conversation` の ID を返す。
     /// * in_reply_to があるが復元できない場合、新しい `Conversation` の ID と Mastodon 側の会話ツリーを返す。
-    async fn get_conversation(&self, status: &Status) -> Result<(ConversationId, Vec<Message>), ClientError> {
-        let Some(status_id) = status.in_reply_to_id.clone() else {
-            info!("creating new conversation");
-            let id = self.assistant.new_conversation().await?;
-            let user_message = self.transform_status(status);
-            return Ok((id, vec![user_message]));
-        };
+    async fn get_conversation(&self, mentioned_status: &Status) -> Result<(ConversationId, Vec<Message>), ClientError> {
+        match mentioned_status.in_reply_to_id.clone() {
+            // リプライであることが確定している
+            Some(in_reply_to_id) => {
+                debug!("restoring id {in_reply_to_id}");
+                let context_key = format!("{CONTEXT_KEY_PREFIX}:{in_reply_to_id}");
 
-        match self.assistant.restore_conversation(status_id.as_ref()).await? {
-            Some(id) => {
-                info!("conversation {status_id} restored");
-                let user_message = self.transform_status(status);
-                Ok((id, vec![user_message]))
-            }
-            None => {
+                // 既知の会話
+                if let Some(id) = self.assistant.restore_conversation(&context_key).await? {
+                    let user_message = self.transform_status(mentioned_status);
+                    return Ok((id, vec![user_message]));
+                }
+
+                // 未知の会話
                 let id = self.assistant.new_conversation().await?;
-                let new_messages = {
-                    let ancestors = match self.mastodon.get_context(&status_id).await {
-                        Ok(mstdn_context) => {
-                            info!(
-                                "unknown conversation detected; restoring {} statuses from context",
-                                mstdn_context.ancestors.len()
-                            );
-                            mstdn_context
-                                .ancestors
-                                .into_iter()
-                                .map(|s| self.transform_status(&s))
-                                .collect()
-                        }
-                        Err(e) => {
-                            warn!("failed to fetch context: {e}");
-                            vec![]
-                        }
-                    };
-                    let current = self.transform_status(status);
-                    ancestors.into_iter().chain(once(current)).collect()
-                };
-                Ok((id, new_messages))
+                let ancestors = self.get_ancestor(&mentioned_status.id).await;
+                let current = self.transform_status(mentioned_status);
+                Ok((id, ancestors.into_iter().chain(once(current)).collect()))
+            }
+
+            // リプライがあるかもしれない(到着直後では埋まっていないことがあるため)
+            None => {
+                let has_unknown_mention = mentioned_status
+                    .mentions
+                    .iter()
+                    .any(|m| m.acct != self.self_account.acct);
+
+                if has_unknown_mention {
+                    // 他人に言及されているので待つ
+                    // 意思表示としてふぁぼる
+                    self.mastodon
+                        .favourite(&mentioned_status.id)
+                        .map_err(ClientError::by_external)
+                        .await?;
+
+                    sleep(self.remote_fetch_delay).await;
+
+                    let id = self.assistant.new_conversation().await?;
+                    let ancestors = self.get_ancestor(&mentioned_status.id).await;
+                    let current = self.transform_status(mentioned_status);
+                    Ok((id, ancestors.into_iter().chain(once(current)).collect()))
+                } else {
+                    // もはや新規会話とみなすしかない
+                    debug!("creating new conversation");
+                    let id = self.assistant.new_conversation().await?;
+                    let user_message = self.transform_status(mentioned_status);
+                    Ok((id, vec![user_message]))
+                }
+            }
+        }
+    }
+
+    /// 親会話ツリーを取得して Message にする。
+    async fn get_ancestor(&self, base_id: &StatusId) -> Vec<Message> {
+        match self.mastodon.get_context(base_id).await {
+            Ok(mstdn_context) => {
+                debug!("restoring {} statuses from context", mstdn_context.ancestors.len());
+                mstdn_context
+                    .ancestors
+                    .into_iter()
+                    .map(|s| self.transform_status(&s))
+                    .collect()
+            }
+            Err(e) => {
+                warn!("failed to fetch context: {e}");
+                vec![]
             }
         }
     }
