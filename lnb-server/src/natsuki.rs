@@ -17,7 +17,7 @@ use lnb_core::{
     },
     model::{
         conversation::{ConversationId, ConversationUpdate, UserRole},
-        message::UserMessage,
+        message::Message,
     },
 };
 
@@ -71,7 +71,7 @@ impl LnbServer for Natsuki {
         &self,
         context: Context,
         conversation_id: ConversationId,
-        user_message: UserMessage,
+        user_message: Vec<Message>,
         user_role: UserRole,
     ) -> BoxFuture<'_, Result<ConversationUpdate, ServerError>> {
         async move {

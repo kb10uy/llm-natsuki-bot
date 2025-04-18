@@ -117,17 +117,20 @@ impl<S: LnbServer> DiscordLnbClientInner<S> {
         // contents.extend(images);
 
         // Conversation の更新・呼出し
-        let user_message = UserMessage {
-            contents,
-            language: message.author.locale.clone(),
-            ..Default::default()
-        };
+        let new_messages = vec![
+            UserMessage {
+                contents,
+                language: message.author.locale.clone(),
+                ..Default::default()
+            }
+            .into(),
+        ];
         let conversation_update = self
             .assistant
             .process_conversation(
                 LnbContext::default(),
                 conversation_id,
-                user_message.clone(),
+                new_messages.clone(),
                 UserRole::Normal,
             )
             .await;
@@ -138,7 +141,7 @@ impl<S: LnbServer> DiscordLnbClientInner<S> {
                 warn!("reporting conversation error: {e}",);
                 ConversationUpdate::create_ephemeral(
                     conversation_id,
-                    user_message,
+                    new_messages,
                     AssistantMessage {
                         text: e.to_string(),
                         skip_llm: true,

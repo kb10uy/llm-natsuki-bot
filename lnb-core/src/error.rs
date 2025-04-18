@@ -55,6 +55,10 @@ pub enum ServerError {
     /// Interception によって中断された。
     #[error("interception reported abortion before LLM calls")]
     ConversationAborted,
+
+    /// 追加された Message の末尾が User ではない。
+    #[error("new messages must have at least 1 element and last must be UserMessage")]
+    MustEndsWithUserMessage,
 }
 
 /// LLM 層のエラー。

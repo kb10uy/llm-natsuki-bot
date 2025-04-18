@@ -15,7 +15,7 @@ use lnb_core::{
         conversation::{
             Conversation, ConversationAttachment, ConversationId, ConversationUpdate, IncompleteConversation, UserRole,
         },
-        message::{AssistantMessage, FunctionResponseMessage, Message, MessageToolCalling, UserMessage},
+        message::{AssistantMessage, FunctionResponseMessage, Message, MessageToolCalling},
     },
 };
 use tokio::sync::RwLock;
@@ -77,15 +77,20 @@ impl NatsukiInner {
         &self,
         context: Context,
         conversation_id: ConversationId,
-        user_message: UserMessage,
+        new_messages: Vec<Message>,
         user_role: UserRole,
     ) -> Result<ConversationUpdate, ServerError> {
+        if !matches!(new_messages.last(), Some(Message::User(_))) {
+            return Err(ServerError::MustEndsWithUserMessage);
+        }
+
         let conversation = self
             .storage
             .fetch_content_by_id(conversation_id)
             .await?
             .ok_or_else(|| ServerError::ConversationNotFound(conversation_id))?;
-        let mut incomplete_conversation = IncompleteConversation::start(conversation, user_message);
+        let mut incomplete_conversation = IncompleteConversation::start(conversation);
+        incomplete_conversation.extend_messages(new_messages);
 
         // interception updates
         // 後から追加した方が前のものを "wrap" する (axum などと同じ)ので逆順

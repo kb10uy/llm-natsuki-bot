@@ -22,6 +22,7 @@ pub struct MastodonLnbClientConfig {
     pub token: String,
     pub sensitive_spoiler: String,
     pub max_length: usize,
+    pub remote_fetch_delay_seconds: usize,
 }
 
 #[derive(Debug, Clone)]

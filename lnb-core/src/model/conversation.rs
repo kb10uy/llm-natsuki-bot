@@ -52,11 +52,10 @@ pub struct IncompleteConversation {
 }
 
 impl IncompleteConversation {
-    pub fn start(conversation: Conversation, user_message: UserMessage) -> IncompleteConversation {
-        let pushed_messages = vec![user_message.into()];
+    pub fn start(conversation: Conversation) -> IncompleteConversation {
         IncompleteConversation {
             base: conversation,
-            pushed_messages,
+            pushed_messages: vec![],
             attachments: vec![],
             model_override: None,
         }
@@ -166,10 +165,14 @@ pub struct ConversationUpdate {
 }
 
 impl ConversationUpdate {
-    pub fn create_ephemeral(id: ConversationId, user: UserMessage, assistant: AssistantMessage) -> ConversationUpdate {
+    pub fn create_ephemeral(
+        id: ConversationId,
+        user: impl IntoIterator<Item = Message>,
+        assistant: AssistantMessage,
+    ) -> ConversationUpdate {
         ConversationUpdate {
             base_conversation_id: id,
-            intermediate_messages: vec![user.into()],
+            intermediate_messages: user.into_iter().collect(),
             assistant_response: assistant,
             attachments: vec![],
             model_override: None,
