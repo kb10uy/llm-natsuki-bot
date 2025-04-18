@@ -100,15 +100,19 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
     }
 
     async fn process_event(self: Arc<Self>, event: Event) {
-        let processed = match event {
-            // Event::Update(status) => self.process_status(status).await,
-            Event::Notification(notification) => match notification.notification_type {
-                NotificationType::Mention => match notification.status {
-                    Some(status) => self.process_status(status).await,
-                    None => Err(ClientError::External(MastodonClientError::InvalidMention.into())),
-                },
-                _ => Ok(()),
+        let Event::Notification(notification) = event else {
+            return;
+        };
+
+        let processed = match notification.notification_type {
+            NotificationType::Mention => match notification.status {
+                Some(status) => self.process_status(status).await,
+                None => Err(ClientError::External(MastodonClientError::InvalidMention.into())),
             },
+            NotificationType::Follow => {
+                info!("followed by {}", notification.account.acct);
+                Ok(())
+            }
             _ => Ok(()),
         };
 
@@ -118,6 +122,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         error!("mastodon event process reported error: {err}");
     }
 
+    /// 投稿イベントを処理する。
     async fn process_status(&self, status: Status) -> Result<(), ClientError> {
         // フィルタリング(bot flag と自分には応答しない)
         if status.account.bot || status.account.id == self.self_account.id {
@@ -171,6 +176,10 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         Ok(())
     }
 
+    /// `ConversationId` と新規追加されるべき `Message` のリストを取得する。
+    /// * in_reply_to があり、会話を復元できる場合はその ID を返す。
+    /// * in_reply_to がない場合は新しい `Conversation` の ID を返す。
+    /// * in_reply_to があるが復元できない場合、新しい `Conversation` の ID と Mastodon 側の会話ツリーを返す。
     async fn get_conversation(&self, status: &Status) -> Result<(ConversationId, Vec<Message>), ClientError> {
         let Some(status_id) = status.in_reply_to_id.clone() else {
             info!("creating new conversation");
@@ -213,6 +222,8 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         }
     }
 
+    /// Mastodon の `Status` を `Message` 形式に変換する。
+    /// 会話復元時などに bot 自身のアカウントの投稿だった場合は `AssistantMessage` になる。
     fn transform_status(&self, status: &Status) -> Message {
         let sanitized_mention_text = sanitize_mention_html_from_mastodon(&status.content);
         let language = status.language.and_then(|l| l.to_639_1()).map(|l| l.to_string());
@@ -252,6 +263,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         }
     }
 
+    /// `assistant_message` に対応する内容のリプライを送信する。
     async fn send_reply(
         &self,
         reply_type: ReplyType,
@@ -301,6 +313,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         Ok(replied_status)
     }
 
+    /// 画像をアップロードする(非同期アップロード)。
     async fn upload_image(&self, url: &Url, description: Option<&str>) -> Result<AttachmentId, ClientError> {
         // ダウンロード
         let response = self
@@ -387,15 +400,20 @@ fn create_context(status: &Status) -> Result<Context, ClientError> {
     Ok(context)
 }
 
+/// `Remindable` に付与する requester。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct RemindRequester {
     acct: String,
     visibility: Visibility,
 }
 
+/// bot から投げるメンション投稿の形式。
 #[derive(Debug)]
 enum ReplyType {
+    /// 投稿に対するリプライ。
     Status(Status),
+
+    /// リマインド(親投稿なし)。
     Remind(RemindRequester),
 }
 
