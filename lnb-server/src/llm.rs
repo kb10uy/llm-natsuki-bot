@@ -2,13 +2,16 @@ mod claude;
 mod openai;
 
 use self::openai::{ChatCompletionBackend, ResponsesBackend};
-use crate::config::{AppConfigLlm, AppConfigLlmBackend, AppConfigLlmOpenaiApi};
+use crate::config::{AppConfigLlm, AppConfigLlmBackend, AppConfigLlmModel, AppConfigLlmOpenaiApi};
 
-use std::{collections::HashMap, sync::LazyLock};
+use std::{
+    collections::HashMap,
+    sync::{Arc, LazyLock},
+};
 
 use lnb_core::{
     error::LlmError,
-    interface::llm::BoxLlm,
+    interface::llm::ArcLlm,
     model::schema::{DescribedSchema, DescribedSchemaType},
 };
 use serde_json::{Value, json};
@@ -29,17 +32,11 @@ pub static ASSISTANT_RESPONSE_SCHEMA: LazyLock<DescribedSchema> = LazyLock::new(
     )
 });
 
-pub async fn initialize_llm(config: &AppConfigLlm) -> Result<(BoxLlm, &'static str), LlmError> {
+pub async fn create_llm(config: AppConfigLlmModel) -> Result<ArcLlm, LlmError> {
     match config.backend {
         AppConfigLlmBackend::Openai => match config.openai.api {
-            AppConfigLlmOpenaiApi::ChatCompletion => Ok((
-                Box::new(ChatCompletionBackend::new(&config.openai).await?),
-                "OpenAI (Chat Completion)",
-            )),
-            AppConfigLlmOpenaiApi::Resnposes => Ok((
-                Box::new(ResponsesBackend::new(&config.openai).await?),
-                "OpenAI (Responses)",
-            )),
+            AppConfigLlmOpenaiApi::ChatCompletion => Ok(Arc::new(ChatCompletionBackend::new(&config.openai).await?)),
+            AppConfigLlmOpenaiApi::Resnposes => Ok(Arc::new(ResponsesBackend::new(&config.openai).await?)),
         },
     }
 }

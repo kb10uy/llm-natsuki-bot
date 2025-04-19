@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::{
     error::LlmError,
     interface::function::FunctionDescriptor,
@@ -8,6 +10,7 @@ use futures::future::BoxFuture;
 use serde::Deserialize;
 
 pub type BoxLlm = Box<dyn Llm + 'static>;
+pub type ArcLlm = Arc<dyn Llm + 'static>;
 
 pub trait Llm: Send + Sync {
     /// `SimpleFunction` の追加を告知する。

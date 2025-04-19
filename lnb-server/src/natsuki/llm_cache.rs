@@ -1,14 +1,83 @@
+use crate::{
+    config::{AppConfigLlm, AppConfigLlmModel},
+    llm::create_llm,
+};
 
-#[derive(Debug, Clone)]
-pub struct LlmCache(Arc<RwLock<HashMap<String, >);
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
+use lnb_core::interface::llm::ArcLlm;
+use thiserror::Error as ThisError;
+use tokio::sync::RwLock;
+use tracing::{debug, warn};
 
-
-impl LlmCache {
-    pub fn
+#[derive(Clone)]
+pub struct LlmCache {
+    uninitialized_models: Arc<RwLock<HashMap<String, AppConfigLlmModel>>>,
+    created_models: Arc<RwLock<HashMap<String, ArcLlm>>>,
+    failed_models: Arc<RwLock<HashSet<String>>>,
 }
 
-#[derive(Debug)]
-enum LlmCache {
-    Uninitialized(AppConfigLlm)
+impl LlmCache {
+    pub fn new(config: &AppConfigLlm) -> LlmCache {
+        let uninitialized_models = config.models.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+
+        LlmCache {
+            uninitialized_models: Arc::new(RwLock::new(uninitialized_models)),
+            created_models: Arc::new(RwLock::new(HashMap::new())),
+            failed_models: Arc::new(RwLock::new(HashSet::new())),
+        }
+    }
+
+    pub async fn get(&self, key: &str) -> Result<ArcLlm, LlmCacheError> {
+        let created_llm = {
+            let created_lock = self.created_models.read().await;
+            created_lock.get(key).cloned()
+        };
+        if let Some(created_llm) = created_llm {
+            return Ok(created_llm);
+        }
+
+        let failed_llm_name = {
+            let failed_lock = self.failed_models.read().await;
+            failed_lock.get(key).cloned()
+        };
+        if let Some(failed_llm_name) = failed_llm_name {
+            return Err(LlmCacheError::Failed(failed_llm_name));
+        }
+
+        let creating_llm_config = {
+            let mut uninitialized_lock = self.uninitialized_models.write().await;
+            uninitialized_lock.remove(key)
+        };
+        let Some(creating_llm_config) = creating_llm_config else {
+            return Err(LlmCacheError::Undefined(key.to_string()));
+        };
+
+        match create_llm(creating_llm_config).await {
+            Ok(llm) => {
+                debug!("initialized and cached LLM {key}");
+                let mut created_lock = self.created_models.write().await;
+                created_lock.insert(key.to_string(), llm.clone());
+                Ok(llm)
+            }
+            Err(e) => {
+                warn!("failed to initialize LLM {key}: {e}");
+                let mut failed_lock = self.failed_models.write().await;
+                failed_lock.insert(key.to_string());
+                Err(LlmCacheError::Failed(key.to_string()))
+            }
+        }
+    }
+}
+
+#[derive(Debug, ThisError)]
+enum LlmCacheError {
+    #[error("undefined model: {0}")]
+    Undefined(String),
+
+    #[error("failed model")]
+    Failed(String),
 }
