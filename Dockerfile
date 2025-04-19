@@ -9,4 +9,4 @@ RUN cargo build --release
 FROM gcr.io/distroless/cc-debian12
 COPY --from=builder /build/target/release/lnb-server /
 USER nonroot
-CMD [ "/lnb-server", "-c", "/data/config.yaml" ]
+CMD [ "/lnb-server", "-c", "/data/config.generated.json" ]
