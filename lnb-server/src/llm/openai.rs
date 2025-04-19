@@ -10,6 +10,7 @@ use std::sync::LazyLock;
 
 use async_openai::{Client, config::OpenAIConfig, types::ResponseFormatJsonSchema};
 use lnb_core::{APP_USER_AGENT, error::LlmError};
+use serde::Deserialize;
 
 static RESPONSE_JSON_SCHEMA: LazyLock<ResponseFormatJsonSchema> = LazyLock::new(|| ResponseFormatJsonSchema {
     name: "response".into(),
@@ -17,6 +18,15 @@ static RESPONSE_JSON_SCHEMA: LazyLock<ResponseFormatJsonSchema> = LazyLock::new(
     schema: Some(convert_json_schema(&ASSISTANT_RESPONSE_SCHEMA)),
     strict: Some(true),
 });
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct OpenaiModelConfig {
+    pub endpoint: String,
+    pub token: String,
+    pub model: String,
+    pub enable_tool: bool,
+    pub max_token: usize,
+}
 
 async fn create_openai_client(token: &str, endpoint: &str) -> Result<Client<OpenAIConfig>, LlmError> {
     let config = OpenAIConfig::new().with_api_key(token).with_api_base(endpoint);

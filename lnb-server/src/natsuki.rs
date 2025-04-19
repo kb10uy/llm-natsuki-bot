@@ -1,4 +1,5 @@
 mod inner;
+mod llm_cache;
 
 use crate::{config::AppConfigAssistantIdentity, natsuki::inner::NatsukiInner};
 
