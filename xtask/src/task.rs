@@ -4,7 +4,6 @@ use crate::util::{get_command_output_in_repository, run_command_in_repository};
 
 pub fn build_image() -> Result<()> {
     let commit_hash = get_command_output_in_repository("git", &["rev-parse", "HEAD"])?;
-
     let commit_hash_arg = format!("GIT_COMMIT_HASH={}", commit_hash.trim());
     run_command_in_repository("sudo", &["docker", "compose", "build", "--build-arg", &commit_hash_arg])?;
     Ok(())
@@ -17,7 +16,6 @@ pub fn up() -> Result<()> {
 }
 
 pub fn down() -> Result<()> {
-    build_config()?;
     run_command_in_repository("sudo", &["docker", "compose", "down"])?;
     Ok(())
 }
