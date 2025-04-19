@@ -1,3 +1,6 @@
+mod task;
+mod util;
+
 use anyhow::Result;
 use clap::Parser;
 
@@ -10,12 +13,22 @@ struct Arguments {
 #[derive(Debug, Parser)]
 enum ArgumentsTask {
     BuildImage,
+    Up,
+    Down,
+    Restart,
+
+    #[clap(aliases = &["dev"])]
+    Development,
 }
 
 fn main() -> Result<()> {
     let args = Arguments::parse();
     match args.task {
-        ArgumentsTask::BuildImage => {}
+        ArgumentsTask::BuildImage => task::build_image()?,
+        ArgumentsTask::Up => task::up()?,
+        ArgumentsTask::Down => task::down()?,
+        ArgumentsTask::Restart => task::restart()?,
+        ArgumentsTask::Development => task::development()?,
     }
     Ok(())
 }
