@@ -91,12 +91,13 @@ impl NatsukiInner {
         }
 
         // LLM updates
-        let llm = self
-            .llm_cache
-            .get(incomplete_conversation.current_model())
-            .await
-            .map_err(ServerError::by_internal)?;
+        let model = incomplete_conversation.current_model();
+        let llm = self.llm_cache.get(model).await.map_err(ServerError::by_internal)?;
+        debug!("using model {model:?}");
+
         let function_descriptors: Vec<_> = self.function_store.descriptors().collect();
+        debug!("registered functions: {}", function_descriptors.len());
+
         let mut sent_count = 0;
         loop {
             // 超過したらエラー
