@@ -23,16 +23,13 @@ impl ResponsesBackend {
 }
 
 impl Llm for ResponsesBackend {
-    fn add_simple_function(&self, _descriptor: FunctionDescriptor) -> BoxFuture<'_, ()> {
-        todo!()
-    }
-
     fn send_conversation<'a>(
         &'a self,
         conversation: &'a IncompleteConversation,
+        function_descriptors: &'a [&'a FunctionDescriptor],
     ) -> BoxFuture<'a, Result<LlmUpdate, LlmError>> {
         let cloned = self.0.clone();
-        async move { cloned.send_conversation(conversation).await }.boxed()
+        async move { cloned.send_conversation(conversation, function_descriptors).await }.boxed()
     }
 }
 
@@ -41,7 +38,11 @@ impl Llm for ResponsesBackend {
 struct ResponsesBackendInner {}
 
 impl ResponsesBackendInner {
-    async fn send_conversation(&self, _conversation: &IncompleteConversation) -> Result<LlmUpdate, LlmError> {
+    async fn send_conversation(
+        &self,
+        _conversation: &IncompleteConversation,
+        _function_descriptors: &[&FunctionDescriptor],
+    ) -> Result<LlmUpdate, LlmError> {
         todo!();
     }
 }

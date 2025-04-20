@@ -96,6 +96,7 @@ impl NatsukiInner {
             .get(incomplete_conversation.current_model())
             .await
             .map_err(ServerError::by_internal)?;
+        let function_descriptors: Vec<_> = self.function_store.descriptors().collect();
         let mut sent_count = 0;
         loop {
             // 超過したらエラー
@@ -103,7 +104,9 @@ impl NatsukiInner {
                 return Err(ServerError::TooMuchConversationCall);
             }
 
-            let update = llm.send_conversation(&incomplete_conversation).await?;
+            let update = llm
+                .send_conversation(&incomplete_conversation, &function_descriptors)
+                .await?;
             sent_count += 1;
 
             match update {

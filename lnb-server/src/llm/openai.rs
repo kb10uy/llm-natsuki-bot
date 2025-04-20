@@ -27,6 +27,7 @@ pub struct OpenaiModelConfig {
     pub token: String,
     pub model: String,
     pub enable_tool: bool,
+    pub structured: bool,
     pub max_token: usize,
 }
 

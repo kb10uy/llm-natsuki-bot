@@ -12,13 +12,11 @@ use serde::Deserialize;
 pub type ArcLlm = Arc<dyn Llm + 'static>;
 
 pub trait Llm: Send + Sync {
-    /// `SimpleFunction` の追加を告知する。
-    fn add_simple_function(&self, descriptor: FunctionDescriptor) -> BoxFuture<'_, ()>;
-
     /// `Conversation` を送信する。
     fn send_conversation<'a>(
         &'a self,
         conversation: &'a IncompleteConversation,
+        function_descriptors: &'a [&'a FunctionDescriptor],
     ) -> BoxFuture<'a, Result<LlmUpdate, LlmError>>;
 }
 

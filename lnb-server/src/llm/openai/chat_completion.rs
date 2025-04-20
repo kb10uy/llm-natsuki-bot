@@ -17,10 +17,7 @@ use async_openai::{
         ResponseFormat,
     },
 };
-use futures::{
-    FutureExt, TryFutureExt,
-    future::{BoxFuture, OptionFuture},
-};
+use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use lnb_core::{
     error::LlmError,
     interface::{
@@ -28,11 +25,10 @@ use lnb_core::{
         llm::{Llm, LlmAssistantResponse, LlmUpdate},
     },
     model::{
-        conversation::{ConversationModel, IncompleteConversation},
+        conversation::IncompleteConversation,
         message::{Message, MessageToolCalling, UserMessageContent},
     },
 };
-use tokio::sync::RwLock;
 
 /// OpenAI Chat Completion API を利用したバックエンド。
 #[derive(Debug, Clone)]
@@ -40,89 +36,68 @@ pub struct ChatCompletionBackend(Arc<ChatCompletionBackendInner>);
 
 impl ChatCompletionBackend {
     pub async fn new(config: OpenaiModelConfig) -> Result<ChatCompletionBackend, LlmError> {
-        let client = create_openai_client(&self.default_model.token, &self.default_model.endpoint).await?;
+        /*
+
+        */
+        let client = create_openai_client(&config.token, &config.endpoint).await?;
         Ok(ChatCompletionBackend(Arc::new(ChatCompletionBackendInner {
-            tools: RwLock::new(Vec::new()),
-            model_config: config,
+            client,
+            model: config.model,
+            enable_tool: config.enable_tool,
+            structured: config.structured,
+            max_token: config.max_token,
         })))
     }
 }
 
 impl Llm for ChatCompletionBackend {
-    fn add_simple_function(&self, descriptor: FunctionDescriptor) -> BoxFuture<'_, ()> {
-        async { self.0.add_simple_function(descriptor).await }.boxed()
-    }
-
     fn send_conversation<'a>(
         &'a self,
         conversation: &'a IncompleteConversation,
+        function_descriptors: &'a [&'a FunctionDescriptor],
     ) -> BoxFuture<'a, Result<LlmUpdate, LlmError>> {
         let cloned = self.0.clone();
-        async move { cloned.send_conversation(conversation).await }.boxed()
+        async move { cloned.send_conversation(conversation, function_descriptors).await }.boxed()
     }
 }
 
 #[derive(Debug)]
 struct ChatCompletionBackendInner {
-    tools: RwLock<Vec<ChatCompletionTool>>,
     client: Client<OpenAIConfig>,
     model: String,
-    use_structured: bool,
     enable_tool: bool,
+    structured: bool,
     max_token: usize,
 }
 
 impl ChatCompletionBackendInner {
-    async fn add_simple_function(&self, descriptor: FunctionDescriptor) {
-        let tool = ChatCompletionTool {
-            function: FunctionObject {
-                name: descriptor.name,
-                description: Some(descriptor.description),
-                parameters: Some(convert_json_schema(&descriptor.parameters)),
-                strict: Some(true),
-            },
-            ..Default::default()
-        };
-
-        let mut locked = self.tools.write().await;
-        locked.push(tool);
-    }
-
-    async fn send_conversation(&self, conversation: &IncompleteConversation) -> Result<LlmUpdate, LlmError> {
+    async fn send_conversation(
+        &self,
+        conversation: &IncompleteConversation,
+        function_descriptors: &[&FunctionDescriptor],
+    ) -> Result<LlmUpdate, LlmError> {
         let messages: Result<_, _> = conversation.llm_sending_messages().map(transform_message).collect();
-        if self.structured_mode {
-            self.send_conversation_structured(messages?, conversation.current_model())
-                .await
+        if self.structured {
+            self.send_conversation_structured(messages?, function_descriptors).await
         } else {
-            self.send_conversation_normal(messages?, conversation.current_model())
-                .await
+            self.send_conversation_normal(messages?, function_descriptors).await
         }
     }
 
     async fn send_conversation_normal(
         &self,
         messages: Vec<ChatCompletionRequestMessage>,
-        model: &ConversationModel,
+        function_descriptors: &[&FunctionDescriptor],
     ) -> Result<LlmUpdate, LlmError> {
-        let filled = self.create_client_by_name(model).await?;
-        // https://github.com/rust-lang/rust-clippy/issues/14578
-        #[allow(clippy::unnecessary_lazy_evaluations)]
-        let tools: OptionFuture<_> = filled.enable_tool.then(async || self.tools.read().await.clone()).into();
-
         let request = CreateChatCompletionRequest {
-            model: filled.model,
+            model: self.model.clone(),
             messages,
-            tools: tools.await,
-            max_completion_tokens: Some(filled.max_token as u32),
+            tools: self.enable_tool.then(|| transform_tools(function_descriptors)),
+            max_completion_tokens: Some(self.max_token as u32),
             ..Default::default()
         };
 
-        let openai_response = filled
-            .client
-            .chat()
-            .create(request)
-            .map_err(LlmError::by_backend)
-            .await?;
+        let openai_response = self.client.chat().create(request).map_err(LlmError::by_backend).await?;
         let Some(first_choice) = openai_response.choices.into_iter().next() else {
             return Err(LlmError::NoChoice);
         };
@@ -133,46 +108,41 @@ impl ChatCompletionBackendInner {
     async fn send_conversation_structured(
         &self,
         messages: Vec<ChatCompletionRequestMessage>,
-        model: &ConversationModel,
+        function_descriptors: &[&FunctionDescriptor],
     ) -> Result<LlmUpdate, LlmError> {
-        let filled = self.create_client_by_name(model).await?;
-        // https://github.com/rust-lang/rust-clippy/issues/14578
-        #[allow(clippy::unnecessary_lazy_evaluations)]
-        let tools: OptionFuture<_> = filled.enable_tool.then(async || self.tools.read().await.clone()).into();
-
         let request = CreateChatCompletionRequest {
-            model: filled.model,
+            model: self.model.clone(),
             messages,
-            tools: tools.await,
+            tools: self.enable_tool.then(|| transform_tools(function_descriptors)),
             response_format: Some(ResponseFormat::JsonSchema {
                 json_schema: RESPONSE_JSON_SCHEMA.clone(),
             }),
-            max_completion_tokens: Some(filled.max_token as u32),
+            max_completion_tokens: Some(self.max_token as u32),
             ..Default::default()
         };
 
-        let openai_response = filled
-            .client
-            .chat()
-            .create(request)
-            .map_err(LlmError::by_backend)
-            .await?;
+        let openai_response = self.client.chat().create(request).map_err(LlmError::by_backend).await?;
         let Some(first_choice) = openai_response.choices.into_iter().next() else {
             return Err(LlmError::NoChoice);
         };
 
         transform_choice(first_choice)
     }
+}
 
-    async fn create_client_by_name(&self, model: &ConversationModel) -> Result<FilledModel, LlmError> {
-        let client = create_openai_client(&self.default_model.token, &self.default_model.endpoint).await?;
-        Ok(FilledModel {
-            client,
-            model: self.default_model.model.clone(),
-            enable_tool: self.default_model.enable_tool,
-            max_token: self.default_model.max_token,
+fn transform_tools(descriptors: &[&FunctionDescriptor]) -> Vec<ChatCompletionTool> {
+    descriptors
+        .iter()
+        .map(|d| ChatCompletionTool {
+            function: FunctionObject {
+                name: d.name.clone(),
+                description: Some(d.description.clone()),
+                parameters: Some(convert_json_schema(&d.parameters)),
+                strict: Some(true),
+            },
+            ..Default::default()
         })
-    }
+        .collect()
 }
 
 fn transform_choice(choice: ChatChoice) -> Result<LlmUpdate, LlmError> {

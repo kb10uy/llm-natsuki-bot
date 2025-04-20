@@ -78,7 +78,7 @@ impl LlmCache {
 }
 
 #[derive(Debug, ThisError)]
-enum LlmCacheError {
+pub enum LlmCacheError {
     #[error("undefined model: {0}")]
     Undefined(String),
 
