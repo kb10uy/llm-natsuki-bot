@@ -40,7 +40,7 @@ impl ChatCompletionBackend {
         Ok(ChatCompletionBackend(Arc::new(ChatCompletionBackendInner {
             client,
             model: config.model,
-            enable_tool: config.enable_tool,
+            enable_tool: config.tool,
             structured: config.structured,
             max_token: config.max_token,
         })))
