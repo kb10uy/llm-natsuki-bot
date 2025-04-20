@@ -22,6 +22,10 @@ impl MemoryConversationStorage {
 }
 
 impl ConversationStorage for MemoryConversationStorage {
+    fn description(&self) -> String {
+        "HashMap Memory".to_string()
+    }
+
     fn fetch_content_by_id(&self, id: ConversationId) -> BoxFuture<'_, Result<Option<Conversation>, StorageError>> {
         async move { self.0.fetch_content_by_id(id).await }.boxed()
     }

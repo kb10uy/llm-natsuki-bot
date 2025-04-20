@@ -4,19 +4,19 @@ use crate::{
     model::{conversation::IncompleteConversation, message::MessageToolCalling},
 };
 
+use std::sync::Arc;
+
 use futures::future::BoxFuture;
 use serde::Deserialize;
 
-pub type BoxLlm = Box<dyn Llm + 'static>;
+pub type ArcLlm = Arc<dyn Llm + 'static>;
 
 pub trait Llm: Send + Sync {
-    /// `SimpleFunction` の追加を告知する。
-    fn add_simple_function(&self, descriptor: FunctionDescriptor) -> BoxFuture<'_, ()>;
-
     /// `Conversation` を送信する。
     fn send_conversation<'a>(
         &'a self,
         conversation: &'a IncompleteConversation,
+        function_descriptors: &'a [&'a FunctionDescriptor],
     ) -> BoxFuture<'a, Result<LlmUpdate, LlmError>>;
 }
 
@@ -34,10 +34,4 @@ pub struct LlmAssistantResponse {
     pub text: String,
     pub language: Option<String>,
     pub sensitive: Option<bool>,
-}
-
-impl<T: Llm + 'static> From<T> for BoxLlm {
-    fn from(value: T) -> BoxLlm {
-        Box::new(value)
-    }
 }

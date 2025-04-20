@@ -22,6 +22,15 @@ pub enum ConversationModel {
     Specified(String),
 }
 
+impl ConversationModel {
+    pub fn specified_or<'a>(&'a self, default: &'a str) -> &'a str {
+        match self {
+            ConversationModel::Default => default,
+            ConversationModel::Specified(model) => model,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Conversation {
     id: ConversationId,

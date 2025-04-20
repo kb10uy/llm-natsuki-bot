@@ -8,20 +8,17 @@ use std::{collections::HashMap, path::PathBuf};
 use lnb_discord_client::DiscordLnbClientConfig;
 use lnb_mastodon_client::MastodonLnbClientConfig;
 use serde::Deserialize;
+use serde_json::Value;
 
 /// config.yaml
 #[derive(Debug, Clone, Deserialize)]
 pub struct AppConfig {
-    #[serde(default = "Default::default")]
     pub client: AppConfigClient,
-
-    #[serde(default = "Default::default")]
-    pub tool: AppConfigTool,
-
+    pub tools: AppConfigTools,
     pub llm: AppConfigLlm,
     pub storage: AppConfigStorage,
     pub assistant: AppConfigAssistant,
-    pub reminder: Option<ReminderConfig>,
+    pub reminder: ReminderConfig,
 }
 
 /// [client]
@@ -33,7 +30,7 @@ pub struct AppConfigClient {
 
 /// [tool]
 #[derive(Debug, Clone, Default, Deserialize)]
-pub struct AppConfigTool {
+pub struct AppConfigTools {
     pub image_generator: Option<ImageGeneratorConfig>,
     pub get_illust_url: Option<GetIllustUrlConfig>,
     pub exchange_rate: Option<ExchangeRateConfig>,
@@ -63,40 +60,20 @@ pub struct AppConfigStorageSqlite {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct AppConfigLlm {
+    pub default: String,
+    pub models: HashMap<String, AppConfigLlmModel>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AppConfigLlmModel {
     pub backend: AppConfigLlmBackend,
-    pub openai: AppConfigLlmOpenai,
+    pub config: Value,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AppConfigLlmBackend {
     Openai,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct AppConfigLlmOpenai {
-    pub api: AppConfigLlmOpenaiApi,
-    pub use_structured_output: bool,
-    pub default_model: AppConfigLlmOpenaiDefaultModel,
-    pub models: HashMap<String, AppConfigLlmOpenaiModel>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct AppConfigLlmOpenaiDefaultModel {
-    pub endpoint: String,
-    pub token: String,
-    pub model: String,
-    pub enable_tool: bool,
-    pub max_token: usize,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct AppConfigLlmOpenaiModel {
-    pub endpoint: Option<String>,
-    pub token: Option<String>,
-    pub model: Option<String>,
-    pub enable_tool: Option<bool>,
-    pub max_token: Option<usize>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -108,12 +85,6 @@ pub enum AppConfigLlmOpenaiApi {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct AppConfigAssistant {
-    pub identity: String,
-    pub identities: HashMap<String, AppConfigAssistantIdentity>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct AppConfigAssistantIdentity {
     pub system_role: String,
 
     #[serde(default = "Default::default")]
