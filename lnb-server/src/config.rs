@@ -13,12 +13,8 @@ use serde_json::Value;
 /// config.yaml
 #[derive(Debug, Clone, Deserialize)]
 pub struct AppConfig {
-    #[serde(default = "Default::default")]
     pub client: AppConfigClient,
-
-    #[serde(default = "Default::default")]
-    pub tool: AppConfigTool,
-
+    pub tools: AppConfigTools,
     pub llm: AppConfigLlm,
     pub storage: AppConfigStorage,
     pub assistant: AppConfigAssistant,
@@ -34,7 +30,7 @@ pub struct AppConfigClient {
 
 /// [tool]
 #[derive(Debug, Clone, Default, Deserialize)]
-pub struct AppConfigTool {
+pub struct AppConfigTools {
     pub image_generator: Option<ImageGeneratorConfig>,
     pub get_illust_url: Option<GetIllustUrlConfig>,
     pub exchange_rate: Option<ExchangeRateConfig>,

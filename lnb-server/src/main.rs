@@ -9,7 +9,7 @@ mod storage;
 
 use crate::{
     bang_command::initialize_bang_command,
-    config::{AppConfig, AppConfigTool},
+    config::{AppConfig, AppConfigTools},
     function::{
         ConfigurableSimpleFunction, DailyPrivate, ExchangeRate, GetIllustUrl, ImageGenerator, LocalInfo, SelfInfo,
     },
@@ -94,7 +94,7 @@ async fn initialize_natsuki(config: &AppConfig) -> Result<(Natsuki, Shiyu)> {
     info!("{} LLM backend definitions loaded", config.llm.models.len());
 
     // Functions
-    let simple_functions = initialize_simple_functions(&config.tool).await?;
+    let simple_functions = initialize_simple_functions(&config.tools).await?;
     let complex_functions: Vec<ArcComplexFunction> = vec![Arc::new(shiyu_provider)];
     let function_store = FunctionStore::new(simple_functions, complex_functions);
 
@@ -105,7 +105,7 @@ async fn initialize_natsuki(config: &AppConfig) -> Result<(Natsuki, Shiyu)> {
     Ok((natsuki, shiyu))
 }
 
-async fn initialize_simple_functions(tool_config: &AppConfigTool) -> Result<Vec<ArcSimpleFunction>> {
+async fn initialize_simple_functions(tool_config: &AppConfigTools) -> Result<Vec<ArcSimpleFunction>> {
     let mut functions: Vec<ArcSimpleFunction> = vec![];
 
     functions.push(Arc::new(SelfInfo::new()));
