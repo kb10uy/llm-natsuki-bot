@@ -2,6 +2,9 @@ mod function_store;
 mod inner;
 mod llm_cache;
 
+pub use function_store::FunctionStore;
+pub use llm_cache::LlmCache;
+
 use crate::{config::AppConfigAssistantIdentity, natsuki::inner::NatsukiInner};
 
 use std::sync::Arc;

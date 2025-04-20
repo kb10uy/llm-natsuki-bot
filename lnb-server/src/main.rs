@@ -13,20 +13,21 @@ use crate::{
     function::{
         ConfigurableSimpleFunction, DailyPrivate, ExchangeRate, GetIllustUrl, ImageGenerator, LocalInfo, SelfInfo,
     },
-    natsuki::Natsuki,
+    natsuki::{FunctionStore, LlmCache, Natsuki},
     shiyu::{Shiyu, ShiyuProvider},
     storage::initialize_storage,
 };
 
-use std::{collections::HashMap, path::Path};
+use std::{collections::HashMap, path::Path, sync::Arc};
 
 use anyhow::{Context as _, Result, bail};
 use clap::Parser;
-use futures::{
-    FutureExt,
-    future::{join, join_all, ready},
+use futures::future::{join, join_all};
+use lnb_core::interface::{
+    client::LnbClient,
+    function::{complex::ArcComplexFunction, simple::ArcSimpleFunction},
+    interception::BoxInterception,
 };
-use lnb_core::interface::client::LnbClient;
 use lnb_discord_client::DiscordLnbClient;
 use lnb_mastodon_client::MastodonLnbClient;
 use tokio::{fs::read_to_string, spawn};
@@ -39,20 +40,7 @@ async fn main() -> Result<()> {
     let debug_options: HashMap<_, _> = args.debug_options.into_iter().collect();
     let config = load_config(args.config).await?;
 
-    let natsuki = initialize_natsuki(&config).await?;
-    register_simple_functions(&config.tool, &natsuki).await?;
-    register_interceptions(&natsuki).await?;
-
-    // Reminder
-    let shiyu = if let Some(reminder_config) = &config.reminder {
-        info!("enabled Shiyu reminder system");
-        let shiyu = Shiyu::new(reminder_config).await?;
-        let shiyu_provider = ShiyuProvider::new(reminder_config, shiyu.clone()).await?;
-        natsuki.add_complex_function(shiyu_provider).await;
-        Some(shiyu)
-    } else {
-        None
-    };
+    let (natsuki, shiyu) = initialize_natsuki(&config).await?;
 
     let mut client_tasks = vec![];
 
@@ -60,27 +48,22 @@ async fn main() -> Result<()> {
     if let Some(mastodon_config) = &config.client.mastodon {
         info!("starting Mastodon client");
         let mastodon_client = MastodonLnbClient::new(mastodon_config, &debug_options, natsuki.clone()).await?;
+        shiyu.register_remindable(mastodon_client.clone()).await;
+
         let mastodon_task = spawn(mastodon_client.execute());
         client_tasks.push(Box::new(mastodon_task));
-
-        if let Some(shiyu) = shiyu.as_ref() {
-            shiyu.register_remindable(mastodon_client.clone()).await;
-        }
     }
 
     // Discord
     if let Some(dicsord_config) = &config.client.discord {
         info!("starting Discord client");
         let discord_client = DiscordLnbClient::new(dicsord_config, natsuki.clone()).await?;
+
         let discord_task = spawn(discord_client.execute());
         client_tasks.push(Box::new(discord_task));
     }
 
-    let shiyu_task = if let Some(shiyu) = shiyu {
-        shiyu.run(natsuki.clone()).boxed()
-    } else {
-        ready(Ok(())).boxed()
-    };
+    let shiyu_task = shiyu.run(natsuki.clone());
 
     let (shiyu_result, client_results) = join(shiyu_task, join_all(client_tasks)).await;
     for client_join in client_results {
@@ -97,48 +80,64 @@ async fn load_config(path: impl AsRef<Path>) -> Result<AppConfig> {
     serde_json::from_str(&config_str).context("failed to parse config")
 }
 
-async fn initialize_natsuki(config: &AppConfig) -> Result<Natsuki> {
+async fn initialize_natsuki(config: &AppConfig) -> Result<(Natsuki, Shiyu)> {
+    // Reminder
+    let shiyu = Shiyu::new(&config.reminder).await?;
+    let shiyu_provider = ShiyuProvider::new(&config.reminder, shiyu.clone()).await?;
+
+    // Storage
+    let storage = initialize_storage(&config.storage).await?;
+    info!("using storage engine: {}", storage.description());
+
+    // LlmCache
+    let llm_cache = LlmCache::new(&config.llm);
+    info!("{} LLM backend definitions loaded", config.llm.models.len());
+
+    // Functions
+    let simple_functions = initialize_simple_functions(&config.tool).await?;
+    let complex_functions: Vec<ArcComplexFunction> = vec![Arc::new(shiyu_provider)];
+    let function_store = FunctionStore::new(simple_functions, complex_functions);
+
+    // Interceptions
+    let interceptions = initialize_interceptions().await?;
+
     let Some(assistant_identity) = config.assistant.identities.get(&config.assistant.identity) else {
         bail!("assistant identity {} not defined", config.assistant.identity);
     };
     info!("using assistant identity: {}", config.assistant.identity);
 
-    let (storage, storage_name) = initialize_storage(&config.storage).await?;
-    let natsuki = Natsuki::new(assistant_identity, &config.llm, storage).await?;
-    info!("assistant engine initialized (LLM engine: {llm_name}, storage engine: {storage_name})");
+    let natsuki = Natsuki::new(storage, llm_cache, function_store, interceptions, assistant_identity).await?;
 
-    Ok(natsuki)
+    Ok((natsuki, shiyu))
 }
 
-async fn register_simple_functions(tool_config: &AppConfigTool, natsuki: &Natsuki) -> Result<()> {
-    natsuki.add_simple_function(SelfInfo::new()).await;
-    natsuki.add_simple_function(LocalInfo::new()?).await;
+async fn initialize_simple_functions(tool_config: &AppConfigTool) -> Result<Vec<ArcSimpleFunction>> {
+    let mut functions: Vec<ArcSimpleFunction> = vec![];
 
-    register_simple_function_config::<ImageGenerator>(&tool_config.image_generator, natsuki).await?;
-    register_simple_function_config::<ExchangeRate>(&tool_config.exchange_rate, natsuki).await?;
-    register_simple_function_config::<GetIllustUrl>(&tool_config.get_illust_url, natsuki).await?;
-    register_simple_function_config::<DailyPrivate>(&tool_config.daily_private, natsuki).await?;
+    functions.push(Arc::new(SelfInfo::new()));
+    functions.push(Arc::new(LocalInfo::new()?));
 
-    Ok(())
+    functions.extend(configure_simple_function::<ImageGenerator>(&tool_config.image_generator).await?);
+    functions.extend(configure_simple_function::<ExchangeRate>(&tool_config.exchange_rate).await?);
+    functions.extend(configure_simple_function::<GetIllustUrl>(&tool_config.get_illust_url).await?);
+    functions.extend(configure_simple_function::<DailyPrivate>(&tool_config.daily_private).await?);
+
+    Ok(functions)
 }
 
-async fn register_interceptions(natsuki: &Natsuki) -> Result<()> {
-    let bang_command = initialize_bang_command().await;
-    natsuki.apply_interception(bang_command).await;
-    Ok(())
+async fn initialize_interceptions() -> Result<Vec<BoxInterception>> {
+    Ok(vec![initialize_bang_command().await.into()])
 }
 
-async fn register_simple_function_config<F>(config: &Option<F::Configuration>, natsuki: &Natsuki) -> Result<()>
+async fn configure_simple_function<F>(config: &Option<F::Configuration>) -> Result<Option<ArcSimpleFunction>>
 where
     F: ConfigurableSimpleFunction + 'static,
 {
     let Some(config) = config.as_ref() else {
-        return Ok(());
+        return Ok(None);
     };
 
     let simple_function = F::configure(config).await?;
-    natsuki.add_simple_function(simple_function).await;
     info!("simple function configured: {}", F::NAME);
-
-    Ok(())
+    Ok(Some(Arc::new(simple_function)))
 }

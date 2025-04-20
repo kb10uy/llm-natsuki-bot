@@ -22,7 +22,7 @@ pub struct AppConfig {
     pub llm: AppConfigLlm,
     pub storage: AppConfigStorage,
     pub assistant: AppConfigAssistant,
-    pub reminder: Option<ReminderConfig>,
+    pub reminder: ReminderConfig,
 }
 
 /// [client]

@@ -21,7 +21,7 @@ pub struct FunctionStore {
 impl FunctionStore {
     pub fn new(
         simple_functions: impl IntoIterator<Item = ArcSimpleFunction>,
-        complex_functiuons: impl IntoIterator<Item = ArcComplexFunction>,
+        complex_functions: impl IntoIterator<Item = ArcComplexFunction>,
     ) -> FunctionStore {
         let simple_functions = simple_functions
             .into_iter()
@@ -30,7 +30,7 @@ impl FunctionStore {
                 (descriptor.name.clone(), (f, descriptor))
             })
             .collect();
-        let complex_functions = complex_functiuons
+        let complex_functions = complex_functions
             .into_iter()
             .map(|f| {
                 let descriptor = f.get_descriptor();
