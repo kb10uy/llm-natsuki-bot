@@ -189,16 +189,17 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         match mentioned_status.in_reply_to_id.clone() {
             // リプライであることが確定している
             Some(in_reply_to_id) => {
-                debug!("restoring id {in_reply_to_id}");
                 let context_key = format!("{CONTEXT_KEY_PREFIX}:{in_reply_to_id}");
 
                 // 既知の会話
                 if let Some(id) = self.assistant.restore_conversation(&context_key).await? {
+                    debug!("restored conversation from id {in_reply_to_id}");
                     let user_message = self.transform_status(mentioned_status);
                     return Ok((id, vec![user_message]));
                 }
 
                 // 未知の会話
+                debug!("unknown in_reply_to_id, creating new one: {in_reply_to_id}");
                 let id = self.assistant.new_conversation().await?;
                 let ancestors = self.get_ancestor(&mentioned_status.id).await;
                 let current = self.transform_status(mentioned_status);
