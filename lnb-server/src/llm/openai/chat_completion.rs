@@ -1,12 +1,9 @@
-use crate::{
-    config::{AppConfigLlmOpenai, AppConfigLlmOpenaiDefaultModel, AppConfigLlmOpenaiModel},
-    llm::{
-        convert_json_schema,
-        openai::{RESPONSE_JSON_SCHEMA, create_openai_client},
-    },
+use crate::llm::{
+    convert_json_schema,
+    openai::{OpenaiModelConfig, RESPONSE_JSON_SCHEMA, create_openai_client},
 };
 
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use async_openai::{
     Client,
@@ -42,12 +39,11 @@ use tokio::sync::RwLock;
 pub struct ChatCompletionBackend(Arc<ChatCompletionBackendInner>);
 
 impl ChatCompletionBackend {
-    pub async fn new(config: &AppConfigLlmOpenai) -> Result<ChatCompletionBackend, LlmError> {
+    pub async fn new(config: OpenaiModelConfig) -> Result<ChatCompletionBackend, LlmError> {
+        let client = create_openai_client(&self.default_model.token, &self.default_model.endpoint).await?;
         Ok(ChatCompletionBackend(Arc::new(ChatCompletionBackendInner {
             tools: RwLock::new(Vec::new()),
-            structured_mode: config.use_structured_output,
-            default_model: config.default_model.clone(),
-            models: config.models.clone(),
+            model_config: config,
         })))
     }
 }
@@ -69,15 +65,9 @@ impl Llm for ChatCompletionBackend {
 #[derive(Debug)]
 struct ChatCompletionBackendInner {
     tools: RwLock<Vec<ChatCompletionTool>>,
-    structured_mode: bool,
-    default_model: AppConfigLlmOpenaiDefaultModel,
-    models: HashMap<String, AppConfigLlmOpenaiModel>,
-}
-
-#[derive(Debug)]
-struct FilledModel {
     client: Client<OpenAIConfig>,
     model: String,
+    use_structured: bool,
     enable_tool: bool,
     max_token: usize,
 }
@@ -175,35 +165,13 @@ impl ChatCompletionBackendInner {
     }
 
     async fn create_client_by_name(&self, model: &ConversationModel) -> Result<FilledModel, LlmError> {
-        if let ConversationModel::Specified(model_name) = model {
-            let Some(overriding_model) = self.models.get(model_name) else {
-                return Err(LlmError::ModelNotFound(model_name.to_string()));
-            };
-            let token = overriding_model.token.as_deref().unwrap_or(&self.default_model.token);
-            let endpoint = overriding_model
-                .endpoint
-                .as_deref()
-                .unwrap_or(&self.default_model.endpoint);
-            let model = overriding_model.model.as_deref().unwrap_or(&self.default_model.model);
-            let enable_tool = overriding_model.enable_tool.unwrap_or(self.default_model.enable_tool);
-            let max_token = overriding_model.max_token.unwrap_or(self.default_model.max_token);
-
-            let client = create_openai_client(token, endpoint).await?;
-            Ok(FilledModel {
-                client,
-                model: model.to_string(),
-                enable_tool,
-                max_token,
-            })
-        } else {
-            let client = create_openai_client(&self.default_model.token, &self.default_model.endpoint).await?;
-            Ok(FilledModel {
-                client,
-                model: self.default_model.model.clone(),
-                enable_tool: self.default_model.enable_tool,
-                max_token: self.default_model.max_token,
-            })
-        }
+        let client = create_openai_client(&self.default_model.token, &self.default_model.endpoint).await?;
+        Ok(FilledModel {
+            client,
+            model: self.default_model.model.clone(),
+            enable_tool: self.default_model.enable_tool,
+            max_token: self.default_model.max_token,
+        })
     }
 }
 

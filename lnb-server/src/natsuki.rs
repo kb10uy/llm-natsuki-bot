@@ -1,3 +1,4 @@
+mod function_store;
 mod inner;
 mod llm_cache;
 
@@ -8,14 +9,7 @@ use std::sync::Arc;
 use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
     error::ServerError,
-    interface::{
-        Context,
-        function::{complex::BoxComplexFunction, simple::BoxSimpleFunction},
-        interception::BoxInterception,
-        llm::BoxLlm,
-        server::LnbServer,
-        storage::BoxConversationStorage,
-    },
+    interface::{Context, interception::BoxInterception, server::LnbServer, storage::BoxConversationStorage},
     model::{
         conversation::{ConversationId, ConversationUpdate, UserRole},
         message::Message,
@@ -27,24 +21,20 @@ pub struct Natsuki(Arc<NatsukiInner>);
 
 impl Natsuki {
     pub async fn new(
+        storage: BoxConversationStorage,
+        llm_cache: llm_cache::LlmCache,
+        function_store: function_store::FunctionStore,
+        interceptions: impl IntoIterator<Item = BoxInterception>,
         assistant_identity: &AppConfigAssistantIdentity,
-        llm: impl Into<BoxLlm>,
-        storage: impl Into<BoxConversationStorage>,
     ) -> Result<Natsuki, ServerError> {
-        let inner = NatsukiInner::new(assistant_identity, llm.into(), storage.into())?;
+        let inner = NatsukiInner::new(
+            storage,
+            llm_cache,
+            function_store,
+            interceptions.into_iter().collect(),
+            assistant_identity,
+        )?;
         Ok(Natsuki(Arc::new(inner)))
-    }
-
-    pub async fn add_simple_function(&self, simple_function: impl Into<BoxSimpleFunction>) {
-        self.0.add_simple_function(simple_function.into()).await;
-    }
-
-    pub async fn add_complex_function(&self, complex_function: impl Into<BoxComplexFunction>) {
-        self.0.add_complex_function(complex_function.into()).await;
-    }
-
-    pub async fn apply_interception(&self, interception: impl Into<BoxInterception>) {
-        self.0.apply_interception(interception.into()).await;
     }
 }
 

@@ -44,6 +44,9 @@ pub enum ServerError {
     #[error("function error: {0}")]
     Function(#[from] FunctionError),
 
+    #[error("internal error: {0}")]
+    Internal(#[source] ErasedError),
+
     /// 存在するべき `Conversation` が存在しなかった。
     #[error("expected conversation {0:?} not found")]
     ConversationNotFound(ConversationId),
@@ -61,12 +64,15 @@ pub enum ServerError {
     MustEndsWithUserMessage,
 }
 
+impl ServerError {
+    pub fn by_internal(source: impl Into<ErasedError>) -> ServerError {
+        ServerError::Internal(source.into())
+    }
+}
+
 /// LLM 層のエラー。
 #[derive(Debug, ThisError)]
 pub enum LlmError {
-    #[error("model definition not found: {0}")]
-    ModelNotFound(String),
-
     #[error("communication failed: {0}")]
     Communication(#[source] ErasedError),
 

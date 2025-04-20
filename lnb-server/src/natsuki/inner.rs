@@ -1,14 +1,16 @@
-use crate::config::AppConfigAssistantIdentity;
+use crate::{
+    config::AppConfigAssistantIdentity,
+    natsuki::{function_store::FunctionStore, llm_cache::LlmCache},
+};
 
-use std::{collections::HashMap, iter::once};
+use std::iter::once;
 
 use lnb_core::{
     error::ServerError,
     interface::{
         Context,
-        function::{complex::BoxComplexFunction, simple::BoxSimpleFunction},
         interception::{BoxInterception, InterceptionStatus},
-        llm::{BoxLlm, LlmUpdate},
+        llm::LlmUpdate,
         storage::BoxConversationStorage,
     },
     model::{
@@ -18,59 +20,35 @@ use lnb_core::{
         message::{AssistantMessage, FunctionResponseMessage, Message, MessageToolCalling},
     },
 };
-use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
 const MAX_CONVERSATION_LOOP: usize = 8;
 
 pub struct NatsukiInner {
-    llm: BoxLlm,
     storage: BoxConversationStorage,
-    simple_functions: RwLock<HashMap<String, BoxSimpleFunction>>,
-    complex_functions: RwLock<HashMap<String, BoxComplexFunction>>,
-    interceptions: RwLock<Vec<BoxInterception>>,
+    llm_cache: LlmCache,
+    function_store: FunctionStore,
+    interceptions: Vec<BoxInterception>,
     system_role: String,
     sensitive_marker: String,
 }
 
 impl NatsukiInner {
     pub fn new(
-        assistant_identity: &AppConfigAssistantIdentity,
-        llm: BoxLlm,
         storage: BoxConversationStorage,
+        llm_cache: LlmCache,
+        function_store: FunctionStore,
+        interceptions: Vec<BoxInterception>,
+        assistant_identity: &AppConfigAssistantIdentity,
     ) -> Result<NatsukiInner, ServerError> {
         Ok(NatsukiInner {
-            llm,
             storage,
-            simple_functions: RwLock::new(HashMap::new()),
-            complex_functions: RwLock::new(HashMap::new()),
-            interceptions: RwLock::new(Vec::new()),
+            llm_cache,
+            function_store,
+            interceptions,
             system_role: assistant_identity.system_role.clone(),
             sensitive_marker: assistant_identity.sensitive_marker.clone(),
         })
-    }
-
-    /// `SimpleFunction` を登録する。
-    pub async fn add_simple_function(&self, simple_function: BoxSimpleFunction) {
-        let descriptor = simple_function.get_descriptor();
-
-        let mut locked = self.simple_functions.write().await;
-        locked.insert(descriptor.name.clone(), simple_function);
-        self.llm.add_simple_function(descriptor).await;
-    }
-
-    /// `SimpleFunction` を登録する。
-    pub async fn add_complex_function(&self, complex_function: BoxComplexFunction) {
-        let descriptor = complex_function.get_descriptor();
-
-        let mut locked = self.complex_functions.write().await;
-        locked.insert(descriptor.name.clone(), complex_function);
-        self.llm.add_simple_function(descriptor).await;
-    }
-
-    pub async fn apply_interception(&self, interception: BoxInterception) {
-        let mut locked = self.interceptions.write().await;
-        locked.push(interception);
     }
 
     pub async fn process_conversation(
@@ -94,8 +72,7 @@ impl NatsukiInner {
 
         // interception updates
         // 後から追加した方が前のものを "wrap" する (axum などと同じ)ので逆順
-        let interceptions = self.interceptions.read().await;
-        for interception in interceptions.iter().rev() {
+        for interception in self.interceptions.iter().rev() {
             let status = interception
                 .before_llm(&context, &mut incomplete_conversation, &user_role)
                 .await?;
@@ -114,6 +91,11 @@ impl NatsukiInner {
         }
 
         // LLM updates
+        let llm = self
+            .llm_cache
+            .get(incomplete_conversation.current_model())
+            .await
+            .map_err(ServerError::by_internal)?;
         let mut sent_count = 0;
         loop {
             // 超過したらエラー
@@ -121,7 +103,7 @@ impl NatsukiInner {
                 return Err(ServerError::TooMuchConversationCall);
             }
 
-            let update = self.llm.send_conversation(&incomplete_conversation).await?;
+            let update = llm.send_conversation(&incomplete_conversation).await?;
             sent_count += 1;
 
             match update {
@@ -194,37 +176,28 @@ impl NatsukiInner {
         user_role: &UserRole,
         tool_callings: Vec<MessageToolCalling>,
     ) -> Result<(Vec<FunctionResponseMessage>, Vec<ConversationAttachment>), ServerError> {
-        let locked_simple = self.simple_functions.read().await;
-        let locked_complex = self.complex_functions.read().await;
-
         let mut responses = vec![];
         let mut attachments = vec![];
         for tool_calling in tool_callings {
-            info!("calling tool {} (id: {})", tool_calling.name, tool_calling.id);
+            let (id, name) = (tool_calling.id.clone(), tool_calling.name.clone());
+            info!("calling tool {name} (id: {id})");
 
-            let result_attachments = if let Some(simple_function) = locked_simple.get(&tool_calling.name) {
-                let result = simple_function.call(&tool_calling.id, tool_calling.arguments).await?;
-                responses.push(FunctionResponseMessage {
-                    id: tool_calling.id,
-                    name: tool_calling.name,
-                    result: result.result,
-                });
-                result.attachments
-            } else if let Some(complex_function) = locked_complex.get(&tool_calling.name) {
-                let result = complex_function
-                    .call(context, incomplete_conversation, user_role, &tool_calling)
-                    .await?;
-                responses.push(FunctionResponseMessage {
-                    id: tool_calling.id,
-                    name: tool_calling.name,
-                    result: result.result,
-                });
-                result.attachments
-            } else {
-                warn!("tool {} not found, skipping", tool_calling.name);
+            let Some(response) = self
+                .function_store
+                .find_call(tool_calling, context, incomplete_conversation, user_role)
+                .await
+            else {
+                warn!("tool {name} not found, skipping");
                 continue;
             };
-            attachments.extend(result_attachments);
+            let response = response?;
+
+            responses.push(FunctionResponseMessage {
+                id,
+                name,
+                result: response.result,
+            });
+            attachments.extend(response.attachments);
         }
 
         Ok((responses, attachments))

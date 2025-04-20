@@ -68,13 +68,12 @@ impl ComplexFunction for ShiyuProvider {
         context: &'a Context,
         _incomplete: &'a IncompleteConversation,
         _user_role: &'a UserRole,
-        tool_calling: &'a MessageToolCalling,
+        tool_calling: MessageToolCalling,
     ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
-        let parameters =
-            match serde_json::from_value(tool_calling.arguments.clone()).map_err(FunctionError::by_serialization) {
-                Ok(p) => p,
-                Err(err) => return async { Err(FunctionError::Serialization(err.into())) }.boxed(),
-            };
+        let parameters = match serde_json::from_value(tool_calling.arguments).map_err(FunctionError::by_serialization) {
+            Ok(p) => p,
+            Err(err) => return async { Err(FunctionError::Serialization(err.into())) }.boxed(),
+        };
         async move { self.execute(context, parameters).await }.boxed()
     }
 }

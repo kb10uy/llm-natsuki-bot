@@ -64,6 +64,7 @@ pub struct AppConfigStorageSqlite {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct AppConfigLlm {
+    pub default: String,
     pub models: HashMap<String, AppConfigLlmModel>,
 }
 

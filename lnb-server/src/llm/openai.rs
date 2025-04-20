@@ -3,13 +3,14 @@ mod responses;
 
 pub use chat_completion::ChatCompletionBackend;
 pub use responses::ResponsesBackend;
+use serde_json::Value;
 
 use crate::llm::{ASSISTANT_RESPONSE_SCHEMA, convert_json_schema};
 
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 
 use async_openai::{Client, config::OpenAIConfig, types::ResponseFormatJsonSchema};
-use lnb_core::{APP_USER_AGENT, error::LlmError};
+use lnb_core::{APP_USER_AGENT, error::LlmError, interface::llm::ArcLlm};
 use serde::Deserialize;
 
 static RESPONSE_JSON_SCHEMA: LazyLock<ResponseFormatJsonSchema> = LazyLock::new(|| ResponseFormatJsonSchema {
@@ -21,11 +22,27 @@ static RESPONSE_JSON_SCHEMA: LazyLock<ResponseFormatJsonSchema> = LazyLock::new(
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct OpenaiModelConfig {
+    pub api: OpenaiModelConfigApi,
     pub endpoint: String,
     pub token: String,
     pub model: String,
     pub enable_tool: bool,
     pub max_token: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OpenaiModelConfigApi {
+    ChatCompletion,
+    Responses,
+}
+
+pub async fn create_openai_llm(config_value: Value) -> Result<ArcLlm, LlmError> {
+    let config: OpenaiModelConfig = serde_json::from_value(config_value).map_err(LlmError::by_format)?;
+    match config.api {
+        OpenaiModelConfigApi::ChatCompletion => Ok(Arc::new(ChatCompletionBackend::new(config).await?)),
+        OpenaiModelConfigApi::Responses => Ok(Arc::new(ResponsesBackend::new(config).await?)),
+    }
 }
 
 async fn create_openai_client(token: &str, endpoint: &str) -> Result<Client<OpenAIConfig>, LlmError> {

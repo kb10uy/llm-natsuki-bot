@@ -1,8 +1,7 @@
-use crate::{config::AppConfigLlmOpenai, llm::openai::create_openai_client};
+use crate::llm::openai::OpenaiModelConfig;
 
 use std::sync::Arc;
 
-use async_openai::{Client, config::OpenAIConfig};
 use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
     error::LlmError,
@@ -18,11 +17,8 @@ use lnb_core::{
 pub struct ResponsesBackend(Arc<ResponsesBackendInner>);
 
 impl ResponsesBackend {
-    pub async fn new(config: &AppConfigLlmOpenai) -> Result<ResponsesBackend, LlmError> {
-        let client = create_openai_client(&config.default_model.token, &config.default_model.endpoint).await?;
-        let model = config.default_model.model.clone();
-
-        Ok(ResponsesBackend(Arc::new(ResponsesBackendInner { client, model })))
+    pub async fn new(_config: OpenaiModelConfig) -> Result<ResponsesBackend, LlmError> {
+        Ok(ResponsesBackend(Arc::new(ResponsesBackendInner {})))
     }
 }
 
@@ -42,10 +38,7 @@ impl Llm for ResponsesBackend {
 
 #[derive(Debug)]
 #[allow(dead_code)]
-struct ResponsesBackendInner {
-    client: Client<OpenAIConfig>,
-    model: String,
-}
+struct ResponsesBackendInner {}
 
 impl ResponsesBackendInner {
     async fn send_conversation(&self, _conversation: &IncompleteConversation) -> Result<LlmUpdate, LlmError> {

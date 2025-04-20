@@ -8,13 +8,14 @@ use std::{
     sync::Arc,
 };
 
-use lnb_core::interface::llm::ArcLlm;
+use lnb_core::{interface::llm::ArcLlm, model::conversation::ConversationModel};
 use thiserror::Error as ThisError;
 use tokio::sync::RwLock;
 use tracing::{debug, warn};
 
 #[derive(Clone)]
 pub struct LlmCache {
+    default_model: String,
     uninitialized_models: Arc<RwLock<HashMap<String, AppConfigLlmModel>>>,
     created_models: Arc<RwLock<HashMap<String, ArcLlm>>>,
     failed_models: Arc<RwLock<HashSet<String>>>,
@@ -25,13 +26,16 @@ impl LlmCache {
         let uninitialized_models = config.models.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
 
         LlmCache {
+            default_model: config.default.clone(),
             uninitialized_models: Arc::new(RwLock::new(uninitialized_models)),
             created_models: Arc::new(RwLock::new(HashMap::new())),
             failed_models: Arc::new(RwLock::new(HashSet::new())),
         }
     }
 
-    pub async fn get(&self, key: &str) -> Result<ArcLlm, LlmCacheError> {
+    pub async fn get(&self, model: &ConversationModel) -> Result<ArcLlm, LlmCacheError> {
+        let key = model.specified_or(&self.default_model);
+
         let created_llm = {
             let created_lock = self.created_models.read().await;
             created_lock.get(key).cloned()
@@ -78,6 +82,6 @@ enum LlmCacheError {
     #[error("undefined model: {0}")]
     Undefined(String),
 
-    #[error("failed model")]
+    #[error("model {0} reported initialization failure")]
     Failed(String),
 }

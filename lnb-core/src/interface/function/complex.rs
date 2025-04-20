@@ -10,9 +10,11 @@ use crate::{
     },
 };
 
+use std::sync::Arc;
+
 use futures::future::BoxFuture;
 
-pub type BoxComplexFunction = Box<dyn ComplexFunction + 'static>;
+pub type ArcComplexFunction = Arc<dyn ComplexFunction + 'static>;
 
 pub trait ComplexFunction: Send + Sync {
     /// この `ComplexFunction` のディスクリプタを返す。
@@ -24,12 +26,6 @@ pub trait ComplexFunction: Send + Sync {
         context: &'a Context,
         incomplete: &'a IncompleteConversation,
         user_role: &'a UserRole,
-        tool_calling: &'a MessageToolCalling,
+        tool_calling: MessageToolCalling,
     ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>>;
-}
-
-impl<T: ComplexFunction + 'static> From<T> for BoxComplexFunction {
-    fn from(value: T) -> BoxComplexFunction {
-        Box::new(value)
-    }
 }

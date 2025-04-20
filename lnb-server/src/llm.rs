@@ -1,13 +1,9 @@
 mod claude;
 mod openai;
 
-use self::openai::{ChatCompletionBackend, ResponsesBackend};
-use crate::config::{AppConfigLlm, AppConfigLlmBackend, AppConfigLlmModel, AppConfigLlmOpenaiApi};
+use crate::config::{AppConfigLlmBackend, AppConfigLlmModel};
 
-use std::{
-    collections::HashMap,
-    sync::{Arc, LazyLock},
-};
+use std::{collections::HashMap, sync::LazyLock};
 
 use lnb_core::{
     error::LlmError,
@@ -34,10 +30,7 @@ pub static ASSISTANT_RESPONSE_SCHEMA: LazyLock<DescribedSchema> = LazyLock::new(
 
 pub async fn create_llm(config: AppConfigLlmModel) -> Result<ArcLlm, LlmError> {
     match config.backend {
-        AppConfigLlmBackend::Openai => match config.openai.api {
-            AppConfigLlmOpenaiApi::ChatCompletion => Ok(Arc::new(ChatCompletionBackend::new(&config.openai).await?)),
-            AppConfigLlmOpenaiApi::Resnposes => Ok(Arc::new(ResponsesBackend::new(&config.openai).await?)),
-        },
+        AppConfigLlmBackend::Openai => openai::create_openai_llm(config.config).await,
     }
 }
 

@@ -13,7 +13,6 @@ use crate::{
     function::{
         ConfigurableSimpleFunction, DailyPrivate, ExchangeRate, GetIllustUrl, ImageGenerator, LocalInfo, SelfInfo,
     },
-    llm::create_llm,
     natsuki::Natsuki,
     shiyu::{Shiyu, ShiyuProvider},
     storage::initialize_storage,
@@ -104,9 +103,8 @@ async fn initialize_natsuki(config: &AppConfig) -> Result<Natsuki> {
     };
     info!("using assistant identity: {}", config.assistant.identity);
 
-    let (llm, llm_name) = create_llm(&config.llm).await?;
     let (storage, storage_name) = initialize_storage(&config.storage).await?;
-    let natsuki = Natsuki::new(assistant_identity, llm, storage).await?;
+    let natsuki = Natsuki::new(assistant_identity, &config.llm, storage).await?;
     info!("assistant engine initialized (LLM engine: {llm_name}, storage engine: {storage_name})");
 
     Ok(natsuki)

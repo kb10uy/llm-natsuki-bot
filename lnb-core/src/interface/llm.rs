@@ -9,7 +9,6 @@ use crate::{
 use futures::future::BoxFuture;
 use serde::Deserialize;
 
-pub type BoxLlm = Box<dyn Llm + 'static>;
 pub type ArcLlm = Arc<dyn Llm + 'static>;
 
 pub trait Llm: Send + Sync {
@@ -37,10 +36,4 @@ pub struct LlmAssistantResponse {
     pub text: String,
     pub language: Option<String>,
     pub sensitive: Option<bool>,
-}
-
-impl<T: Llm + 'static> From<T> for BoxLlm {
-    fn from(value: T) -> BoxLlm {
-        Box::new(value)
-    }
 }
