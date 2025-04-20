@@ -36,9 +36,6 @@ pub struct ChatCompletionBackend(Arc<ChatCompletionBackendInner>);
 
 impl ChatCompletionBackend {
     pub async fn new(config: OpenaiModelConfig) -> Result<ChatCompletionBackend, LlmError> {
-        /*
-
-        */
         let client = create_openai_client(&config.token, &config.endpoint).await?;
         Ok(ChatCompletionBackend(Arc::new(ChatCompletionBackendInner {
             client,

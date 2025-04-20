@@ -1,10 +1,10 @@
-use std::sync::Arc;
-
 use crate::{
     error::LlmError,
     interface::function::FunctionDescriptor,
     model::{conversation::IncompleteConversation, message::MessageToolCalling},
 };
+
+use std::sync::Arc;
 
 use futures::future::BoxFuture;
 use serde::Deserialize;
