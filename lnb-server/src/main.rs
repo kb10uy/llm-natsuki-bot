@@ -20,7 +20,7 @@ use crate::{
 
 use std::{collections::HashMap, path::Path, sync::Arc};
 
-use anyhow::{Context as _, Result, bail};
+use anyhow::{Context as _, Result};
 use clap::Parser;
 use futures::future::{join, join_all};
 use lnb_core::interface::{
@@ -101,13 +101,7 @@ async fn initialize_natsuki(config: &AppConfig) -> Result<(Natsuki, Shiyu)> {
     // Interceptions
     let interceptions = initialize_interceptions().await?;
 
-    let Some(assistant_identity) = config.assistant.identities.get(&config.assistant.identity) else {
-        bail!("assistant identity {} not defined", config.assistant.identity);
-    };
-    info!("using assistant identity: {}", config.assistant.identity);
-
-    let natsuki = Natsuki::new(storage, llm_cache, function_store, interceptions, assistant_identity).await?;
-
+    let natsuki = Natsuki::new(storage, llm_cache, function_store, interceptions, &config.assistant).await?;
     Ok((natsuki, shiyu))
 }
 

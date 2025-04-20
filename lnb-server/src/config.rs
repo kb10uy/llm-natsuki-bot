@@ -89,12 +89,6 @@ pub enum AppConfigLlmOpenaiApi {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct AppConfigAssistant {
-    pub identity: String,
-    pub identities: HashMap<String, AppConfigAssistantIdentity>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct AppConfigAssistantIdentity {
     pub system_role: String,
 
     #[serde(default = "Default::default")]

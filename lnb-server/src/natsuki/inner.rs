@@ -1,5 +1,5 @@
 use crate::{
-    config::AppConfigAssistantIdentity,
+    config::AppConfigAssistant,
     natsuki::{function_store::FunctionStore, llm_cache::LlmCache},
 };
 
@@ -39,7 +39,7 @@ impl NatsukiInner {
         llm_cache: LlmCache,
         function_store: FunctionStore,
         interceptions: Vec<BoxInterception>,
-        assistant_identity: &AppConfigAssistantIdentity,
+        assistant_identity: &AppConfigAssistant,
     ) -> Result<NatsukiInner, ServerError> {
         Ok(NatsukiInner {
             storage,
