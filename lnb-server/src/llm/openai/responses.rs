@@ -236,9 +236,12 @@ fn transform_choice(outputs: &[Value]) -> Result<LlmUpdate, LlmError> {
                 sensitive: None,
             };
             match message.status.as_str() {
-                "complete" => Ok(LlmUpdate::Finished(response)),
+                "completed" => Ok(LlmUpdate::Finished(response)),
                 "incomplete" | "in_progress" => Ok(LlmUpdate::Finished(response)),
-                _ => Err(LlmError::Backend("unknown message reason".into())),
+                otherwise => {
+                    let message = format!("unknown message reason: {otherwise}");
+                    Err(LlmError::Backend(message.into()))
+                }
             }
         }
         ResponsesMessageContent::Refusal { .. } => Ok(LlmUpdate::Filtered),
