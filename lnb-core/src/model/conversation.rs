@@ -16,6 +16,7 @@ impl ConversationId {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "kind", content = "value")]
 pub enum ConversationModel {
     #[default]
     Default,
@@ -221,12 +222,14 @@ impl ConversationUpdate {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "kind", content = "value")]
 pub enum ConversationAttachment {
     Image { url: Url, description: Option<String> },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "kind", content = "value")]
 pub enum UserRole {
     Privileged,
     Scoped(BTreeSet<String>),

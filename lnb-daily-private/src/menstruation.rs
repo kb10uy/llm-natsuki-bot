@@ -11,6 +11,7 @@ pub struct MenstruationConfiguration {
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case", tag = "phase", content = "progress")]
 pub enum MensePhase {
     /// 卵胞期
     Follicular(f64),

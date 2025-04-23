@@ -4,6 +4,7 @@ use url::Url;
 
 /// `Conversation` 中の単一メッセージ。
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "kind", content = "value")]
 pub enum Message {
     System(SystemMessage),
     User(UserMessage),
