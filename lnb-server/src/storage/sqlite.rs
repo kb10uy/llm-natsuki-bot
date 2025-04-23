@@ -72,7 +72,7 @@ impl SqliteConversationStorageInner {
                 .await?;
 
         let conversation = row
-            .map(|r| rmp_serde::from_slice(&r.content))
+            .map(|r| serde_json::from_slice(&r.content))
             .transpose()
             .map_err(StorageError::by_serialization)?;
         Ok(conversation)
@@ -90,7 +90,7 @@ impl SqliteConversationStorageInner {
                 .await?;
 
         let conversation = row
-            .map(|r| rmp_serde::from_slice(&r.content))
+            .map(|r| serde_json::from_slice(&r.content))
             .transpose()
             .map_err(StorageError::by_serialization)?;
         Ok(conversation)
@@ -115,7 +115,7 @@ impl SqliteConversationStorageInner {
         context_key: Option<&'a str>,
     ) -> Result<(), StorageError> {
         let id = conversation.id().0;
-        let blob = rmp_serde::to_vec(conversation).map_err(StorageError::by_serialization)?;
+        let blob = serde_json::to_vec(conversation).map_err(StorageError::by_serialization)?;
 
         sqlx::query(
             r#"
