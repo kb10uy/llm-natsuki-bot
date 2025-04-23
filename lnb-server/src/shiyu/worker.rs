@@ -46,7 +46,7 @@ impl Worker {
         let id_str = id.to_string();
 
         // ジョブ本体を登録
-        let job_bytes = rmp_serde::to_vec(job).map_err(ReminderError::by_serialization)?;
+        let job_bytes = serde_json::to_vec(job).map_err(ReminderError::by_serialization)?;
         let _: Value = conn
             .hset(JOB_TABLE_KEY, &id_str, job_bytes)
             .map_err(ReminderError::by_internal)
@@ -127,7 +127,7 @@ impl Worker {
                     .map_err(ReminderError::by_internal)
                     .await?;
                 debug!("sending {job_id}");
-                let job: T = rmp_serde::from_slice(&job_bytes).map_err(ReminderError::by_serialization)?;
+                let job: T = serde_json::from_slice(&job_bytes).map_err(ReminderError::by_serialization)?;
                 send.send(job).map_err(|_| ReminderError::CannotPushAnymore)?;
             }
 
