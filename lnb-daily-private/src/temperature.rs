@@ -1,8 +1,10 @@
+use crate::menstruation::MensePhase;
+
+use std::f64::consts::TAU;
+
 use rand::prelude::*;
 use rand_distr::Normal;
 use serde::{Deserialize, Serialize};
-
-use crate::menstruation::MensePhase;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct TemperatureConfiguration {
@@ -38,7 +40,7 @@ impl TemperatureConfiguration {
         self.fourier_coefficients
             .iter()
             .enumerate()
-            .map(|(i, &(co_x, co_y))| (co_x, co_y, i as f64 * canonical_t))
+            .map(|(i, &(co_x, co_y))| (co_x, co_y, i as f64 * canonical_t * TAU))
             .fold(0.0, |a, (co_x, co_y, t)| a + co_x * t.cos() + co_y * t.sin())
     }
 }
