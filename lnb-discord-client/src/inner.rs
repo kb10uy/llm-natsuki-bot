@@ -1,9 +1,10 @@
+use std::sync::Arc;
+
 use crate::{
     DiscordLnbClientConfig,
     text::{sanitize_discord_message, sanitize_markdown_for_discord},
 };
 
-use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use lnb_core::{
     error::ClientError,
     interface::{Context as LnbContext, server::LnbServer},
@@ -12,83 +13,97 @@ use lnb_core::{
         message::{AssistantMessage, UserMessage, UserMessageContent},
     },
 };
-use serenity::{
-    Client as SerenityClient,
-    all::{Context, CreateMessage, EventHandler, GatewayIntents, Message as SerenityMessage, Ready, User},
+use tokio::{spawn, sync::RwLock};
+use tracing::{info, warn};
+use twilight_cache_inmemory::{DefaultInMemoryCache, ResourceType};
+use twilight_gateway::{Event, EventTypeFlags, Intents, Shard, ShardId, StreamExt};
+use twilight_http::Client;
+use twilight_model::{
+    gateway::payload::incoming::{MessageCreate, Ready},
+    user::CurrentUser,
 };
-use tokio::sync::RwLock;
-use tracing::{error, info, warn};
 
 const CONTEXT_KEY_PREFIX: &str = "discord";
 
 #[derive(Debug)]
 pub struct DiscordLnbClientInner<S> {
-    bot_user: RwLock<Option<User>>,
+    client: Client,
+    bot_user: RwLock<Option<CurrentUser>>,
     max_length: usize,
     assistant: S,
 }
 
-impl<S: LnbServer> EventHandler for DiscordLnbClientInner<S> {
-    fn ready<'a, 't>(&'a self, ctx: Context, ready: Ready) -> BoxFuture<'t, ()>
-    where
-        'a: 't,
-        Self: 't,
-    {
-        do_event(self.on_ready(ctx, ready))
-    }
-
-    fn message<'a, 't>(&'a self, ctx: Context, new_message: SerenityMessage) -> BoxFuture<'t, ()>
-    where
-        'a: 't,
-        Self: 't,
-    {
-        do_event(self.on_message(ctx, new_message))
-    }
-}
-
 impl<S: LnbServer> DiscordLnbClientInner<S> {
-    pub async fn new_as_serenity_client(
-        config: &DiscordLnbClientConfig,
-        assistant: S,
-    ) -> Result<SerenityClient, ClientError> {
+    pub async fn new(config: &DiscordLnbClientConfig, assistant: S) -> Result<DiscordLnbClientInner<S>, ClientError> {
+        let client = Client::new(config.token.clone());
         let inner = DiscordLnbClientInner {
+            client,
             bot_user: RwLock::new(None),
             max_length: config.max_length,
             assistant,
         };
-
-        let intents = GatewayIntents::GUILDS | GatewayIntents::GUILD_MESSAGES | GatewayIntents::MESSAGE_CONTENT;
-        let discord = SerenityClient::builder(&config.token, intents)
-            .event_handler(inner)
-            .await
-            .map_err(ClientError::by_external)?;
-        Ok(discord)
+        Ok(inner)
     }
 
-    async fn on_ready(&self, _ctx: Context, ready: Ready) -> Result<(), ClientError> {
-        info!("Discord client got ready: [{}] {}", ready.user.id, ready.user.name);
+    pub async fn execute(self: Arc<Self>) -> Result<(), ClientError> {
+        let mut shard = Shard::new(
+            ShardId::ONE,
+            self.client.token().expect("should be set").to_string(),
+            Intents::GUILDS | Intents::GUILD_MESSAGES | Intents::MESSAGE_CONTENT,
+        );
+        let cache = DefaultInMemoryCache::builder()
+            .resource_types(ResourceType::MESSAGE)
+            .build();
 
-        let mut bot_user = self.bot_user.write().await;
-        *bot_user = Some(ready.user.into());
+        while let Some(item) = shard.next_event(EventTypeFlags::all()).await {
+            match item {
+                Ok(event) => {
+                    cache.update(&event);
+                    let cloned_self = self.clone();
+                    spawn(cloned_self.handle_event(event));
+                }
+                Err(err) => {
+                    warn!("message error: {err}");
+                }
+            }
+        }
+
         Ok(())
     }
 
-    async fn on_message(&self, ctx: Context, message: SerenityMessage) -> Result<(), ClientError> {
+    async fn handle_event(self: Arc<Self>, event: Event) -> Result<(), ClientError> {
+        match event {
+            Event::Ready(ready) => self.on_ready(*ready).await?,
+            Event::MessageCreate(message_create) => self.on_message_create(*message_create).await?,
+            _ => (),
+        }
+        Ok(())
+    }
+
+    async fn on_ready(&self, ready: Ready) -> Result<(), ClientError> {
+        info!("Discord client got ready: [{}] {}", ready.user.id, ready.user.name);
+
+        let mut bot_user = self.bot_user.write().await;
+        *bot_user = Some(ready.user);
+        Ok(())
+    }
+
+    async fn on_message_create(&self, message_create: MessageCreate) -> Result<(), ClientError> {
         let bot_user = self.bot_user.read().await;
         let Some(bot_user) = bot_user.as_ref() else {
             return Ok(());
         };
 
         // (自分含む) bot のメッセージと非メンションを除外
-        if message.author.bot || !message.mentions_user(bot_user) {
+        if message_create.author.bot || message_create.mentions.iter().all(|m| m.id != bot_user.id) {
             return Ok(());
         }
 
-        self.on_mentioned_message(ctx, message).await?;
+        self.on_mentioned_message(message_create).await?;
         Ok(())
     }
 
-    async fn on_mentioned_message(&self, ctx: Context, message: SerenityMessage) -> Result<(), ClientError> {
+    async fn on_mentioned_message(&self, message: MessageCreate) -> Result<(), ClientError> {
         // Conversation の検索
         let context_key = message.referenced_message.as_ref().map(|rm| rm.id.to_string());
         let conversation_id = match context_key {
@@ -167,14 +182,16 @@ impl<S: LnbServer> DiscordLnbClientInner<S> {
             sanitized_text.push_str("...(omitted)");
         }
 
-        let replied_message = message
-            .channel_id
-            .send_message(
-                &ctx.http,
-                CreateMessage::new().reference_message(&message).content(sanitized_text),
-            )
-            .map_err(ClientError::by_external)
-            .await?;
+        let replied_message = {
+            let response = self
+                .client
+                .create_message(message.channel_id)
+                .reply(message.id)
+                .content(&sanitized_text)
+                .await
+                .map_err(ClientError::by_communication)?;
+            response.model().await.map_err(ClientError::by_communication)?
+        };
 
         // Conversation/history の更新
         let new_history_id = format!("{CONTEXT_KEY_PREFIX}:{}", replied_message.id);
@@ -184,16 +201,4 @@ impl<S: LnbServer> DiscordLnbClientInner<S> {
 
         Ok(())
     }
-}
-
-fn do_event<'t>(event_future: impl Future<Output = Result<(), ClientError>> + Send + 't) -> BoxFuture<'t, ()> {
-    async {
-        match event_future.await {
-            Ok(()) => (),
-            Err(err) => {
-                error!("Discord event process reported error: {err}");
-            }
-        }
-    }
-    .boxed()
 }
