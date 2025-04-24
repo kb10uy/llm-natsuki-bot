@@ -68,7 +68,10 @@ fn walk_mastodon(writer: &mut impl Write, children: Vec<Node>) -> FmtResult {
                     writeln!(writer)?;
                 }
             }
-            Node::Code(code) => write_text_element(writer, &code.value)?,
+            Node::Code(code) => {
+                write_text_element(writer, &code.value)?;
+                writeln!(writer)?;
+            }
             Node::Math(math) => write_text_element(writer, &math.value)?,
 
             Node::Table(_) => {
