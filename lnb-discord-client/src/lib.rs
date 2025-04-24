@@ -11,8 +11,6 @@ use lnb_core::{
     interface::{client::LnbClient, server::LnbServer},
 };
 use serde::Deserialize;
-use serenity::Client as SerenityClient;
-use tokio::sync::Mutex;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct DiscordLnbClientConfig {
@@ -20,24 +18,23 @@ pub struct DiscordLnbClientConfig {
     pub max_length: usize,
 }
 
-pub struct DiscordLnbClient(Arc<Mutex<SerenityClient>>);
+pub struct DiscordLnbClient<S>(Arc<inner::DiscordLnbClientInner<S>>);
 
-impl DiscordLnbClient {
-    pub async fn new(
-        config: &DiscordLnbClientConfig,
-        assistant: impl LnbServer,
-    ) -> Result<DiscordLnbClient, ClientError> {
-        let inner_discord = DiscordLnbClientInner::new_as_serenity_client(config, assistant).await?;
-        Ok(DiscordLnbClient(Arc::new(Mutex::new(inner_discord))))
+impl<S: LnbServer> DiscordLnbClient<S> {
+    pub async fn new(config: &DiscordLnbClientConfig, assistant: S) -> Result<DiscordLnbClient<S>, ClientError> {
+        let inner_discord = DiscordLnbClientInner::new(config, assistant).await?;
+        Ok(DiscordLnbClient(Arc::new(inner_discord)))
     }
 }
 
-impl LnbClient for DiscordLnbClient {
+impl<S: LnbServer> LnbClient for DiscordLnbClient<S> {
     fn execute(&self) -> BoxFuture<'static, Result<(), ClientError>> {
         let cloned = self.0.clone();
         async move {
-            let mut locked = cloned.lock().await;
-            locked.start().map_err(|e| ClientError::Communication(e.into())).await?;
+            cloned
+                .execute()
+                .map_err(|e| ClientError::Communication(e.into()))
+                .await?;
             Ok(())
         }
         .boxed()
