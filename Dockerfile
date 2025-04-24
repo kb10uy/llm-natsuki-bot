@@ -6,7 +6,8 @@ RUN apt-get update && apt-get install mold
 COPY . /build
 RUN cargo build --release
 
-FROM gcr.io/distroless/cc-debian12
+FROM mirror.gcr.io/debian:bookworm-slim
+RUN apt-get update && apt-get install -y openssl ca-certificates
 COPY --from=builder /build/target/release/lnb-server /
-USER nonroot
+USER 1000:1000
 CMD [ "/lnb-server", "-c", "/data/config.generated.json" ]
