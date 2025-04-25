@@ -42,8 +42,7 @@ pub struct JwtClaims {
 pub struct JwtAuthLayer {
     jwt_header: HeaderName,
     jwks_url: Url,
-    allowed_emails: Vec<String>,
-
+    jwt_validation: Validation,
     jwks: Arc<RwLock<Option<JwkSet>>>,
     jwks_fetched_at: Arc<RwLock<UtcDateTime>>,
     client: Client,
@@ -52,12 +51,18 @@ pub struct JwtAuthLayer {
 impl JwtAuthLayer {
     pub fn new(config: ConfigAdminApiJwtAuth) -> Result<JwtAuthLayer> {
         let jwt_header = config.jwt_header_name.parse()?;
+        let jwks_url = config.jwks_url;
+        let jwt_validation = {
+            let mut v = Validation::new(Algorithm::RS256);
+            v.set_issuer(&[config.issuer]);
+            v.set_audience(&config.allowed_audience);
+            v
+        };
         let client = ClientBuilder::new().user_agent(APP_USER_AGENT).build()?;
         Ok(JwtAuthLayer {
             jwt_header,
-            jwks_url: config.jwks_url,
-            allowed_emails: config.allowed_emails,
-
+            jwks_url,
+            jwt_validation,
             jwks: Arc::new(RwLock::new(None)),
             jwks_fetched_at: Arc::new(RwLock::new(UtcDateTime::UNIX_EPOCH)),
             client,
@@ -83,14 +88,7 @@ impl JwtAuthLayer {
             DecodingKey::from_jwk(&jwk)?
         };
 
-        // TODO: issuer とか audience を検証する
-        let validation = Validation::new(Algorithm::RS256);
-
-        let token_data: TokenData<JwtClaims> = jsonwebtoken::decode(jwt_token, &decoding_key, &validation)?;
-
-        if !self.allowed_emails.contains(&token_data.claims.email) {
-            return Err(JwtAuthError::JwtForbidden);
-        }
+        let token_data: TokenData<JwtClaims> = jsonwebtoken::decode(jwt_token, &decoding_key, &self.jwt_validation)?;
         Ok(token_data.claims)
     }
 
@@ -115,13 +113,11 @@ impl JwtAuthLayer {
             .await?;
         let jwks: JwkSet = resp.json().map_err(|e| JwtAuthError::JwkFailure(e.into())).await?;
 
+        info!("JWKs cache updated; {} keys registered", jwks.keys.len());
         let mut locked_jwks = self.jwks.write().await;
         let mut locked_jwks_fetched_at = self.jwks_fetched_at.write().await;
         *locked_jwks = Some(jwks);
         *locked_jwks_fetched_at = UtcDateTime::now();
-
-        info!("JWKs cache updated");
-
         Ok(())
     }
 }
@@ -189,9 +185,6 @@ fn unauthorized_response(err: JwtAuthError) -> Response<Body> {
 pub enum JwtAuthError {
     #[error("JWT header required")]
     JwtRequired,
-
-    #[error("forbidden")]
-    JwtForbidden,
 
     #[error("invalid JWT")]
     InvalidJwk,

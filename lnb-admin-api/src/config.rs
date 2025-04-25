@@ -18,5 +18,6 @@ pub struct ConfigAdminApi {
 pub struct ConfigAdminApiJwtAuth {
     pub jwt_header_name: String,
     pub jwks_url: Url,
-    pub allowed_emails: Vec<String>,
+    pub issuer: String,
+    pub allowed_audience: Vec<String>,
 }
