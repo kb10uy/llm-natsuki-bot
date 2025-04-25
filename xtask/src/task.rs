@@ -35,6 +35,22 @@ pub fn development() -> Result<()> {
     Ok(())
 }
 
+pub fn development_api() -> Result<()> {
+    build_config()?;
+    run_command_in_repository(
+        "cargo",
+        &[
+            "run",
+            "--bin",
+            "lnb-admin-api",
+            "--",
+            "-c",
+            "data/config.generated.json",
+        ],
+    )?;
+    Ok(())
+}
+
 pub fn build_config() -> Result<()> {
     run_command_in_repository("jsonnet", &["config.jsonnet", "-o", "data/config.generated.json"])?;
     Ok(())

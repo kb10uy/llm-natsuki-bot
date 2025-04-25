@@ -19,6 +19,9 @@ enum ArgumentsTask {
 
     #[clap(aliases = &["dev"])]
     Development,
+
+    #[clap(aliases = &["dev-api"])]
+    DevelopmentApi,
 }
 
 fn main() -> Result<()> {
@@ -29,6 +32,7 @@ fn main() -> Result<()> {
         ArgumentsTask::Down => task::down()?,
         ArgumentsTask::Restart => task::restart()?,
         ArgumentsTask::Development => task::development()?,
+        ArgumentsTask::DevelopmentApi => task::development_api()?,
     }
     Ok(())
 }

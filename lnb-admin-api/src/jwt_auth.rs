@@ -26,6 +26,7 @@ use thiserror::Error as ThisError;
 use time::{Duration, UtcDateTime};
 use tokio::sync::RwLock;
 use tower::{Layer, Service};
+use tracing::info;
 use url::Url;
 
 const JWK_CACHE_EXPIRATION: Duration = Duration::days(1);
@@ -118,6 +119,8 @@ impl JwtAuthLayer {
         let mut locked_jwks_fetched_at = self.jwks_fetched_at.write().await;
         *locked_jwks = Some(jwks);
         *locked_jwks_fetched_at = UtcDateTime::now();
+
+        info!("JWKs cache updated");
 
         Ok(())
     }

@@ -5,9 +5,10 @@ mod jwt_auth;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use axum::Router;
+use axum::{Router, routing::get};
 use clap::Parser;
 use tokio::{fs::read_to_string, net::TcpListener};
+use tracing::info;
 
 #[derive(Debug, Clone, Parser)]
 #[clap(author, version)]
@@ -24,9 +25,13 @@ async fn main() -> Result<()> {
 
     let app = {
         let mut router = routes();
-        if let Some(auth_config) = config.admin_api.auth {
+
+        // JWT Auth
+        if let Some(auth_config) = config.admin_api.jwt_auth {
             router = router.layer(jwt_auth::JwtAuthLayer::new(auth_config)?);
+            info!("JWT authentication enabled");
         }
+
         router
     };
 
@@ -36,7 +41,7 @@ async fn main() -> Result<()> {
 }
 
 fn routes() -> Router<()> {
-    Router::new().route("/test", todo!())
+    Router::new().route("/health", get(api::health))
 }
 
 async fn load_config(path: impl AsRef<Path>) -> Result<config::Config> {

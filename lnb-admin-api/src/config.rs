@@ -11,7 +11,7 @@ pub struct Config {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ConfigAdminApi {
     pub bind_address: SocketAddr,
-    pub auth: Option<ConfigAdminApiJwtAuth>,
+    pub jwt_auth: Option<ConfigAdminApiJwtAuth>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
