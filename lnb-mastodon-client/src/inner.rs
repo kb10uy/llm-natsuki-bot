@@ -22,20 +22,18 @@ use mastodon_async::{
     },
     prelude::MediaType,
 };
-use reqwest::{Client, header::HeaderMap};
+use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 use thiserror::Error as ThisError;
 use tokio::{fs::File, io::AsyncWriteExt, spawn, time::sleep};
 use tracing::{debug, error, info, warn};
-use url::Url;
 
 const RECONNECT_SLEEP: Duration = Duration::from_secs(120);
 
 #[derive(Debug)]
 pub struct MastodonLnbClientInner<S> {
     assistant: S,
-    http_client: Client,
     mastodon: Mastodon,
     self_account: Account,
     sensitive_spoiler: String,
@@ -65,7 +63,6 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
 
         Ok(MastodonLnbClientInner {
             assistant,
-            http_client,
             mastodon,
             self_account,
             sensitive_spoiler: config.sensitive_spoiler.clone(),
@@ -310,8 +307,8 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         let mut attachment_ids = vec![];
         for attachment in attachments {
             match attachment {
-                ConversationAttachment::Image { url, description } => {
-                    let image_id = self.upload_image(url, description.as_deref()).await?;
+                ConversationAttachment::Image { bytes, description } => {
+                    let image_id = self.upload_image(bytes, description.as_deref()).await?;
                     attachment_ids.push(image_id);
                 }
             }
@@ -350,16 +347,8 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
     }
 
     /// 画像をアップロードする(非同期アップロード)。
-    async fn upload_image(&self, url: &Url, description: Option<&str>) -> Result<AttachmentId, ClientError> {
-        // ダウンロード
-        let response = self
-            .http_client
-            .get(url.to_string())
-            .send()
-            .map_err(ClientError::by_external)
-            .await?;
-        let image_data = response.bytes().map_err(ClientError::by_external).await?;
-        let mime_type = infer::get(&image_data).map(|ft| ft.mime_type());
+    async fn upload_image(&self, image_data: &[u8], description: Option<&str>) -> Result<AttachmentId, ClientError> {
+        let mime_type = infer::get(image_data).map(|ft| ft.mime_type());
 
         // tempfile に書き出し
         let tempfile = match mime_type {
@@ -383,7 +372,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
             let (temp_file, temp_path) = tempfile.into_parts();
             let mut async_file = File::from_std(temp_file);
             async_file
-                .write_all(&image_data)
+                .write_all(image_data)
                 .await
                 .map_err(ClientError::by_external)?;
             let restored_file = async_file.into_std().await;
