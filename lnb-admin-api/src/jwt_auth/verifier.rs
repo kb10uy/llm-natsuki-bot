@@ -51,10 +51,8 @@ impl JwtVerifier {
         if self.allowed_subjects.contains(&claims.sub) {
             Ok(claims)
         } else {
-             Err(JwtAuthError::SubjectNotAllowed(claims.sub))
+            Err(JwtAuthError::SubjectNotAllowed(claims.sub))
         }
-
-
     }
 }
 
