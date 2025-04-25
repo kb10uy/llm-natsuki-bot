@@ -10,7 +10,7 @@ use serde::Deserialize;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct JwtClaims {
-    sub: String,
-    email: String,
-    exp: usize,
+    pub sub: String,
+    pub email: String,
+    pub exp: usize,
 }
