@@ -3,7 +3,6 @@ use crate::model::message::{AssistantMessage, Message, UserMessage};
 use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
-use url::Url;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -225,7 +224,11 @@ impl ConversationUpdate {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "kind", content = "value")]
 pub enum ConversationAttachment {
-    Image { url: Url, description: Option<String> },
+    Image {
+        #[serde(with = "serde_bytes")]
+        bytes: Vec<u8>,
+        description: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
