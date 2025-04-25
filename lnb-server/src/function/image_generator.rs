@@ -5,17 +5,19 @@ use async_openai::{
     config::OpenAIConfig,
     types::{CreateImageRequest, Image, ImageModel},
 };
-use futures::{FutureExt, future::BoxFuture};
+use base64::prelude::*;
+use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use lnb_core::{
     APP_USER_AGENT,
     error::FunctionError,
     interface::function::{FunctionDescriptor, FunctionResponse, simple::SimpleFunction},
     model::{conversation::ConversationAttachment, schema::DescribedSchema},
 };
+use reqwest::Client as ReqwestClient;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use time::UtcDateTime;
 use tracing::info;
-use url::Url;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ImageGeneratorConfig {
@@ -27,6 +29,7 @@ pub struct ImageGeneratorConfig {
 #[derive(Debug)]
 pub struct ImageGenerator {
     client: Client<OpenAIConfig>,
+    http_client: ReqwestClient,
     model: String,
 }
 
@@ -44,9 +47,10 @@ impl ConfigurableSimpleFunction for ImageGenerator {
             .build()
             .map_err(|e| FunctionError::External(e.into()))?;
 
-        let client = Client::with_config(openai_config).with_http_client(http_client);
+        let client = Client::with_config(openai_config).with_http_client(http_client.clone());
         Ok(ImageGenerator {
             client,
+            http_client,
             model: config.model.to_string(),
         })
     }
@@ -94,30 +98,51 @@ impl ImageGenerator {
             Ok(r) => r,
             Err(e) => return make_error_value(&e.to_string()),
         };
-        let Some(first_image) = response.data.first() else {
-            return make_error_value("no image was generated");
-        };
-        match first_image {
-            Image::Url { url, revised_prompt } => todo!(),
-            Image::B64Json { b64_json, revised_prompt } => todo!(),
-        }
-        let Image::Url { url, revised_prompt } = first_image.as_ref() else {
-            return make_error_value("invalid response generated");
+
+        let (image_bytes, returning_prompt) = {
+            let Some(first_image) = response.data.first() else {
+                return make_error_value("no image was generated");
+            };
+            match first_image.as_ref() {
+                Image::Url { url, revised_prompt } => {
+                    let image_response = self
+                        .http_client
+                        .get(url)
+                        .send()
+                        .map_err(FunctionError::by_external)
+                        .await?;
+                    let image_bytes = image_response.bytes().map_err(FunctionError::by_external).await?;
+
+                    let attached_prompt = revised_prompt.as_deref().unwrap_or(&prompt).to_string();
+                    (image_bytes.into(), attached_prompt)
+                }
+                Image::B64Json {
+                    b64_json,
+                    revised_prompt,
+                } => {
+                    let image_bytes = BASE64_STANDARD
+                        .decode(b64_json.as_str())
+                        .map_err(FunctionError::by_serialization)?;
+                    let attached_prompt = revised_prompt.as_deref().unwrap_or(&prompt).to_string();
+
+                    (image_bytes, attached_prompt)
+                }
+            }
         };
 
-        let image_url = Url::parse(url).map_err(FunctionError::by_external)?;
-        let revised_prompt = revised_prompt.as_ref().unwrap_or(&prompt).to_string();
         let function_response = GenerationResponse {
-            image_url: image_url.clone(),
-            revised_prompt: revised_prompt.clone(),
+            created_at: UtcDateTime::from_unix_timestamp(response.created as i64)
+                .map_err(FunctionError::by_external)?,
+            revised_prompt: returning_prompt.clone(),
         };
-        let attachment = ConversationAttachment::Image {
-            url: image_url,
-            description: Some(revised_prompt),
+        let image_attachment = ConversationAttachment::Image {
+            bytes: image_bytes,
+            description: Some(returning_prompt),
         };
+
         Ok(FunctionResponse {
             result: serde_json::to_value(function_response).map_err(FunctionError::by_serialization)?,
-            attachments: vec![attachment],
+            attachments: vec![image_attachment],
         })
     }
 }
@@ -134,7 +159,7 @@ fn make_error_value(message: &str) -> Result<FunctionResponse, FunctionError> {
 
 #[derive(Debug, Serialize)]
 struct GenerationResponse {
-    image_url: Url,
+    created_at: UtcDateTime,
     revised_prompt: String,
 }
 

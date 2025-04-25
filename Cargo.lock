@@ -1704,6 +1704,7 @@ version = "0.11.1"
 dependencies = [
  "anyhow",
  "async-openai",
+ "base64",
  "bimap",
  "clap",
  "futures",
