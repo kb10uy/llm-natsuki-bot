@@ -61,8 +61,7 @@ impl SimpleFunction for ImageGenerator {
         FunctionDescriptor {
             name: "image_generator".to_string(),
             description: r#"
-                ユーザーからの要望に基づき、プロンプトの入力から AI を利用して画像を生成します。生成された画像の URL は返答文に含めないでください。
-                ユーザーから明示的に画像生成の要求があるとき以外は決してこのツールを呼ばないでください。
+                ユーザーからの要望に基づき、プロンプトの入力から AI を利用して画像を生成します。
             "#
             .to_string(),
             parameters: DescribedSchema::object(
@@ -70,7 +69,7 @@ impl SimpleFunction for ImageGenerator {
                 "引数",
                 vec![DescribedSchema::string(
                     "prompt",
-                    "DALL-E 3 などの画像生成モデルに入力するプロンプト文。",
+                    "GPT-Image-1, DALL-E 3 などの画像生成モデルに入力するプロンプト文。",
                 )],
             ),
         }
