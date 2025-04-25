@@ -28,7 +28,7 @@ async fn main() -> Result<()> {
 
         // JWT Auth
         if let Some(auth_config) = config.admin_api.jwt_auth {
-            router = router.layer(jwt_auth::JwtAuthLayer::new(auth_config)?);
+            router = router.layer(jwt_auth::JwtAuthLayer::new(auth_config));
             info!("JWT authentication enabled");
         }
 
