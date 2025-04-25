@@ -7,7 +7,7 @@ use lnb_core::{DebugOptionValue, parse_debug_option};
 #[clap(author, version)]
 pub struct Arguments {
     /// Specify path for config file.
-    #[clap(short, long, default_value = "./config.toml")]
+    #[clap(short, long, default_value = "./config.json")]
     pub config: PathBuf,
 
     #[clap(short, long, value_parser = parse_debug_option)]
