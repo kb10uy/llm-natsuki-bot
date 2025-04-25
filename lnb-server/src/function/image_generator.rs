@@ -97,6 +97,10 @@ impl ImageGenerator {
         let Some(first_image) = response.data.first() else {
             return make_error_value("no image was generated");
         };
+        match first_image {
+            Image::Url { url, revised_prompt } => todo!(),
+            Image::B64Json { b64_json, revised_prompt } => todo!(),
+        }
         let Image::Url { url, revised_prompt } = first_image.as_ref() else {
             return make_error_value("invalid response generated");
         };

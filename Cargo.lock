@@ -1630,6 +1630,7 @@ version = "0.11.1"
 dependencies = [
  "futures",
  "serde",
+ "serde_bytes",
  "serde_json",
  "thiserror 2.0.12",
  "time",
@@ -1714,7 +1715,6 @@ dependencies = [
  "redis",
  "reqwest",
  "serde",
- "serde_bytes",
  "serde_json",
  "sha2",
  "sqlx",
