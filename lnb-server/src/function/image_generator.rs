@@ -16,7 +16,6 @@ use lnb_core::{
 use reqwest::Client as ReqwestClient;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use time::UtcDateTime;
 use tracing::info;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -62,6 +61,7 @@ impl SimpleFunction for ImageGenerator {
             name: "image_generator".to_string(),
             description: r#"
                 ユーザーからの要望に基づき、プロンプトの入力から AI を利用して画像を生成します。
+                生成された画像は返答のメッセージに直接添付されます。
             "#
             .to_string(),
             parameters: DescribedSchema::object(
@@ -130,8 +130,7 @@ impl ImageGenerator {
         };
 
         let function_response = GenerationResponse {
-            created_at: UtcDateTime::from_unix_timestamp(response.created as i64)
-                .map_err(FunctionError::by_external)?,
+            status: GenerationStatus::GenerationCompleted,
             revised_prompt: returning_prompt.clone(),
         };
         let image_attachment = ConversationAttachment::Image {
@@ -158,8 +157,14 @@ fn make_error_value(message: &str) -> Result<FunctionResponse, FunctionError> {
 
 #[derive(Debug, Serialize)]
 struct GenerationResponse {
-    created_at: UtcDateTime,
+    status: GenerationStatus,
     revised_prompt: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+enum GenerationStatus {
+    GenerationCompleted,
 }
 
 #[derive(Debug, Serialize)]
