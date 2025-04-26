@@ -74,6 +74,7 @@ impl From<UserMessage> for Message {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "kind", content = "value")]
 pub enum UserMessageContent {
     Text(String),
     ImageUrl(Url),
