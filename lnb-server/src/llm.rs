@@ -53,6 +53,11 @@ fn convert_json_schema(schema: &DescribedSchema) -> Value {
             "type": type_value("string"),
             "description": schema.description,
         }),
+        DescribedSchemaType::Enum(variants) => json!({
+            "type": type_value("string"),
+            "description": schema.description,
+            "enum": variants,
+        }),
         DescribedSchemaType::Array(item_type) => json!({
             "type": type_value("array"),
             "description": schema.description,
