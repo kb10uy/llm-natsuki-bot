@@ -13,7 +13,7 @@ use lnb_core::{
     interface::function::{FunctionDescriptor, FunctionResponse, simple::SimpleFunction},
     model::{conversation::ConversationAttachment, schema::DescribedSchema},
 };
-use reqwest::{Client as ReqwestClient, multipart::Form};
+use reqwest::{Client as ReqwestClient, ClientBuilder, header::HeaderMap, multipart::Form};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tempfile::NamedTempFile;
@@ -43,16 +43,30 @@ impl ConfigurableSimpleFunction for ImageGenerator {
     type Configuration = ImageGeneratorConfig;
 
     async fn configure(config: &ImageGeneratorConfig) -> Result<ImageGenerator, FunctionError> {
-        let openai_config = OpenAIConfig::new()
-            .with_api_key(&config.token)
-            .with_api_base(&config.endpoint);
-        let http_client = reqwest::ClientBuilder::new()
-            .user_agent(APP_USER_AGENT)
-            .build()
-            .map_err(|e| FunctionError::External(e.into()))?;
+        let client = {
+            let openai_config = OpenAIConfig::new()
+                .with_api_key(&config.token)
+                .with_api_base(&config.endpoint);
+            let http_client = ClientBuilder::new()
+                .user_agent(APP_USER_AGENT)
+                .build()
+                .map_err(|e| FunctionError::External(e.into()))?;
+            Client::with_config(openai_config).with_http_client(http_client)
+        };
+        let http_client = {
+            let mut headers = HeaderMap::new();
+            headers.insert(
+                "Authorization",
+                format!("Bearer {}", config.token).parse().expect("should pass header"),
+            );
+            ClientBuilder::new()
+                .user_agent(APP_USER_AGENT)
+                .default_headers(headers)
+                .build()
+                .map_err(FunctionError::by_external)?
+        };
         let edit_endpoint =
             Url::parse(&format!("{}/images/edits", config.endpoint)).map_err(FunctionError::by_serialization)?;
-        let client = Client::with_config(openai_config).with_http_client(http_client.clone());
         Ok(ImageGenerator {
             client,
             http_client,
@@ -226,6 +240,7 @@ impl ImageGenerator {
     }
 
     async fn download_temporary_image(&self, url: String) -> Result<NamedTempFile, IntermediateError> {
+        debug!("downloading image from {url}");
         let image_bytes = self
             .http_client
             .get(url)
