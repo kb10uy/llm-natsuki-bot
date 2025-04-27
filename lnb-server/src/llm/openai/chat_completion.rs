@@ -179,7 +179,6 @@ fn transform_choice(choice: ChatChoice) -> Result<LlmUpdate, LlmError> {
         }
 
         // tool_calls
-        // 先頭で抜けてるので来ないはずだけど一応
         Some(FinishReason::ToolCalls) => {
             let Some(tool_calls) = choice.message.tool_calls else {
                 // OpenRouter がたまに空で返してくるので見なかったことにする
