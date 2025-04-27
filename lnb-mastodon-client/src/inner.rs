@@ -258,7 +258,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
     /// Mastodon の `Status` を `Message` 形式に変換する。
     /// 会話復元時などに bot 自身のアカウントの投稿だった場合は `AssistantMessage` になる。
     fn transform_status(&self, status: &Status) -> Message {
-        let sanitized_mention_text = sanitize_mention_html_from_mastodon(&status.content);
+        let mut sanitized_mention_text = sanitize_mention_html_from_mastodon(&status.content);
         let language = status.language.and_then(|l| l.to_639_1()).map(|l| l.to_string());
 
         if status.account.id == self.self_account.id {
@@ -269,24 +269,38 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
             }
             .into()
         } else {
+            info!(
+                "[{}] {}: {:?} ({} attachment(s))",
+                status.id,
+                status.account.acct,
+                sanitized_mention_text,
+                status.media_attachments.len(),
+            );
             let contents = {
-                let images: Vec<_> = status
+                let image_urls: Vec<_> = status
                     .media_attachments
                     .iter()
                     .filter(|a| matches!(a.media_type, MediaType::Image | MediaType::Gifv))
-                    .map(|atch| UserMessageContent::ImageUrl(atch.preview_url.clone()))
+                    .map(|atch| atch.preview_url.clone())
                     .collect();
-                info!(
-                    "[{}] {}: {:?} ({} image(s))",
-                    status.id,
-                    status.account.acct,
-                    sanitized_mention_text,
-                    images.len()
-                );
+                let images: Vec<_> = image_urls
+                    .iter()
+                    .map(|url| UserMessageContent::ImageUrl(url.clone()))
+                    .collect();
+
+                if !image_urls.is_empty() {
+                    sanitized_mention_text.push_str("\n--------\n");
+                    sanitized_mention_text.push_str("Original Media Images:\n");
+                    for image_url in &image_urls {
+                        sanitized_mention_text.push_str(image_url.as_str());
+                        sanitized_mention_text.push('\n');
+                    }
+                }
                 once(UserMessageContent::Text(sanitized_mention_text))
                     .chain(images)
                     .collect()
             };
+
             UserMessage {
                 contents,
                 language,

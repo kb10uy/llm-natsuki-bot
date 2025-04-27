@@ -7,6 +7,7 @@ pub enum DescribedSchemaType {
     Float,
     Boolean,
     String,
+    Enum(Vec<String>),
     Array(Box<DescribedSchema>),
     Object(Vec<DescribedSchema>),
 }
@@ -47,6 +48,28 @@ impl DescribedSchema {
         }
     }
 
+    pub fn string(name: impl Into<String>, description: impl Into<String>) -> DescribedSchema {
+        DescribedSchema {
+            name: name.into(),
+            description: description.into(),
+            field_type: DescribedSchemaType::String,
+            optional: false,
+        }
+    }
+
+    pub fn string_enum(
+        name: impl Into<String>,
+        description: impl Into<String>,
+        variants: impl IntoIterator<Item = impl Into<String>>,
+    ) -> DescribedSchema {
+        DescribedSchema {
+            name: name.into(),
+            description: description.into(),
+            field_type: DescribedSchemaType::Enum(variants.into_iter().map(|s| s.into()).collect()),
+            optional: false,
+        }
+    }
+
     pub fn array(
         name: impl Into<String>,
         description: impl Into<String>,
@@ -56,15 +79,6 @@ impl DescribedSchema {
             name: name.into(),
             description: description.into(),
             field_type: DescribedSchemaType::Array(Box::new(item_schema)),
-            optional: false,
-        }
-    }
-
-    pub fn string(name: impl Into<String>, description: impl Into<String>) -> DescribedSchema {
-        DescribedSchema {
-            name: name.into(),
-            description: description.into(),
-            field_type: DescribedSchemaType::String,
             optional: false,
         }
     }

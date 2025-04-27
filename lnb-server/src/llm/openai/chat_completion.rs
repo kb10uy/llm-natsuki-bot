@@ -29,6 +29,7 @@ use lnb_core::{
         message::{Message, MessageToolCalling, UserMessageContent},
     },
 };
+use tracing::warn;
 
 /// OpenAI Chat Completion API を利用したバックエンド。
 #[derive(Debug, Clone)]
@@ -147,6 +148,7 @@ fn transform_choice(choice: ChatChoice) -> Result<LlmUpdate, LlmError> {
         // stop
         Some(FinishReason::Stop) => {
             let Some(text) = choice.message.content else {
+                warn!("no content value detected; actual value: {choice:?}");
                 return Err(LlmError::ExpectationMismatch("no content value".to_string()));
             };
             Ok(LlmUpdate::Finished(LlmAssistantResponse {
@@ -158,7 +160,15 @@ fn transform_choice(choice: ChatChoice) -> Result<LlmUpdate, LlmError> {
 
         // max_length
         Some(FinishReason::Length) => {
+            // max_token で tool_calls がカットされることがあるので、明示的に拒否する
+            if matches!(&choice.message.tool_calls, Some(v) if !v.is_empty()) {
+                return Err(LlmError::ExpectationMismatch(
+                    "tool calling was cut by length".to_string(),
+                ));
+            }
+
             let Some(text) = choice.message.content else {
+                warn!("no content value detected; actual value: {choice:?}");
                 return Err(LlmError::ExpectationMismatch("no content value".to_string()));
             };
             Ok(LlmUpdate::LengthCut(LlmAssistantResponse {
