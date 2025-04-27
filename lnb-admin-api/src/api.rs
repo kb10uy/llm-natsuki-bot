@@ -10,4 +10,5 @@ pub fn routes() -> Router<Application> {
     Router::new()
         .route("/health", get(auxiliary::health))
         .route("/conversations/count", get(conversations::count))
+        .route("/conversations/show", get(conversations::show))
 }
