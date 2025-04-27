@@ -1,4 +1,5 @@
 mod api;
+mod application;
 mod config;
 mod jwt_auth;
 
@@ -22,7 +23,7 @@ async fn main() -> Result<()> {
     let args = Arguments::parse();
     let config = load_config(&args.config).await?;
 
-    let app = {
+    let router = {
         let mut router = api::routes();
 
         // JWT Auth
@@ -34,8 +35,13 @@ async fn main() -> Result<()> {
         router
     };
 
+    let application = application::Application {
+        conversation: application::ConversationDb::connect()?,
+        reminder: application::ReminderDb::connect()?,
+    };
+
     let listener = TcpListener::bind(config.admin_api.bind_address).await?;
-    axum::serve(listener, app).await?;
+    axum::serve(listener, router.with_state(application)).await?;
     Ok(())
 }
 

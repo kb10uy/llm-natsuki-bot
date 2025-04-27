@@ -1,8 +1,10 @@
-use axum::{Router, routing::get};
-
 mod auxiliary;
 mod conversations;
 
-pub fn routes() -> Router<()> {
+use crate::application::Application;
+
+use axum::{Router, routing::get};
+
+pub fn routes() -> Router<Application> {
     Router::new().route("/health", get(auxiliary::health))
 }
