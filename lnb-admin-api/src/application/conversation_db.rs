@@ -37,12 +37,27 @@ impl ConversationDb {
         Ok(conversation)
     }
 
-    pub async fn latest_ids(&self, count: usize) -> Result<Vec<Uuid>, ApplicationError> {
-        let rows: Vec<(Uuid,)> = sqlx::query_as(r#"SELECT id FROM conversations ORDER BY id DESC LIMIT ?;"#)
-            .bind(count as i64)
-            .fetch_all(&self.pool)
-            .map_err(ApplicationError::by_backend)
-            .await?;
+    pub async fn latest_ids(&self, count: usize, max_id: Option<Uuid>) -> Result<Vec<Uuid>, ApplicationError> {
+        let max = max_id.unwrap_or(Uuid::max());
+        let rows: Vec<(Uuid,)> =
+            sqlx::query_as(r#"SELECT id FROM conversations WHERE id < ? ORDER BY id DESC LIMIT ?;"#)
+                .bind(max)
+                .bind(count as i64)
+                .fetch_all(&self.pool)
+                .map_err(ApplicationError::by_backend)
+                .await?;
+        Ok(rows.into_iter().map(|(id,)| id).collect())
+    }
+
+    pub async fn earliest_ids(&self, count: usize, min_id: Option<Uuid>) -> Result<Vec<Uuid>, ApplicationError> {
+        let min = min_id.unwrap_or(Uuid::max());
+        let rows: Vec<(Uuid,)> =
+            sqlx::query_as(r#"SELECT id FROM conversations WHERE id > ? ORDER BY id ASC LIMIT ?;"#)
+                .bind(min)
+                .bind(count as i64)
+                .fetch_all(&self.pool)
+                .map_err(ApplicationError::by_backend)
+                .await?;
         Ok(rows.into_iter().map(|(id,)| id).collect())
     }
 }

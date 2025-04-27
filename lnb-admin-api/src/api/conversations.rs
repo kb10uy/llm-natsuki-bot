@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
+const FETCH_COUNT_DEFAULT: usize = 20;
 const FETCH_COUNT_MAX: usize = 50;
 
 #[derive(Debug, Serialize)]
@@ -37,7 +38,9 @@ pub async fn show(
 
 #[derive(Debug, Deserialize)]
 pub struct LatestIdsRequest {
-    count: usize,
+    count: Option<usize>,
+    max_id: Option<Uuid>,
+    min_id: Option<Uuid>,
 }
 #[derive(Debug, Serialize)]
 pub struct LatestIdsResponseItem {
@@ -49,9 +52,23 @@ pub async fn latest_ids(
     State(state): State<Application>,
     request: Query<LatestIdsRequest>,
 ) -> Result<Json<Vec<LatestIdsResponseItem>>, ApiError> {
-    let fetching_count = request.count.min(FETCH_COUNT_MAX);
-    let ids = state.conversation.latest_ids(fetching_count).await?;
-    let response_items: Result<Vec<_>, ApiError> = ids
+    let fetching_count = request.count.unwrap_or(FETCH_COUNT_DEFAULT).min(FETCH_COUNT_MAX);
+    let fetched_ids = match (request.min_id, request.max_id) {
+        // 降順
+        (None, Some(max)) => state.conversation.latest_ids(fetching_count, Some(max)).await?,
+        (None, None) => state.conversation.latest_ids(fetching_count, None).await?,
+
+        // 昇順
+        (Some(min), None) => {
+            let mut ids = state.conversation.earliest_ids(fetching_count, Some(min)).await?;
+            ids.reverse();
+            ids
+        }
+
+        (Some(_), Some(_)) => return Err(ApiError::InvalidRequest("max_id and min_id are exclusive".to_string())),
+    };
+
+    let response_items: Result<Vec<_>, ApiError> = fetched_ids
         .into_iter()
         .map(|id| {
             let (timestamp, _) = id
