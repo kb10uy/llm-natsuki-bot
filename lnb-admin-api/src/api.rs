@@ -1,6 +1,7 @@
 mod auxiliary;
 mod conversations;
 mod error;
+mod reminders;
 
 use crate::application::Application;
 
@@ -12,4 +13,5 @@ pub fn routes() -> Router<Application> {
         .route("/conversations/count", get(conversations::count))
         .route("/conversations/show", get(conversations::show))
         .route("/conversations/latest_ids", get(conversations::latest_ids))
+        .route("/reminders/count", get(reminders::count))
 }
