@@ -36,8 +36,8 @@ async fn main() -> Result<()> {
     };
 
     let application = application::Application {
-        conversation: application::ConversationDb::connect()?,
-        reminder: application::ReminderDb::connect()?,
+        conversation: application::ConversationDb::connect(&config.storage.sqlite).await?,
+        reminder: application::ReminderDb::connect(&config.reminder.redis_address).await?,
     };
 
     let listener = TcpListener::bind(config.admin_api.bind_address).await?;
