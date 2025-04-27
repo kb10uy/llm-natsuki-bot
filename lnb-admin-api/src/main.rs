@@ -5,7 +5,6 @@ mod jwt_auth;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use axum::{Router, routing::get};
 use clap::Parser;
 use tokio::{fs::read_to_string, net::TcpListener};
 use tracing::info;
@@ -24,7 +23,7 @@ async fn main() -> Result<()> {
     let config = load_config(&args.config).await?;
 
     let app = {
-        let mut router = routes();
+        let mut router = api::routes();
 
         // JWT Auth
         if let Some(auth_config) = config.admin_api.jwt_auth {
@@ -38,10 +37,6 @@ async fn main() -> Result<()> {
     let listener = TcpListener::bind(config.admin_api.bind_address).await?;
     axum::serve(listener, app).await?;
     Ok(())
-}
-
-fn routes() -> Router<()> {
-    Router::new().route("/health", get(api::health))
 }
 
 async fn load_config(path: impl AsRef<Path>) -> Result<config::Config> {

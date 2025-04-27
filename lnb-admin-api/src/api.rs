@@ -1,7 +1,8 @@
-use axum::{Extension, response::IntoResponse};
+use axum::{Router, routing::get};
 
-use crate::jwt_auth::JwtClaims;
+mod auxiliary;
+mod conversations;
 
-pub async fn health(Extension(claims): Extension<JwtClaims>) -> impl IntoResponse {
-    format!("Authenticated. Hello, {} ! (sub: {})", claims.email, claims.sub)
+pub fn routes() -> Router<()> {
+    Router::new().route("/health", get(auxiliary::health))
 }
