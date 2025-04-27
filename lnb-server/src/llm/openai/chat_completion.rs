@@ -144,6 +144,23 @@ fn transform_tools(descriptors: &[&FunctionDescriptor]) -> Vec<ChatCompletionToo
 }
 
 fn transform_choice(choice: ChatChoice) -> Result<LlmUpdate, LlmError> {
+    // Reason 関係なく tool_calls が埋まることがあるので先頭で判定する
+    let tool_calls = choice.message.tool_calls.clone().unwrap_or_default();
+    if !tool_calls.is_empty() {
+        let converted_calls: Result<_, _> = tool_calls
+            .into_iter()
+            .map(|c| {
+                let arguments = serde_json::from_str(&c.function.arguments).map_err(LlmError::by_format)?;
+                Ok(MessageToolCalling {
+                    id: c.id,
+                    name: c.function.name,
+                    arguments,
+                })
+            })
+            .collect();
+        return Ok(LlmUpdate::ToolCalling(converted_calls?));
+    }
+
     match choice.finish_reason {
         // stop
         Some(FinishReason::Stop) => {
@@ -172,24 +189,8 @@ fn transform_choice(choice: ChatChoice) -> Result<LlmUpdate, LlmError> {
         }
 
         // tool_calls
-        Some(FinishReason::ToolCalls) => {
-            let Some(tool_calls) = choice.message.tool_calls else {
-                // OpenRouter がたまに空で返してくるので見なかったことにする
-                return Ok(LlmUpdate::ToolCalling(vec![]));
-            };
-            let converted_calls: Result<_, _> = tool_calls
-                .into_iter()
-                .map(|c| {
-                    let arguments = serde_json::from_str(&c.function.arguments).map_err(LlmError::by_format)?;
-                    Ok(MessageToolCalling {
-                        id: c.id,
-                        name: c.function.name,
-                        arguments,
-                    })
-                })
-                .collect();
-            Ok(LlmUpdate::ToolCalling(converted_calls?))
-        }
+        // 先頭で抜けてるので来ないはずだけど一応
+        Some(FinishReason::ToolCalls) => Ok(LlmUpdate::ToolCalling(vec![])),
 
         // content_filter
         Some(FinishReason::ContentFilter) => Ok(LlmUpdate::Filtered),
