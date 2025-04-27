@@ -1,4 +1,7 @@
-use crate::{api::error::ApiError, application::Application};
+use crate::{
+    api::error::ApiError,
+    application::{Application, ApplicationError},
+};
 
 use axum::{
     Json,
@@ -6,7 +9,10 @@ use axum::{
 };
 use lnb_core::model::conversation::Conversation;
 use serde::{Deserialize, Serialize};
+use time::OffsetDateTime;
 use uuid::Uuid;
+
+const FETCH_COUNT_MAX: usize = 50;
 
 #[derive(Debug, Serialize)]
 pub struct CountResponse {
@@ -18,7 +24,6 @@ pub async fn count(State(state): State<Application>) -> Result<Json<CountRespons
 }
 
 #[derive(Debug, Deserialize)]
-
 pub struct ShowRequest {
     id: Uuid,
 }
@@ -28,4 +33,35 @@ pub async fn show(
 ) -> Result<Json<Conversation>, ApiError> {
     let conversation = state.conversation.show(request.id).await?;
     Ok(Json(conversation))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct LatestIdsRequest {
+    count: usize,
+}
+#[derive(Debug, Serialize)]
+pub struct LatestIdsResponseItem {
+    id: Uuid,
+    #[serde(with = "time::serde::rfc3339")]
+    created_at: OffsetDateTime,
+}
+pub async fn latest_ids(
+    State(state): State<Application>,
+    request: Query<LatestIdsRequest>,
+) -> Result<Json<Vec<LatestIdsResponseItem>>, ApiError> {
+    let fetching_count = request.count.min(FETCH_COUNT_MAX);
+    let ids = state.conversation.latest_ids(fetching_count).await?;
+    let response_items: Result<Vec<_>, ApiError> = ids
+        .into_iter()
+        .map(|id| {
+            let (timestamp, _) = id
+                .get_timestamp()
+                .ok_or_else(|| ApplicationError::Serialization("invalid ID".into()))?
+                .to_unix();
+            let created_at =
+                OffsetDateTime::from_unix_timestamp(timestamp as i64).map_err(ApplicationError::by_serialization)?;
+            Ok(LatestIdsResponseItem { id, created_at })
+        })
+        .collect();
+    Ok(Json(response_items?))
 }

@@ -15,7 +15,7 @@ pub enum ApplicationError {
 
 impl ApplicationError {
     pub fn by_serialization(source: impl Into<ErasedError>) -> ApplicationError {
-        ApplicationError::Backend(source.into())
+        ApplicationError::Serialization(source.into())
     }
 
     pub fn by_backend(source: impl Into<ErasedError>) -> ApplicationError {

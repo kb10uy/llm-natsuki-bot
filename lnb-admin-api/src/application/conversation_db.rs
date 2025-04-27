@@ -36,6 +36,15 @@ impl ConversationDb {
         let conversation = serde_json::from_slice(&row.content).map_err(ApplicationError::by_serialization)?;
         Ok(conversation)
     }
+
+    pub async fn latest_ids(&self, count: usize) -> Result<Vec<Uuid>, ApplicationError> {
+        let rows: Vec<(Uuid,)> = sqlx::query_as(r#"SELECT id FROM conversations ORDER BY id DESC LIMIT ?;"#)
+            .bind(count as i64)
+            .fetch_all(&self.pool)
+            .map_err(ApplicationError::by_backend)
+            .await?;
+        Ok(rows.into_iter().map(|(id,)| id).collect())
+    }
 }
 
 #[derive(Debug, Clone, FromRow)]

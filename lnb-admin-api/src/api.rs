@@ -11,4 +11,5 @@ pub fn routes() -> Router<Application> {
         .route("/health", get(auxiliary::health))
         .route("/conversations/count", get(conversations::count))
         .route("/conversations/show", get(conversations::show))
+        .route("/conversations/latest_ids", get(conversations::latest_ids))
 }
