@@ -15,4 +15,12 @@ impl ConversationDb {
             .await?;
         Ok(ConversationDb { pool })
     }
+
+    pub async fn count(&self) -> Result<usize, ApplicationError> {
+        let count: (u64,) = sqlx::query_as(r#""#)
+            .fetch_one(&self.pool)
+            .map_err(ApplicationError::by_backend)
+            .await?;
+        Ok(count.0 as usize)
+    }
 }
