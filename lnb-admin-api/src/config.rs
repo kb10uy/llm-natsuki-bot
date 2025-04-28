@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, path::PathBuf};
+use std::net::SocketAddr;
 
 use serde::Deserialize;
 use url::Url;
@@ -6,8 +6,6 @@ use url::Url;
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
     pub admin_api: ConfigAdminApi,
-    pub storage: ConfigStorage,
-    pub reminder: ConfigReminder,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -28,19 +26,4 @@ pub struct ConfigAdminApiJwtAuth {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ConfigAdminApiCors {
     pub allowed_origins: Vec<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ConfigStorage {
-    pub sqlite: ConfigStorageSqlite,
-}
-
-#[derive(Debug, Clone, Deserialize, Default)]
-pub struct ConfigStorageSqlite {
-    pub filepath: PathBuf,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ConfigReminder {
-    pub redis_address: String,
 }

@@ -1,13 +1,7 @@
-mod conversation_db;
-mod error;
-mod reminder_db;
-
-pub use conversation_db::ConversationDb;
-pub use error::ApplicationError;
-pub use reminder_db::ReminderDb;
+use lnb_common::persistence::{RedisReminderDb, SqliteConversationDb};
 
 #[derive(Debug, Clone)]
 pub struct Application {
-    pub conversation: ConversationDb,
-    pub reminder: ReminderDb,
+    pub conversation: SqliteConversationDb,
+    pub reminder: RedisReminderDb,
 }

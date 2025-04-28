@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use clap::Parser;
+use lnb_common::persistence::{RedisReminderDb, SqliteConversationDb};
 use tokio::{fs::read_to_string, net::TcpListener};
 
 #[derive(Debug, Clone, Parser)]
@@ -23,8 +24,8 @@ async fn main() -> Result<()> {
     let config = load_config(&args.config).await?;
 
     let application = application::Application {
-        conversation: application::ConversationDb::connect(&config.storage.sqlite).await?,
-        reminder: application::ReminderDb::connect(&config.reminder.redis_address).await?,
+        conversation: SqliteConversationDb::connect(&config.storage).await?,
+        reminder: RedisReminderDb::connect(&config.reminder.redis_address).await?,
     };
     let app_service = api::routes(&config.admin_api).with_state(application);
 
