@@ -8,8 +8,6 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use clap::Parser;
 use tokio::{fs::read_to_string, net::TcpListener};
-use tower_http::cors::CorsLayer;
-use tracing::info;
 
 #[derive(Debug, Clone, Parser)]
 #[clap(author, version)]
@@ -24,32 +22,14 @@ async fn main() -> Result<()> {
     let args = Arguments::parse();
     let config = load_config(&args.config).await?;
 
-    let router = {
-        let mut router = api::routes();
-
-        // JWT Auth
-        if let Some(auth_config) = config.admin_api.jwt_auth {
-            router = router.layer(jwt_auth::JwtAuthLayer::new(auth_config));
-            info!("JWT authentication enabled");
-        }
-        // CORS
-        if let Some(cors_config) = config.admin_api.cors {
-            let header_origin: Result<Vec<_>, _> = cors_config.allowed_origins.into_iter().map(|o| o.parse()).collect();
-            let cors_layer = CorsLayer::new().allow_origin(header_origin?).allow_credentials(true);
-            router = router.layer(cors_layer);
-            info!("CORS setting applied");
-        }
-
-        router
-    };
-
     let application = application::Application {
         conversation: application::ConversationDb::connect(&config.storage.sqlite).await?,
         reminder: application::ReminderDb::connect(&config.reminder.redis_address).await?,
     };
+    let app_service = api::routes(&config.admin_api).with_state(application);
 
     let listener = TcpListener::bind(config.admin_api.bind_address).await?;
-    axum::serve(listener, router.with_state(application)).await?;
+    axum::serve(listener, app_service).await?;
     Ok(())
 }
 
