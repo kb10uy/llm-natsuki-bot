@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use clap::Parser;
 use tokio::{fs::read_to_string, net::TcpListener};
+use tower_http::cors::CorsLayer;
 use tracing::info;
 
 #[derive(Debug, Clone, Parser)]
@@ -30,6 +31,13 @@ async fn main() -> Result<()> {
         if let Some(auth_config) = config.admin_api.jwt_auth {
             router = router.layer(jwt_auth::JwtAuthLayer::new(auth_config));
             info!("JWT authentication enabled");
+        }
+        // CORS
+        if let Some(cors_config) = config.admin_api.cors {
+            let header_origin: Result<Vec<_>, _> = cors_config.allowed_origins.into_iter().map(|o| o.parse()).collect();
+            let cors_layer = CorsLayer::new().allow_origin(header_origin?).allow_credentials(true);
+            router = router.layer(cors_layer);
+            info!("CORS setting applied");
         }
 
         router

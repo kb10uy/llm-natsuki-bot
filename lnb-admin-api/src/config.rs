@@ -14,6 +14,7 @@ pub struct Config {
 pub struct ConfigAdminApi {
     pub bind_address: SocketAddr,
     pub jwt_auth: Option<ConfigAdminApiJwtAuth>,
+    pub cors: Option<ConfigAdminApiCors>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -22,6 +23,11 @@ pub struct ConfigAdminApiJwtAuth {
     pub jwks_url: Url,
     pub audience: String,
     pub allowed_subjects: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ConfigAdminApiCors {
+    pub allowed_origins: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
