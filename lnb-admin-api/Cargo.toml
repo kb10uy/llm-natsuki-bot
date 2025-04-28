@@ -27,3 +27,4 @@ uuid = { workspace = true }
 axum = "0.8.3"
 jsonwebtoken = "9.3.1"
 tower = "0.5.2"
+tower-http = { version = "0.6.2", features = ["cors"] }

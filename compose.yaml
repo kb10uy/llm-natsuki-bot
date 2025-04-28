@@ -1,6 +1,7 @@
 services:
   bot:
     build:
+      dockerfile: "./docker/Dockerfile.lnb-server"
       context: "."
       args:
         GIT_COMMIT_HASH: "unknown"
@@ -8,6 +9,21 @@ services:
     environment:
       TZ: "Asia/Tokyo"
       RUST_LOG: "warn,lnb_server=info,lnb_mastodon_client=info,lnb_discord_client=info"
+    volumes:
+      - "./data:/data"
+    depends_on:
+      - "valkey"
+
+  api:
+    build:
+      dockerfile: "./docker/Dockerfile.lnb-admin-api"
+      context: "."
+      args:
+        GIT_COMMIT_HASH: "unknown"
+    stop_grace_period: "2s"
+    environment:
+      TZ: "Asia/Tokyo"
+      RUST_LOG: "warn,lnb_admin_api=info"
     volumes:
       - "./data:/data"
     depends_on:

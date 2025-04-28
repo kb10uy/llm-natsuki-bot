@@ -1,14 +1,13 @@
 mod api;
+mod application;
 mod config;
 mod jwt_auth;
 
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use axum::{Router, routing::get};
 use clap::Parser;
 use tokio::{fs::read_to_string, net::TcpListener};
-use tracing::info;
 
 #[derive(Debug, Clone, Parser)]
 #[clap(author, version)]
@@ -23,25 +22,15 @@ async fn main() -> Result<()> {
     let args = Arguments::parse();
     let config = load_config(&args.config).await?;
 
-    let app = {
-        let mut router = routes();
-
-        // JWT Auth
-        if let Some(auth_config) = config.admin_api.jwt_auth {
-            router = router.layer(jwt_auth::JwtAuthLayer::new(auth_config));
-            info!("JWT authentication enabled");
-        }
-
-        router
+    let application = application::Application {
+        conversation: application::ConversationDb::connect(&config.storage.sqlite).await?,
+        reminder: application::ReminderDb::connect(&config.reminder.redis_address).await?,
     };
+    let app_service = api::routes(&config.admin_api).with_state(application);
 
     let listener = TcpListener::bind(config.admin_api.bind_address).await?;
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app_service).await?;
     Ok(())
-}
-
-fn routes() -> Router<()> {
-    Router::new().route("/health", get(api::health))
 }
 
 async fn load_config(path: impl AsRef<Path>) -> Result<config::Config> {
