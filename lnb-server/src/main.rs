@@ -74,11 +74,6 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn load_config(path: impl AsRef<Path>) -> Result<Config> {
-    let config_str = read_to_string(path).await.context("failed to read config file")?;
-    serde_json::from_str(&config_str).context("failed to parse config")
-}
-
 async fn initialize_natsuki(config: &Config) -> Result<(Natsuki, Shiyu)> {
     // Reminder
     let shiyu = Shiyu::new(&config.reminder).await?;

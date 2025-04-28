@@ -1,12 +1,10 @@
-use crate::{
-    api::error::ApiError,
-    application::{Application, ApplicationError},
-};
+use crate::{api::error::ApiError, application::Application};
 
 use axum::{
     Json,
     extract::{Query, State},
 };
+use lnb_common::persistence::PersistenceError;
 use lnb_core::model::conversation::Conversation;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
@@ -73,10 +71,10 @@ pub async fn latest_ids(
         .map(|id| {
             let (timestamp, _) = id
                 .get_timestamp()
-                .ok_or_else(|| ApplicationError::Serialization("invalid ID".into()))?
+                .ok_or_else(|| PersistenceError::Serialization("invalid ID".into()))?
                 .to_unix();
             let created_at =
-                OffsetDateTime::from_unix_timestamp(timestamp as i64).map_err(ApplicationError::by_serialization)?;
+                OffsetDateTime::from_unix_timestamp(timestamp as i64).map_err(PersistenceError::by_serialization)?;
             Ok(LatestIdsResponseItem { id, created_at })
         })
         .collect();

@@ -4,11 +4,6 @@ use serde::Deserialize;
 use url::Url;
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct Config {
-    pub admin_api: ConfigAdminApi,
-}
-
-#[derive(Debug, Clone, Deserialize)]
 pub struct ConfigAdminApi {
     pub bind_address: SocketAddr,
     pub jwt_auth: Option<ConfigAdminApiJwtAuth>,
