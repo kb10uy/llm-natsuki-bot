@@ -1626,6 +1626,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lnb-common"
+version = "0.12.0"
+dependencies = [
+ "lnb-daily-private",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "lnb-core"
 version = "0.12.0"
 dependencies = [
@@ -1657,6 +1666,7 @@ dependencies = [
  "clap",
  "futures",
  "infer",
+ "lnb-common",
  "lnb-core",
  "markdown",
  "regex",
@@ -1683,6 +1693,7 @@ dependencies = [
  "futures",
  "html2md",
  "infer",
+ "lnb-common",
  "lnb-core",
  "markdown",
  "mastodon-async",
@@ -1710,6 +1721,7 @@ dependencies = [
  "clap",
  "futures",
  "infer",
+ "lnb-common",
  "lnb-core",
  "lnb-daily-private",
  "lnb-discord-client",

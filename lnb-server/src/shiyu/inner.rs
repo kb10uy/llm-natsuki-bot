@@ -1,8 +1,9 @@
+use crate::shiyu::worker::Worker;
+
 use std::{collections::HashMap, sync::Arc};
 
-use crate::shiyu::{ReminderConfig, worker::Worker};
-
 use futures::{FutureExt, TryFutureExt, future::BoxFuture, select};
+use lnb_common::config::reminder::ConfigReminder;
 use lnb_core::{
     error::ReminderError,
     interface::{
@@ -44,7 +45,7 @@ struct ShiyuJob {
 }
 
 impl ShiyuInner {
-    pub async fn new(config: &ReminderConfig) -> Result<ShiyuInner, ReminderError> {
+    pub async fn new(config: &ConfigReminder) -> Result<ShiyuInner, ReminderError> {
         let worker = Worker::connect(&config.redis_address).await?;
 
         Ok(ShiyuInner {

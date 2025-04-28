@@ -1,11 +1,12 @@
 use crate::{
-    CONTEXT_KEY_PREFIX, MastodonLnbClientConfig,
+    CONTEXT_KEY_PREFIX,
     text::{sanitize_markdown_for_mastodon, sanitize_mention_html_from_mastodon},
 };
 
 use std::{collections::HashMap, iter::once, sync::Arc, time::Duration};
 
 use futures::prelude::*;
+use lnb_common::config::client::ConfigClientMastodon;
 use lnb_core::{
     APP_USER_AGENT, DebugOptionValue,
     error::ClientError,
@@ -43,7 +44,7 @@ pub struct MastodonLnbClientInner<S> {
 
 impl<S: LnbServer> MastodonLnbClientInner<S> {
     pub async fn new(
-        config: &MastodonLnbClientConfig,
+        config: &ConfigClientMastodon,
         debug_options: &HashMap<String, DebugOptionValue>,
         assistant: S,
     ) -> Result<MastodonLnbClientInner<S>, ClientError> {

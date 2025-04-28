@@ -1,8 +1,7 @@
-use crate::config::AppConfigStorageSqlite;
-
 use std::sync::Arc;
 
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
+use lnb_common::config::storage::ConfigStorageSqlite;
 use lnb_core::{
     error::StorageError,
     interface::storage::ConversationStorage,
@@ -15,7 +14,7 @@ use uuid::Uuid;
 pub struct SqliteConversationStorage(Arc<SqliteConversationStorageInner>);
 
 impl SqliteConversationStorage {
-    pub async fn new(config: &AppConfigStorageSqlite) -> Result<SqliteConversationStorage, StorageError> {
+    pub async fn new(config: &ConfigStorageSqlite) -> Result<SqliteConversationStorage, StorageError> {
         let pool = SqlitePool::connect(&config.filepath.to_string_lossy())
             .map_err(StorageError::by_backend)
             .await?;

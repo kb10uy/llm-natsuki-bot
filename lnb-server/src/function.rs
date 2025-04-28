@@ -5,10 +5,10 @@ mod image_generator;
 mod local_info;
 mod self_info;
 
-pub use daily_private::{DailyPrivate, DailyPrivateConfig};
-pub use exchange_rate::{ExchangeRate, ExchangeRateConfig};
-pub use get_illust_url::{GetIllustUrl, GetIllustUrlConfig};
-pub use image_generator::{ImageGenerator, ImageGeneratorConfig};
+pub use daily_private::DailyPrivate;
+pub use exchange_rate::ExchangeRate;
+pub use get_illust_url::GetIllustUrl;
+pub use image_generator::ImageGenerator;
 pub use local_info::LocalInfo;
 pub use self_info::SelfInfo;
 

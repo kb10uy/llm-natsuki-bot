@@ -1,10 +1,9 @@
 mod claude;
 mod openai;
 
-use crate::config::{AppConfigLlmBackend, AppConfigLlmModel};
-
 use std::{collections::HashMap, sync::LazyLock};
 
+use lnb_common::config::llm::{ConfigLlmBackend, ConfigLlmModel};
 use lnb_core::{
     error::LlmError,
     interface::llm::ArcLlm,
@@ -28,9 +27,9 @@ pub static ASSISTANT_RESPONSE_SCHEMA: LazyLock<DescribedSchema> = LazyLock::new(
     )
 });
 
-pub async fn create_llm(config: AppConfigLlmModel) -> Result<ArcLlm, LlmError> {
+pub async fn create_llm(config: ConfigLlmModel) -> Result<ArcLlm, LlmError> {
     match config.backend {
-        AppConfigLlmBackend::Openai => openai::create_openai_llm(config.config).await,
+        ConfigLlmBackend::Openai => openai::create_openai_llm(config.config).await,
     }
 }
 

@@ -3,6 +3,7 @@ mod inner;
 mod worker;
 
 pub use function::ShiyuProvider;
+use lnb_common::config::reminder::ConfigReminder;
 
 use std::sync::Arc;
 
@@ -14,22 +15,14 @@ use lnb_core::{
         server::LnbServer,
     },
 };
-use serde::Deserialize;
 use time::OffsetDateTime;
 use uuid::Uuid;
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ReminderConfig {
-    redis_address: String,
-    max_seconds: i64,
-    notification_virtual_text: String,
-}
 
 #[derive(Clone)]
 pub struct Shiyu(Arc<inner::ShiyuInner>);
 
 impl Shiyu {
-    pub async fn new(config: &ReminderConfig) -> Result<Shiyu, ReminderError> {
+    pub async fn new(config: &ConfigReminder) -> Result<Shiyu, ReminderError> {
         let inner = inner::ShiyuInner::new(config).await?;
         Ok(Shiyu(Arc::new(inner)))
     }

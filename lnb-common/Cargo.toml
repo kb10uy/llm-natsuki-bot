@@ -1,0 +1,12 @@
+[package]
+name = "lnb-common"
+version.workspace = true
+description.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[dependencies]
+lnb-daily-private = { workspace = true }
+
+serde = { workspace = true }
+serde_json = { workspace = true }

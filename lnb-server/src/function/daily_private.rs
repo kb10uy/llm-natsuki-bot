@@ -1,6 +1,7 @@
 use crate::function::ConfigurableSimpleFunction;
 
 use futures::{FutureExt, future::BoxFuture};
+use lnb_common::config::tools::ConfigToolsDailyPrivate;
 use lnb_core::{
     error::FunctionError,
     interface::function::{FunctionDescriptor, FunctionResponse, simple::SimpleFunction},
@@ -14,7 +15,7 @@ use lnb_daily_private::{
     underwear::{UnderwearConfiguration, UnderwearStatus},
 };
 use rand::prelude::*;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use time::{
@@ -25,25 +26,6 @@ use time::{
 use tracing::info;
 
 const TIME_FORMAT: &[BorrowedFormatItem<'static>] = format_description!("[hour]:[minute]:[second]");
-
-// TOML は Time だけを書けるが toml::Time は from str しかできないので TomlDateTime で拾う
-#[derive(Debug, Clone, Deserialize)]
-pub struct DailyPrivateConfig {
-    daily_rng_salt: String,
-    day_routine: DailyPrivateConfigDayRoutine,
-    underwear: UnderwearConfiguration,
-    masturbation: MasturbationConfiguration,
-    menstruation: MenstruationConfiguration,
-    temperature: TemperatureConfiguration,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct DailyPrivateConfigDayRoutine {
-    morning_start: String,
-    morning_preparation_minutes: usize,
-    night_start: String,
-    bathtime_minutes: usize,
-}
 
 #[derive(Debug, Clone, Serialize)]
 struct DailyPrivateInfo {
@@ -68,9 +50,9 @@ pub struct DailyPrivate {
 impl ConfigurableSimpleFunction for DailyPrivate {
     const NAME: &'static str = stringify!(DailyPrivate);
 
-    type Configuration = DailyPrivateConfig;
+    type Configuration = ConfigToolsDailyPrivate;
 
-    async fn configure(config: &DailyPrivateConfig) -> Result<Self, FunctionError> {
+    async fn configure(config: &ConfigToolsDailyPrivate) -> Result<Self, FunctionError> {
         let day_routine = DayRoutineConfiguration {
             daytime_start_at: Time::parse(&config.day_routine.morning_start, TIME_FORMAT)
                 .map_err(FunctionError::by_serialization)?,

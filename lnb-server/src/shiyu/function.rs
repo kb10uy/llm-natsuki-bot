@@ -1,6 +1,5 @@
-use crate::shiyu::ReminderConfig;
-
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
+use lnb_common::config::reminder::ConfigReminder;
 use lnb_core::{
     error::FunctionError,
     interface::{
@@ -79,7 +78,7 @@ impl ComplexFunction for ShiyuProvider {
 }
 
 impl ShiyuProvider {
-    pub async fn new(config: &ReminderConfig, reminder: impl Reminder) -> Result<ShiyuProvider, FunctionError> {
+    pub async fn new(config: &ConfigReminder, reminder: impl Reminder) -> Result<ShiyuProvider, FunctionError> {
         Ok(ShiyuProvider {
             reminder: Box::new(reminder),
             max_seconds: config.max_seconds,
