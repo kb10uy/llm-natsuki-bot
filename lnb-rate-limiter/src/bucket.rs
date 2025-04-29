@@ -79,11 +79,17 @@ mod tests {
             assert!(bucket.try_increment(now, 10));
             println!("window count: {}", bucket.weighted_count(now));
         }
-
         // 入れられない
         assert!(!bucket.try_increment(now, 10));
 
+        // 次ウィンドウの中間地点では 5 回呼べる
         let next_window_now = now + Duration::seconds(90);
-        assert!(bucket.try_increment(next_window_now, 10));
+        for i in 1..=5 {
+            println!("increment {i}(th)");
+            assert!(bucket.try_increment(next_window_now, 10));
+            println!("window count: {}", bucket.weighted_count(now));
+        }
+        // 入れられない
+        assert!(!bucket.try_increment(next_window_now, 10));
     }
 }
