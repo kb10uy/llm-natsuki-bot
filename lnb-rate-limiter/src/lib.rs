@@ -1,6 +1,8 @@
 mod bucket;
 mod rate;
 
+pub use rate::{Rate, RateFilter};
+
 use std::{collections::HashMap, sync::Arc};
 
 use time::UtcDateTime;
@@ -14,13 +16,13 @@ pub enum Rated {
 
 #[derive(Debug, Clone)]
 pub struct RateLimiter {
-    default_rate: rate::Rate,
-    filters: Arc<[rate::RateFilter]>,
+    default_rate: Rate,
+    filters: Arc<[RateFilter]>,
     buckets: Arc<Mutex<HashMap<String, bucket::Bucket>>>,
 }
 
 impl RateLimiter {
-    pub fn new(default_rate: rate::Rate, filters: impl IntoIterator<Item = rate::RateFilter>) -> RateLimiter {
+    pub fn new(default_rate: Rate, filters: impl IntoIterator<Item = RateFilter>) -> RateLimiter {
         RateLimiter {
             default_rate,
             filters: filters.into_iter().collect(),
@@ -40,9 +42,9 @@ impl RateLimiter {
     pub async fn check(&self, now: UtcDateTime, key: impl Into<String>) -> Rated {
         let key = key.into();
         let (rate_duration, rate_count) = match self.find_rate(&key) {
-            rate::Rate::Limited { duration, count } => (*duration, *count),
-            rate::Rate::Unlimited => return Rated::Success,
-            rate::Rate::Prohibited => return Rated::Failure,
+            Rate::Limited { duration, count } => (*duration, *count),
+            Rate::Unlimited => return Rated::Success,
+            Rate::Prohibited => return Rated::Failure,
         };
 
         let mut locked_buckets = self.buckets.lock().await;
@@ -58,7 +60,7 @@ impl RateLimiter {
         }
     }
 
-    fn find_rate(&self, key: &str) -> &rate::Rate {
+    fn find_rate(&self, key: &str) -> &Rate {
         self.filters
             .iter()
             .find_map(|f| f.matches(key))
