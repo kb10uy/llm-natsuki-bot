@@ -36,7 +36,7 @@ impl Bucket {
         let current_covering_duration = now - current_start;
         let current_covering_ratio = current_covering_duration / self.duration;
 
-        (1.0 - current_covering_ratio) * self.previous_count as f64 + current_covering_ratio * self.current_count as f64
+        (1.0 - current_covering_ratio) * self.previous_count as f64 + self.current_count as f64
     }
 
     fn ensure_rotated(&mut self, now: UtcDateTime) {
@@ -58,5 +58,32 @@ impl Bucket {
             self.current_count = 0;
             self.previous_start += self.duration;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use time::{Duration, macros::utc_datetime};
+
+    use super::Bucket;
+
+    #[test]
+    fn bucket_counts() {
+        let now = utc_datetime!(2025-04-01 00:00);
+        let duration = Duration::seconds(60);
+        let mut bucket = Bucket::new_from_now(now, duration);
+
+        // 上限まで入れられる
+        for i in 1..=10 {
+            println!("increment {i}(th)");
+            assert!(bucket.try_increment(now, 10));
+            println!("window count: {}", bucket.weighted_count(now));
+        }
+
+        // 入れられない
+        assert!(!bucket.try_increment(now, 10));
+
+        let next_window_now = now + Duration::seconds(90);
+        assert!(bucket.try_increment(next_window_now, 10));
     }
 }
