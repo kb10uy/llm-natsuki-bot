@@ -3,9 +3,10 @@ mod conversations;
 mod error;
 mod reminders;
 
-use crate::{application::Application, config::ConfigAdminApi, jwt_auth::JwtAuthLayer};
+use crate::{application::Application, jwt_auth::JwtAuthLayer};
 
 use axum::{Router, routing::get};
+use lnb_common::config::admin_api::ConfigAdminApi;
 use tower_http::cors::CorsLayer;
 use tracing::info;
 

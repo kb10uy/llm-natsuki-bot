@@ -3,6 +3,7 @@ use crate::function::ConfigurableSimpleFunction;
 use std::collections::HashMap;
 
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
+use lnb_common::config::tools::ConfigToolsExchangeRate;
 use lnb_core::{
     APP_USER_AGENT, RFC3339_NUMOFFSET,
     error::FunctionError,
@@ -19,12 +20,6 @@ const API_RESPONSE_DATETIME: &[BorrowedFormatItem<'static>] = format_description
     "[weekday repr:short], [day] [month repr:short] [year] [hour]:[minute]:[second] [offset_hour sign:mandatory][offset_minute]"
 );
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct ExchangeRateConfig {
-    pub endpoint: String,
-    pub token: String,
-}
-
 #[derive(Debug)]
 pub struct ExchangeRate {
     client: Client,
@@ -34,9 +29,9 @@ pub struct ExchangeRate {
 impl ConfigurableSimpleFunction for ExchangeRate {
     const NAME: &'static str = stringify!(ExchangeRate);
 
-    type Configuration = ExchangeRateConfig;
+    type Configuration = ConfigToolsExchangeRate;
 
-    async fn configure(config: &ExchangeRateConfig) -> Result<ExchangeRate, FunctionError> {
+    async fn configure(config: &ConfigToolsExchangeRate) -> Result<ExchangeRate, FunctionError> {
         let client = ClientBuilder::new()
             .user_agent(APP_USER_AGENT)
             .build()

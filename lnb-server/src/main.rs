@@ -1,6 +1,5 @@
 mod bang_command;
 mod cli;
-mod config;
 mod function;
 mod llm;
 mod natsuki;
@@ -9,7 +8,6 @@ mod storage;
 
 use crate::{
     bang_command::initialize_bang_command,
-    config::{AppConfig, AppConfigTools},
     function::{
         ConfigurableSimpleFunction, DailyPrivate, ExchangeRate, GetIllustUrl, ImageGenerator, LocalInfo, SelfInfo,
     },
@@ -18,11 +16,12 @@ use crate::{
     storage::initialize_storage,
 };
 
-use std::{collections::HashMap, path::Path, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
-use anyhow::{Context as _, Result};
+use anyhow::Result;
 use clap::Parser;
 use futures::future::{join, join_all};
+use lnb_common::config::{Config, load_config, tools::ConfigTools};
 use lnb_core::interface::{
     client::LnbClient,
     function::{complex::ArcComplexFunction, simple::ArcSimpleFunction},
@@ -30,7 +29,7 @@ use lnb_core::interface::{
 };
 use lnb_discord_client::DiscordLnbClient;
 use lnb_mastodon_client::MastodonLnbClient;
-use tokio::{fs::read_to_string, spawn};
+use tokio::spawn;
 use tracing::info;
 
 #[tokio::main]
@@ -38,7 +37,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let args = cli::Arguments::parse();
     let debug_options: HashMap<_, _> = args.debug_options.into_iter().collect();
-    let config = load_config(args.config).await?;
+    let config = load_config(args.config)?;
 
     let (natsuki, shiyu) = initialize_natsuki(&config).await?;
 
@@ -75,12 +74,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn load_config(path: impl AsRef<Path>) -> Result<AppConfig> {
-    let config_str = read_to_string(path).await.context("failed to read config file")?;
-    serde_json::from_str(&config_str).context("failed to parse config")
-}
-
-async fn initialize_natsuki(config: &AppConfig) -> Result<(Natsuki, Shiyu)> {
+async fn initialize_natsuki(config: &Config) -> Result<(Natsuki, Shiyu)> {
     // Reminder
     let shiyu = Shiyu::new(&config.reminder).await?;
     let shiyu_provider = ShiyuProvider::new(&config.reminder, shiyu.clone()).await?;
@@ -105,7 +99,7 @@ async fn initialize_natsuki(config: &AppConfig) -> Result<(Natsuki, Shiyu)> {
     Ok((natsuki, shiyu))
 }
 
-async fn initialize_simple_functions(tool_config: &AppConfigTools) -> Result<Vec<ArcSimpleFunction>> {
+async fn initialize_simple_functions(tool_config: &ConfigTools) -> Result<Vec<ArcSimpleFunction>> {
     let mut functions: Vec<ArcSimpleFunction> = vec![];
 
     functions.push(Arc::new(SelfInfo::new()));

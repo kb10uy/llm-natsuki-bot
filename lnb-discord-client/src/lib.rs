@@ -6,22 +6,16 @@ use crate::inner::DiscordLnbClientInner;
 use std::sync::Arc;
 
 use futures::{future::BoxFuture, prelude::*};
+use lnb_common::config::client::ConfigClientDiscord;
 use lnb_core::{
     error::ClientError,
     interface::{client::LnbClient, server::LnbServer},
 };
-use serde::Deserialize;
-
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-pub struct DiscordLnbClientConfig {
-    pub token: String,
-    pub max_length: usize,
-}
 
 pub struct DiscordLnbClient<S>(Arc<inner::DiscordLnbClientInner<S>>);
 
 impl<S: LnbServer> DiscordLnbClient<S> {
-    pub async fn new(config: &DiscordLnbClientConfig, assistant: S) -> Result<DiscordLnbClient<S>, ClientError> {
+    pub async fn new(config: &ConfigClientDiscord, assistant: S) -> Result<DiscordLnbClient<S>, ClientError> {
         let inner_discord = DiscordLnbClientInner::new(config, assistant).await?;
         Ok(DiscordLnbClient(Arc::new(inner_discord)))
     }

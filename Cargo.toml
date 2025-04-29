@@ -2,12 +2,13 @@
 resolver = "2"
 members = [
   "lnb-core",
+  "lnb-common",
   "lnb-server",
+  "lnb-admin-api",
   "lnb-mastodon-client",
   "lnb-discord-client",
   "lnb-daily-private",
   "xtask",
-  "lnb-admin-api",
 ]
 
 [workspace.package]
@@ -18,6 +19,7 @@ edition = "2024"
 
 [workspace.dependencies]
 lnb-core = { path = "./lnb-core" }
+lnb-common = { path = "./lnb-common" }
 lnb-daily-private = { path = "./lnb-daily-private" }
 lnb-mastodon-client = { path = "./lnb-mastodon-client" }
 lnb-discord-client = { path = "./lnb-discord-client" }

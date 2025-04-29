@@ -7,6 +7,7 @@ edition.workspace = true
 
 [dependencies]
 lnb-core = { workspace = true }
+lnb-common = { workspace = true }
 lnb-daily-private = { workspace = true }
 lnb-mastodon-client = { workspace = true }
 lnb-discord-client = { workspace = true }
@@ -19,7 +20,6 @@ clap = { workspace = true }
 futures = { workspace = true }
 infer = { workspace = true }
 rand = { workspace = true }
-redis = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

@@ -1,13 +1,11 @@
-use crate::{
-    config::{AppConfigLlm, AppConfigLlmModel},
-    llm::create_llm,
-};
+use crate::llm::create_llm;
 
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
 
+use lnb_common::config::llm::{ConfigLlm, ConfigLlmModel};
 use lnb_core::{interface::llm::ArcLlm, model::conversation::ConversationModel};
 use thiserror::Error as ThisError;
 use tokio::sync::RwLock;
@@ -16,13 +14,13 @@ use tracing::{debug, warn};
 #[derive(Clone)]
 pub struct LlmCache {
     default_model: String,
-    uninitialized_models: Arc<RwLock<HashMap<String, AppConfigLlmModel>>>,
+    uninitialized_models: Arc<RwLock<HashMap<String, ConfigLlmModel>>>,
     created_models: Arc<RwLock<HashMap<String, ArcLlm>>>,
     failed_models: Arc<RwLock<HashSet<String>>>,
 }
 
 impl LlmCache {
-    pub fn new(config: &AppConfigLlm) -> LlmCache {
+    pub fn new(config: &ConfigLlm) -> LlmCache {
         let uninitialized_models = config.models.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
 
         LlmCache {

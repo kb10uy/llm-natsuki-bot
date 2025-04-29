@@ -1,14 +1,12 @@
 mod memory;
 mod sqlite;
 
-use self::{memory::MemoryConversationStorage, sqlite::SqliteConversationStorage};
-use crate::config::{AppConfigStorage, AppConfigStorageBackend};
-
+use lnb_common::config::storage::{ConfigStorage, ConfigStorageBackend};
 use lnb_core::{error::StorageError, interface::storage::BoxConversationStorage};
 
-pub async fn initialize_storage(config: &AppConfigStorage) -> Result<BoxConversationStorage, StorageError> {
+pub async fn initialize_storage(config: &ConfigStorage) -> Result<BoxConversationStorage, StorageError> {
     match config.backend {
-        AppConfigStorageBackend::Memory => Ok(Box::new(MemoryConversationStorage::new())),
-        AppConfigStorageBackend::Sqlite => Ok(Box::new(SqliteConversationStorage::new(&config.sqlite).await?)),
+        ConfigStorageBackend::Memory => Ok(Box::new(memory::MemoryConversationStorage::new())),
+        ConfigStorageBackend::Sqlite => Ok(Box::new(sqlite::SqliteConversationStorage::new(&config.sqlite).await?)),
     }
 }

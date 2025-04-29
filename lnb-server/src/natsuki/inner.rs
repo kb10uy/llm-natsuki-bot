@@ -1,10 +1,8 @@
-use crate::{
-    config::AppConfigAssistant,
-    natsuki::{function_store::FunctionStore, llm_cache::LlmCache},
-};
+use crate::natsuki::{function_store::FunctionStore, llm_cache::LlmCache};
 
 use std::iter::once;
 
+use lnb_common::config::assistant::ConfigAssistant;
 use lnb_core::{
     error::ServerError,
     interface::{
@@ -39,7 +37,7 @@ impl NatsukiInner {
         llm_cache: LlmCache,
         function_store: FunctionStore,
         interceptions: Vec<BoxInterception>,
-        assistant_identity: &AppConfigAssistant,
+        assistant_identity: &ConfigAssistant,
     ) -> Result<NatsukiInner, ServerError> {
         Ok(NatsukiInner {
             storage,

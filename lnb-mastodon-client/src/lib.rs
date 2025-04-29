@@ -6,31 +6,22 @@ use crate::inner::MastodonLnbClientInner;
 use std::{collections::HashMap, sync::Arc};
 
 use futures::{future::BoxFuture, prelude::*};
+use lnb_common::config::client::ConfigClientMastodon;
 use lnb_core::{
     DebugOptionValue,
     error::{ClientError, ReminderError},
     interface::{client::LnbClient, reminder::Remindable, server::LnbServer},
     model::conversation::ConversationUpdate,
 };
-use serde::Deserialize;
 
 const CONTEXT_KEY_PREFIX: &str = "mastodon";
-
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-pub struct MastodonLnbClientConfig {
-    pub server_url: String,
-    pub token: String,
-    pub sensitive_spoiler: String,
-    pub max_length: usize,
-    pub remote_fetch_delay_seconds: usize,
-}
 
 #[derive(Debug, Clone)]
 pub struct MastodonLnbClient<S>(Arc<MastodonLnbClientInner<S>>);
 
 impl<S: LnbServer> MastodonLnbClient<S> {
     pub async fn new(
-        config: &MastodonLnbClientConfig,
+        config: &ConfigClientMastodon,
         debug_options: &HashMap<String, DebugOptionValue>,
         assistant: S,
     ) -> Result<MastodonLnbClient<S>, ClientError> {

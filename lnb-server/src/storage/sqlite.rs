@@ -1,26 +1,23 @@
-use crate::config::AppConfigStorageSqlite;
-
 use std::sync::Arc;
 
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
+use lnb_common::{config::storage::ConfigStorageSqlite, persistence::SqliteConversationDb};
 use lnb_core::{
     error::StorageError,
     interface::storage::ConversationStorage,
     model::conversation::{Conversation, ConversationId},
 };
-use sqlx::{SqlitePool, prelude::FromRow};
-use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct SqliteConversationStorage(Arc<SqliteConversationStorageInner>);
 
 impl SqliteConversationStorage {
-    pub async fn new(config: &AppConfigStorageSqlite) -> Result<SqliteConversationStorage, StorageError> {
-        let pool = SqlitePool::connect(&config.filepath.to_string_lossy())
+    pub async fn new(config: &ConfigStorageSqlite) -> Result<SqliteConversationStorage, StorageError> {
+        let db = SqliteConversationDb::connect(config)
             .map_err(StorageError::by_backend)
             .await?;
         Ok(SqliteConversationStorage(Arc::new(SqliteConversationStorageInner {
-            pool,
+            db,
         })))
     }
 }
@@ -59,54 +56,33 @@ impl ConversationStorage for SqliteConversationStorage {
 
 #[derive(Debug)]
 struct SqliteConversationStorageInner {
-    pool: SqlitePool,
+    db: SqliteConversationDb,
 }
 
 impl SqliteConversationStorageInner {
     async fn fetch_content_by_id(&self, id: ConversationId) -> Result<Option<Conversation>, StorageError> {
-        let row: Option<SqliteRowConversation> =
-            sqlx::query_as(r#"SELECT id, context_key, content FROM conversations WHERE id = ?;"#)
-                .bind(id.0)
-                .fetch_optional(&self.pool)
-                .map_err(StorageError::by_backend)
-                .await?;
-
-        let conversation = row
-            .map(|r| serde_json::from_slice(&r.content))
-            .transpose()
-            .map_err(StorageError::by_serialization)?;
-        Ok(conversation)
+        self.db.fetch_by_id(id.0).map_err(StorageError::by_backend).await
     }
 
     async fn fetch_content_by_context_key<'a>(
         &'a self,
         context_key: &'a str,
     ) -> Result<Option<Conversation>, StorageError> {
-        let row: Option<SqliteRowConversation> =
-            sqlx::query_as(r#"SELECT id, context_key, content FROM conversations WHERE context_key = ?;"#)
-                .bind(context_key)
-                .fetch_optional(&self.pool)
-                .map_err(StorageError::by_backend)
-                .await?;
-
-        let conversation = row
-            .map(|r| serde_json::from_slice(&r.content))
-            .transpose()
-            .map_err(StorageError::by_serialization)?;
-        Ok(conversation)
+        self.db
+            .fetch_by_context_key(context_key)
+            .map_err(StorageError::by_backend)
+            .await
     }
 
     async fn fetch_id_by_context_key<'a>(
         &'a self,
         context_key: &'a str,
     ) -> Result<Option<ConversationId>, StorageError> {
-        let row: Option<(Uuid,)> = sqlx::query_as(r#"SELECT id FROM conversations WHERE context_key = ?;"#)
-            .bind(context_key)
-            .fetch_optional(&self.pool)
+        self.db
+            .fetch_id_by_context_key(context_key)
+            .map_ok(|r| r.map(ConversationId))
             .map_err(StorageError::by_backend)
-            .await?;
-
-        Ok(row.map(|r| ConversationId(r.0)))
+            .await
     }
 
     async fn upsert<'a>(
@@ -114,29 +90,9 @@ impl SqliteConversationStorageInner {
         conversation: &'a Conversation,
         context_key: Option<&'a str>,
     ) -> Result<(), StorageError> {
-        let id = conversation.id().0;
-        let blob = serde_json::to_vec(conversation).map_err(StorageError::by_serialization)?;
-
-        sqlx::query(
-            r#"
-            INSERT INTO conversations (id, context_key, content) VALUES (?, ?, ?)
-            ON CONFLICT DO UPDATE SET content = excluded.content, context_key = excluded.context_key;
-        "#,
-        )
-        .bind(id)
-        .bind(context_key)
-        .bind(blob)
-        .execute(&self.pool)
-        .map_err(StorageError::by_backend)
-        .await?;
-        Ok(())
+        self.db
+            .upsert(conversation, context_key)
+            .map_err(StorageError::by_backend)
+            .await
     }
-}
-
-#[derive(Debug, Clone, FromRow)]
-#[allow(dead_code)]
-struct SqliteRowConversation {
-    id: Uuid,
-    context_key: Option<String>,
-    content: Vec<u8>,
 }

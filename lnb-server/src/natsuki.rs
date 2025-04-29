@@ -4,8 +4,9 @@ mod llm_cache;
 
 pub use function_store::FunctionStore;
 pub use llm_cache::LlmCache;
+use lnb_common::config::assistant::ConfigAssistant;
 
-use crate::{config::AppConfigAssistant, natsuki::inner::NatsukiInner};
+use crate::natsuki::inner::NatsukiInner;
 
 use std::sync::Arc;
 
@@ -28,7 +29,7 @@ impl Natsuki {
         llm_cache: llm_cache::LlmCache,
         function_store: function_store::FunctionStore,
         interceptions: impl IntoIterator<Item = BoxInterception>,
-        assistant_identity: &AppConfigAssistant,
+        assistant_identity: &ConfigAssistant,
     ) -> Result<Natsuki, ServerError> {
         let inner = NatsukiInner::new(
             storage,

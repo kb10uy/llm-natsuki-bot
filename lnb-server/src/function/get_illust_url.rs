@@ -1,20 +1,16 @@
 use crate::function::ConfigurableSimpleFunction;
 
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
+use lnb_common::config::tools::ConfigToolsGetIllustUrl;
 use lnb_core::{
     error::FunctionError,
     interface::function::{FunctionDescriptor, FunctionResponse, simple::SimpleFunction},
     model::schema::DescribedSchema,
 };
 use rand::{rng, seq::IndexedRandom};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::{Value, json};
 use sqlx::{SqlitePool, prelude::FromRow};
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct GetIllustUrlConfig {
-    pub database_filepath: String,
-}
 
 #[derive(Debug)]
 pub struct GetIllustUrl {
@@ -24,9 +20,9 @@ pub struct GetIllustUrl {
 impl ConfigurableSimpleFunction for GetIllustUrl {
     const NAME: &'static str = stringify!(GetIllustUrl);
 
-    type Configuration = GetIllustUrlConfig;
+    type Configuration = ConfigToolsGetIllustUrl;
 
-    async fn configure(config: &GetIllustUrlConfig) -> Result<GetIllustUrl, FunctionError> {
+    async fn configure(config: &ConfigToolsGetIllustUrl) -> Result<GetIllustUrl, FunctionError> {
         let pool = SqlitePool::connect(&config.database_filepath)
             .map_err(FunctionError::by_external)
             .await?;

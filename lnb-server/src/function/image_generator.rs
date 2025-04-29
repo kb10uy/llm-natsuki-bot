@@ -7,6 +7,7 @@ use async_openai::{
 };
 use base64::prelude::*;
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
+use lnb_common::config::tools::ConfigToolsImageGenerator;
 use lnb_core::{
     APP_USER_AGENT,
     error::FunctionError,
@@ -22,13 +23,6 @@ use tokio::{fs::File, io::AsyncWriteExt};
 use tracing::{debug, info};
 use url::Url;
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct ImageGeneratorConfig {
-    pub endpoint: String,
-    pub token: String,
-    pub model: String,
-}
-
 #[derive(Debug)]
 pub struct ImageGenerator {
     client: Client<OpenAIConfig>,
@@ -40,9 +34,9 @@ pub struct ImageGenerator {
 impl ConfigurableSimpleFunction for ImageGenerator {
     const NAME: &'static str = stringify!(ImageGenerator);
 
-    type Configuration = ImageGeneratorConfig;
+    type Configuration = ConfigToolsImageGenerator;
 
-    async fn configure(config: &ImageGeneratorConfig) -> Result<ImageGenerator, FunctionError> {
+    async fn configure(config: &ConfigToolsImageGenerator) -> Result<ImageGenerator, FunctionError> {
         let client = {
             let openai_config = OpenAIConfig::new()
                 .with_api_key(&config.token)

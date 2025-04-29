@@ -1,10 +1,8 @@
 use std::sync::Arc;
 
-use crate::{
-    DiscordLnbClientConfig,
-    text::{sanitize_discord_message, sanitize_markdown_for_discord},
-};
+use crate::text::{sanitize_discord_message, sanitize_markdown_for_discord};
 
+use lnb_common::config::client::ConfigClientDiscord;
 use lnb_core::{
     error::ClientError,
     interface::{Context as LnbContext, server::LnbServer},
@@ -34,7 +32,7 @@ pub struct DiscordLnbClientInner<S> {
 }
 
 impl<S: LnbServer> DiscordLnbClientInner<S> {
-    pub async fn new(config: &DiscordLnbClientConfig, assistant: S) -> Result<DiscordLnbClientInner<S>, ClientError> {
+    pub async fn new(config: &ConfigClientDiscord, assistant: S) -> Result<DiscordLnbClientInner<S>, ClientError> {
         let client = Client::new(config.token.clone());
         let inner = DiscordLnbClientInner {
             client,
