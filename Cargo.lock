@@ -1747,6 +1747,7 @@ dependencies = [
  "lnb-daily-private",
  "lnb-discord-client",
  "lnb-mastodon-client",
+ "lnb-rate-limiter",
  "rand 0.9.1",
  "reqwest",
  "serde",
