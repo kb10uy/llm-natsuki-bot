@@ -1721,6 +1721,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lnb-rate-limiter"
+version = "0.12.0"
+dependencies = [
+ "regex",
+ "time",
+ "tokio",
+]
+
+[[package]]
 name = "lnb-server"
 version = "0.12.0"
 dependencies = [

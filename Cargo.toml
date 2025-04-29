@@ -8,7 +8,7 @@ members = [
   "lnb-mastodon-client",
   "lnb-discord-client",
   "lnb-daily-private",
-  "xtask",
+  "xtask", "lnb-rate-limiter",
 ]
 
 [workspace.package]

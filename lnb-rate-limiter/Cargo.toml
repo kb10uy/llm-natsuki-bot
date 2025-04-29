@@ -1,0 +1,11 @@
+[package]
+name = "lnb-rate-limiter"
+version.workspace = true
+description.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[dependencies]
+regex = { workspace = true }
+time = { workspace = true }
+tokio = { workspace = true }
