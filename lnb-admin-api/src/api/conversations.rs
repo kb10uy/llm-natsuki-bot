@@ -30,7 +30,11 @@ pub async fn show(
     State(state): State<Application>,
     request: Query<ShowRequest>,
 ) -> Result<Json<Conversation>, ApiError> {
-    let conversation = state.conversation.show(request.id).await?;
+    let conversation = state
+        .conversation
+        .fetch_by_id(request.id)
+        .await?
+        .ok_or(ApiError::NotFound)?;
     Ok(Json(conversation))
 }
 

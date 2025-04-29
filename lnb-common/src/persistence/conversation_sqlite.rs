@@ -26,15 +26,42 @@ impl SqliteConversationDb {
         Ok(count.0 as usize)
     }
 
-    pub async fn show(&self, id: Uuid) -> Result<Conversation, PersistenceError> {
-        let row: SqliteRowConversation =
+    pub async fn fetch_by_id(&self, id: Uuid) -> Result<Option<Conversation>, PersistenceError> {
+        let row: Option<SqliteRowConversation> =
             sqlx::query_as(r#"SELECT id, context_key, content FROM conversations WHERE id = ?;"#)
                 .bind(id)
-                .fetch_one(&self.pool)
+                .fetch_optional(&self.pool)
                 .map_err(PersistenceError::by_backend)
                 .await?;
-        let conversation = serde_json::from_slice(&row.content).map_err(PersistenceError::by_serialization)?;
+        let conversation = row
+            .map(|r| serde_json::from_slice(&r.content))
+            .transpose()
+            .map_err(PersistenceError::by_serialization)?;
         Ok(conversation)
+    }
+
+    pub async fn fetch_by_context_key(&self, context_key: &str) -> Result<Option<Conversation>, PersistenceError> {
+        let row: Option<SqliteRowConversation> =
+            sqlx::query_as(r#"SELECT id, context_key, content FROM conversations WHERE context_key = ?;"#)
+                .bind(context_key)
+                .fetch_optional(&self.pool)
+                .map_err(PersistenceError::by_backend)
+                .await?;
+        let conversation = row
+            .map(|r| serde_json::from_slice(&r.content))
+            .transpose()
+            .map_err(PersistenceError::by_serialization)?;
+        Ok(conversation)
+    }
+
+    pub async fn fetch_id_by_context_key(&self, context_key: &str) -> Result<Option<Uuid>, PersistenceError> {
+        let row: Option<(Uuid,)> = sqlx::query_as(r#"SELECT id FROM conversations WHERE context_key = ?;"#)
+            .bind(context_key)
+            .fetch_optional(&self.pool)
+            .map_err(PersistenceError::by_backend)
+            .await?;
+
+        Ok(row.map(|r| r.0))
     }
 
     pub async fn latest_ids(&self, count: usize, max_id: Option<Uuid>) -> Result<Vec<Uuid>, PersistenceError> {
@@ -59,6 +86,25 @@ impl SqliteConversationDb {
                 .map_err(PersistenceError::by_backend)
                 .await?;
         Ok(rows.into_iter().map(|(id,)| id).collect())
+    }
+
+    pub async fn upsert(&self, conversation: &Conversation, context_key: Option<&str>) -> Result<(), PersistenceError> {
+        let id = conversation.id().0;
+        let blob = serde_json::to_vec(conversation).map_err(PersistenceError::by_serialization)?;
+
+        sqlx::query(
+            r#"
+            INSERT INTO conversations (id, context_key, content) VALUES (?, ?, ?)
+            ON CONFLICT DO UPDATE SET content = excluded.content, context_key = excluded.context_key;
+        "#,
+        )
+        .bind(id)
+        .bind(context_key)
+        .bind(blob)
+        .execute(&self.pool)
+        .map_err(PersistenceError::by_backend)
+        .await?;
+        Ok(())
     }
 }
 

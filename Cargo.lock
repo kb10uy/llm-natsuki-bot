@@ -1737,7 +1737,6 @@ dependencies = [
  "lnb-discord-client",
  "lnb-mastodon-client",
  "rand 0.9.1",
- "redis",
  "reqwest",
  "serde",
  "serde_json",

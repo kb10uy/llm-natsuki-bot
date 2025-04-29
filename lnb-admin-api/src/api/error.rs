@@ -14,6 +14,9 @@ pub enum ApiError {
 
     #[error("invalid request: {0}")]
     InvalidRequest(String),
+
+    #[error("not found")]
+    NotFound,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -26,6 +29,7 @@ impl IntoResponse for ApiError {
         let (status, error) = match self {
             ApiError::Persistence(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
             ApiError::InvalidRequest(message) => (StatusCode::UNPROCESSABLE_ENTITY, message),
+            ApiError::NotFound => (StatusCode::NOT_FOUND, self.to_string()),
         };
         (status, Json(ErrorResponse { error })).into_response()
     }
