@@ -9,12 +9,12 @@ use time::Duration;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct RateLimits {
-    pub conversation: RateLimitsCagegory,
-    pub image_generator: RateLimitsCagegory,
+    pub conversation: RateLimitsCategory,
+    pub image_generator: RateLimitsCategory,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
-pub struct RateLimitsCagegory {
+pub struct RateLimitsCategory {
     pub default: RateLimitsRateDefinition,
     pub filters: Vec<RateLimitsFilterDefinition>,
 }
@@ -38,7 +38,7 @@ pub enum RateLimitsRateDefinition {
     },
 }
 
-pub fn load_config(path: impl AsRef<Path>) -> Result<RateLimits, RateLimitsError> {
+pub fn load_rate_limits(path: impl AsRef<Path>) -> Result<RateLimits, RateLimitsError> {
     let config_str = read_to_string(path).map_err(RateLimitsError::Io)?;
     let config = serde_json::from_str(&config_str).map_err(RateLimitsError::Serialization)?;
     Ok(config)

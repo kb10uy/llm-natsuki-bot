@@ -7,7 +7,7 @@ use async_openai::{
 };
 use base64::prelude::*;
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
-use lnb_common::config::tools::ConfigToolsImageGenerator;
+use lnb_common::{config::tools::ConfigToolsImageGenerator, rate_limits::RateLimitsCategory};
 use lnb_core::{
     APP_USER_AGENT,
     error::FunctionError,
@@ -36,7 +36,10 @@ impl ConfigurableSimpleFunction for ImageGenerator {
 
     type Configuration = ConfigToolsImageGenerator;
 
-    async fn configure(config: &ConfigToolsImageGenerator) -> Result<ImageGenerator, FunctionError> {
+    async fn configure(
+        config: &ConfigToolsImageGenerator,
+        rate_limits_category: Option<&RateLimitsCategory>,
+    ) -> Result<ImageGenerator, FunctionError> {
         let client = {
             let openai_config = OpenAIConfig::new()
                 .with_api_key(&config.token)

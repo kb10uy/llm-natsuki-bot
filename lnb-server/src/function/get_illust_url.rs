@@ -1,7 +1,7 @@
 use crate::function::ConfigurableSimpleFunction;
 
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
-use lnb_common::config::tools::ConfigToolsGetIllustUrl;
+use lnb_common::{config::tools::ConfigToolsGetIllustUrl, rate_limits::RateLimitsCategory};
 use lnb_core::{
     error::FunctionError,
     interface::function::{FunctionDescriptor, FunctionResponse, simple::SimpleFunction},
@@ -22,7 +22,10 @@ impl ConfigurableSimpleFunction for GetIllustUrl {
 
     type Configuration = ConfigToolsGetIllustUrl;
 
-    async fn configure(config: &ConfigToolsGetIllustUrl) -> Result<GetIllustUrl, FunctionError> {
+    async fn configure(
+        config: &ConfigToolsGetIllustUrl,
+        _: Option<&RateLimitsCategory>,
+    ) -> Result<GetIllustUrl, FunctionError> {
         let pool = SqlitePool::connect(&config.database_filepath)
             .map_err(FunctionError::by_external)
             .await?;

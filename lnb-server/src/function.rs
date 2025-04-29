@@ -14,6 +14,7 @@ pub use self_info::SelfInfo;
 
 use std::fmt::Debug;
 
+use lnb_common::rate_limits::RateLimitsCategory;
 use lnb_core::{error::FunctionError, interface::function::simple::SimpleFunction};
 use serde::de::DeserializeOwned;
 
@@ -28,5 +29,8 @@ where
     type Configuration: Debug + DeserializeOwned;
 
     /// Configures new instance.
-    async fn configure(config: &Self::Configuration) -> Result<Self, FunctionError>;
+    async fn configure(
+        config: &Self::Configuration,
+        rate_limits: Option<&RateLimitsCategory>,
+    ) -> Result<Self, FunctionError>;
 }

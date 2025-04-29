@@ -21,7 +21,10 @@ use std::{collections::HashMap, sync::Arc};
 use anyhow::Result;
 use clap::Parser;
 use futures::future::{join, join_all};
-use lnb_common::config::{Config, load_config, tools::ConfigTools};
+use lnb_common::{
+    config::{Config, load_config, tools::ConfigTools},
+    rate_limits::{RateLimits, RateLimitsCategory, load_rate_limits},
+};
 use lnb_core::interface::{
     client::LnbClient,
     function::{complex::ArcComplexFunction, simple::ArcSimpleFunction},
@@ -38,8 +41,9 @@ async fn main() -> Result<()> {
     let args = cli::Arguments::parse();
     let debug_options: HashMap<_, _> = args.debug_options.into_iter().collect();
     let config = load_config(args.config)?;
+    let rate_limits = load_rate_limits(args.rate_limits)?;
 
-    let (natsuki, shiyu) = initialize_natsuki(&config).await?;
+    let (natsuki, shiyu) = initialize_natsuki(&config, &rate_limits).await?;
 
     let mut client_tasks = vec![];
 
@@ -74,7 +78,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn initialize_natsuki(config: &Config) -> Result<(Natsuki, Shiyu)> {
+async fn initialize_natsuki(config: &Config, rate_limits: &RateLimits) -> Result<(Natsuki, Shiyu)> {
     // Reminder
     let shiyu = Shiyu::new(&config.reminder).await?;
     let shiyu_provider = ShiyuProvider::new(&config.reminder, shiyu.clone()).await?;
@@ -88,7 +92,7 @@ async fn initialize_natsuki(config: &Config) -> Result<(Natsuki, Shiyu)> {
     info!("{} LLM backend definitions loaded", config.llm.models.len());
 
     // Functions
-    let simple_functions = initialize_simple_functions(&config.tools).await?;
+    let simple_functions = initialize_simple_functions(&config.tools, rate_limits).await?;
     let complex_functions: Vec<ArcComplexFunction> = vec![Arc::new(shiyu_provider)];
     let function_store = FunctionStore::new(simple_functions, complex_functions);
 
@@ -99,16 +103,25 @@ async fn initialize_natsuki(config: &Config) -> Result<(Natsuki, Shiyu)> {
     Ok((natsuki, shiyu))
 }
 
-async fn initialize_simple_functions(tool_config: &ConfigTools) -> Result<Vec<ArcSimpleFunction>> {
+async fn initialize_simple_functions(
+    tool_config: &ConfigTools,
+    rate_limits: &RateLimits,
+) -> Result<Vec<ArcSimpleFunction>> {
     let mut functions: Vec<ArcSimpleFunction> = vec![];
 
     functions.push(Arc::new(SelfInfo::new()));
     functions.push(Arc::new(LocalInfo::new()?));
 
-    functions.extend(configure_simple_function::<ImageGenerator>(&tool_config.image_generator).await?);
-    functions.extend(configure_simple_function::<ExchangeRate>(&tool_config.exchange_rate).await?);
-    functions.extend(configure_simple_function::<GetIllustUrl>(&tool_config.get_illust_url).await?);
-    functions.extend(configure_simple_function::<DailyPrivate>(&tool_config.daily_private).await?);
+    functions.extend(
+        configure_simple_function::<ImageGenerator>(
+            tool_config.image_generator.as_ref(),
+            Some(&rate_limits.image_generator),
+        )
+        .await?,
+    );
+    functions.extend(configure_simple_function::<ExchangeRate>(tool_config.exchange_rate.as_ref(), None).await?);
+    functions.extend(configure_simple_function::<GetIllustUrl>(tool_config.get_illust_url.as_ref(), None).await?);
+    functions.extend(configure_simple_function::<DailyPrivate>(tool_config.daily_private.as_ref(), None).await?);
 
     Ok(functions)
 }
@@ -117,15 +130,18 @@ async fn initialize_interceptions() -> Result<Vec<BoxInterception>> {
     Ok(vec![initialize_bang_command().await.into()])
 }
 
-async fn configure_simple_function<F>(config: &Option<F::Configuration>) -> Result<Option<ArcSimpleFunction>>
+async fn configure_simple_function<F>(
+    config: Option<&F::Configuration>,
+    rate_limits_category: Option<&RateLimitsCategory>,
+) -> Result<Option<ArcSimpleFunction>>
 where
     F: ConfigurableSimpleFunction + 'static,
 {
-    let Some(config) = config.as_ref() else {
+    let Some(config) = config else {
         return Ok(None);
     };
 
-    let simple_function = F::configure(config).await?;
+    let simple_function = F::configure(config, rate_limits_category).await?;
     info!("simple function configured: {}", F::NAME);
     Ok(Some(Arc::new(simple_function)))
 }

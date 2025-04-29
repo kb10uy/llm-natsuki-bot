@@ -1,7 +1,7 @@
 use crate::function::ConfigurableSimpleFunction;
 
 use futures::{FutureExt, future::BoxFuture};
-use lnb_common::config::tools::ConfigToolsDailyPrivate;
+use lnb_common::{config::tools::ConfigToolsDailyPrivate, rate_limits::RateLimitsCategory};
 use lnb_core::{
     error::FunctionError,
     interface::function::{FunctionDescriptor, FunctionResponse, simple::SimpleFunction},
@@ -52,7 +52,10 @@ impl ConfigurableSimpleFunction for DailyPrivate {
 
     type Configuration = ConfigToolsDailyPrivate;
 
-    async fn configure(config: &ConfigToolsDailyPrivate) -> Result<Self, FunctionError> {
+    async fn configure(
+        config: &ConfigToolsDailyPrivate,
+        _: Option<&RateLimitsCategory>,
+    ) -> Result<Self, FunctionError> {
         let day_routine = DayRoutineConfiguration {
             daytime_start_at: Time::parse(&config.day_routine.morning_start, TIME_FORMAT)
                 .map_err(FunctionError::by_serialization)?,

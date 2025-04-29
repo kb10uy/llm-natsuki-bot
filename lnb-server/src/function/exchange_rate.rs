@@ -3,7 +3,7 @@ use crate::function::ConfigurableSimpleFunction;
 use std::collections::HashMap;
 
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
-use lnb_common::config::tools::ConfigToolsExchangeRate;
+use lnb_common::{config::tools::ConfigToolsExchangeRate, rate_limits::RateLimitsCategory};
 use lnb_core::{
     APP_USER_AGENT, RFC3339_NUMOFFSET,
     error::FunctionError,
@@ -31,7 +31,10 @@ impl ConfigurableSimpleFunction for ExchangeRate {
 
     type Configuration = ConfigToolsExchangeRate;
 
-    async fn configure(config: &ConfigToolsExchangeRate) -> Result<ExchangeRate, FunctionError> {
+    async fn configure(
+        config: &ConfigToolsExchangeRate,
+        _: Option<&RateLimitsCategory>,
+    ) -> Result<ExchangeRate, FunctionError> {
         let client = ClientBuilder::new()
             .user_agent(APP_USER_AGENT)
             .build()
