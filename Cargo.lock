@@ -1601,7 +1601,7 @@ checksum = "23fb14cb19457329c82206317a5663005a4d404783dc74f4252769b0d5f42856"
 
 [[package]]
 name = "lnb-admin-api"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -1628,7 +1628,7 @@ dependencies = [
 
 [[package]]
 name = "lnb-common"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "futures",
  "lnb-core",
@@ -1648,7 +1648,7 @@ dependencies = [
 
 [[package]]
 name = "lnb-core"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "futures",
  "serde",
@@ -1662,7 +1662,7 @@ dependencies = [
 
 [[package]]
 name = "lnb-daily-private"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "rand 0.9.1",
  "rand_distr",
@@ -1672,7 +1672,7 @@ dependencies = [
 
 [[package]]
 name = "lnb-discord-client"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1698,7 +1698,7 @@ dependencies = [
 
 [[package]]
 name = "lnb-mastodon-client"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1724,7 +1724,7 @@ dependencies = [
 
 [[package]]
 name = "lnb-rate-limiter"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "regex",
  "time",
@@ -1733,7 +1733,7 @@ dependencies = [
 
 [[package]]
 name = "lnb-server"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "async-openai",
@@ -4615,7 +4615,7 @@ dependencies = [
 
 [[package]]
 name = "xtask"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "clap",
