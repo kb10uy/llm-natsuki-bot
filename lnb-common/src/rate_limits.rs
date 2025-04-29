@@ -8,7 +8,16 @@ use thiserror::Error as ThisError;
 use time::Duration;
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct RateLimits {}
+pub struct RateLimits {
+    pub conversation: RateLimitsCagegory,
+    pub image_generator: RateLimitsCagegory,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct RateLimitsCagegory {
+    pub default: RateLimitsRateDefinition,
+    pub filters: Vec<RateLimitsFilterDefinition>,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct RateLimitsFilterDefinition {

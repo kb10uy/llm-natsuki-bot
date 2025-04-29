@@ -4,3 +4,5 @@
 /config
 /config.*
 !/config.template.*
+/rate-limits.*
+!/rate-limits.template.*
