@@ -150,10 +150,7 @@ impl FunctionError {
 #[derive(Debug, ThisError)]
 pub enum ReminderError {
     #[error("internal error: {0}")]
-    Internal(#[from] ErasedError),
-
-    #[error("serialization error: {0}")]
-    Serialization(ErasedError),
+    Persistence(#[from] ErasedError),
 
     #[error("cannot push job anymore")]
     CannotPushAnymore,
@@ -161,10 +158,6 @@ pub enum ReminderError {
 
 impl ReminderError {
     pub fn by_internal(source: impl Into<ErasedError>) -> ReminderError {
-        ReminderError::Internal(source.into())
-    }
-
-    pub fn by_serialization(source: impl Into<ErasedError>) -> ReminderError {
-        ReminderError::Serialization(source.into())
+        ReminderError::Persistence(source.into())
     }
 }

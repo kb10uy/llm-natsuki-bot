@@ -16,12 +16,12 @@ use crate::{
     storage::initialize_storage,
 };
 
-use std::{collections::HashMap, path::Path, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
-use anyhow::{Context as _, Result};
+use anyhow::Result;
 use clap::Parser;
 use futures::future::{join, join_all};
-use lnb_common::config::{Config, tools::ConfigTools};
+use lnb_common::config::{Config, load_config, tools::ConfigTools};
 use lnb_core::interface::{
     client::LnbClient,
     function::{complex::ArcComplexFunction, simple::ArcSimpleFunction},
@@ -29,7 +29,7 @@ use lnb_core::interface::{
 };
 use lnb_discord_client::DiscordLnbClient;
 use lnb_mastodon_client::MastodonLnbClient;
-use tokio::{fs::read_to_string, spawn};
+use tokio::spawn;
 use tracing::info;
 
 #[tokio::main]
@@ -37,7 +37,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let args = cli::Arguments::parse();
     let debug_options: HashMap<_, _> = args.debug_options.into_iter().collect();
-    let config = load_config(args.config).await?;
+    let config = load_config(args.config)?;
 
     let (natsuki, shiyu) = initialize_natsuki(&config).await?;
 

@@ -2,7 +2,7 @@ use crate::{error::ReminderError, model::conversation::ConversationUpdate};
 
 use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -16,7 +16,7 @@ pub trait Reminder: Send + Sync + 'static {
         &'a self,
         context: &'a str,
         remind: Remind,
-        remind_at: OffsetDateTime,
+        remind_at: UtcDateTime,
     ) -> BoxFuture<'a, Result<Uuid, ReminderError>>;
 
     fn remove(&self, id: Uuid) -> BoxFuture<'_, Result<(), ReminderError>>;

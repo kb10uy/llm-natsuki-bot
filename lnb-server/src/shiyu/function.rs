@@ -130,7 +130,7 @@ impl ShiyuProvider {
         };
         let id = self
             .reminder
-            .register(&remindable.context, remind, remind_at)
+            .register(&remindable.context, remind, remind_at.to_utc())
             .map_err(FunctionError::by_external)
             .await?;
 

@@ -15,7 +15,7 @@ use lnb_core::{
         server::LnbServer,
     },
 };
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -41,7 +41,7 @@ impl Reminder for Shiyu {
         &'a self,
         context: &'a str,
         remind: Remind,
-        remind_at: OffsetDateTime,
+        remind_at: UtcDateTime,
     ) -> BoxFuture<'a, Result<Uuid, ReminderError>> {
         async move { self.0.register(context, remind, remind_at).await }.boxed()
     }

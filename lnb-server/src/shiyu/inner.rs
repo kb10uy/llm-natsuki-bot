@@ -17,7 +17,7 @@ use lnb_core::{
     },
 };
 use serde::{Deserialize, Serialize};
-use time::OffsetDateTime;
+use time::UtcDateTime;
 use tokio::{
     spawn,
     sync::{RwLock, mpsc::UnboundedReceiver},
@@ -46,7 +46,7 @@ struct ShiyuJob {
 
 impl ShiyuInner {
     pub async fn new(config: &ConfigReminder) -> Result<ShiyuInner, ReminderError> {
-        let worker = Worker::connect(&config.redis_address).await?;
+        let worker = Worker::connect(config).await?;
 
         Ok(ShiyuInner {
             worker,
@@ -84,12 +84,7 @@ impl ShiyuInner {
         .boxed()
     }
 
-    pub async fn register(
-        &self,
-        context: &str,
-        remind: Remind,
-        remind_at: OffsetDateTime,
-    ) -> Result<Uuid, ReminderError> {
+    pub async fn register(&self, context: &str, remind: Remind, remind_at: UtcDateTime) -> Result<Uuid, ReminderError> {
         let job = ShiyuJob {
             context: context.to_string(),
             remind,
