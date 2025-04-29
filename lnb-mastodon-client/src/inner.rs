@@ -428,7 +428,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
 }
 
 fn create_context(status: &Status) -> Result<Context, ClientError> {
-    let mut context = Context::default();
+    let mut context = Context::new_user(format!("{CONTEXT_KEY_PREFIX}:{}", status.account.acct));
     context.set(RemindableContext {
         context: CONTEXT_KEY_PREFIX.to_string(),
         requester: serde_json::to_string(&RemindRequester {

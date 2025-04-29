@@ -1,11 +1,18 @@
-use crate::function::ConfigurableSimpleFunction;
+use crate::function::ConfigurableFunction;
 
 use futures::{FutureExt, future::BoxFuture};
 use lnb_common::config::tools::ConfigToolsDailyPrivate;
 use lnb_core::{
     error::FunctionError,
-    interface::function::{FunctionDescriptor, FunctionResponse, simple::SimpleFunction},
-    model::schema::DescribedSchema,
+    interface::{
+        Context,
+        function::{Function, FunctionDescriptor, FunctionResponse},
+    },
+    model::{
+        conversation::{IncompleteConversation, UserRole},
+        message::MessageToolCalling,
+        schema::DescribedSchema,
+    },
 };
 use lnb_daily_private::{
     day_routine::{DayRoutineConfiguration, DayStep},
@@ -14,9 +21,9 @@ use lnb_daily_private::{
     temperature::TemperatureConfiguration,
     underwear::{UnderwearConfiguration, UnderwearStatus},
 };
+use lnb_rate_limiter::RateLimiter;
 use rand::prelude::*;
 use serde::Serialize;
-use serde_json::Value;
 use sha2::{Digest, Sha256};
 use time::{
     Duration, OffsetDateTime, PrimitiveDateTime, Time,
@@ -47,12 +54,12 @@ pub struct DailyPrivate {
     underwear: UnderwearConfiguration,
 }
 
-impl ConfigurableSimpleFunction for DailyPrivate {
+impl ConfigurableFunction for DailyPrivate {
     const NAME: &'static str = stringify!(DailyPrivate);
 
     type Configuration = ConfigToolsDailyPrivate;
 
-    async fn configure(config: &ConfigToolsDailyPrivate) -> Result<Self, FunctionError> {
+    async fn configure(config: &ConfigToolsDailyPrivate, _: Option<RateLimiter>) -> Result<Self, FunctionError> {
         let day_routine = DayRoutineConfiguration {
             daytime_start_at: Time::parse(&config.day_routine.morning_start, TIME_FORMAT)
                 .map_err(FunctionError::by_serialization)?,
@@ -72,7 +79,7 @@ impl ConfigurableSimpleFunction for DailyPrivate {
     }
 }
 
-impl SimpleFunction for DailyPrivate {
+impl Function for DailyPrivate {
     fn get_descriptor(&self) -> FunctionDescriptor {
         FunctionDescriptor {
             name: "daily_private".to_string(),
@@ -91,7 +98,13 @@ impl SimpleFunction for DailyPrivate {
         }
     }
 
-    fn call<'a>(&'a self, _id: &str, _params: Value) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
+    fn call<'a>(
+        &'a self,
+        _context: &'a Context,
+        _incomplete: &'a IncompleteConversation,
+        _user_role: &'a UserRole,
+        _tool_calling: MessageToolCalling,
+    ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
         async move { self.get_daily_info().await }.boxed()
     }
 }

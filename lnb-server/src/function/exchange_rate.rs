@@ -1,4 +1,4 @@
-use crate::function::ConfigurableSimpleFunction;
+use crate::function::ConfigurableFunction;
 
 use std::collections::HashMap;
 
@@ -7,12 +7,20 @@ use lnb_common::config::tools::ConfigToolsExchangeRate;
 use lnb_core::{
     APP_USER_AGENT, RFC3339_NUMOFFSET,
     error::FunctionError,
-    interface::function::{FunctionDescriptor, FunctionResponse, simple::SimpleFunction},
-    model::schema::DescribedSchema,
+    interface::{
+        Context,
+        function::{Function, FunctionDescriptor, FunctionResponse},
+    },
+    model::{
+        conversation::{IncompleteConversation, UserRole},
+        message::MessageToolCalling,
+        schema::DescribedSchema,
+    },
 };
+use lnb_rate_limiter::RateLimiter;
 use reqwest::{Client, ClientBuilder};
 use serde::Deserialize;
-use serde_json::{Value, json};
+use serde_json::json;
 use time::{OffsetDateTime, format_description::BorrowedFormatItem, macros::format_description};
 
 // "Sun, 30 Mar 2025 00:00:01 +0000" とかが返ってくるので
@@ -26,12 +34,15 @@ pub struct ExchangeRate {
     token_endpoint: String,
 }
 
-impl ConfigurableSimpleFunction for ExchangeRate {
+impl ConfigurableFunction for ExchangeRate {
     const NAME: &'static str = stringify!(ExchangeRate);
 
     type Configuration = ConfigToolsExchangeRate;
 
-    async fn configure(config: &ConfigToolsExchangeRate) -> Result<ExchangeRate, FunctionError> {
+    async fn configure(
+        config: &ConfigToolsExchangeRate,
+        _: Option<RateLimiter>,
+    ) -> Result<ExchangeRate, FunctionError> {
         let client = ClientBuilder::new()
             .user_agent(APP_USER_AGENT)
             .build()
@@ -41,7 +52,7 @@ impl ConfigurableSimpleFunction for ExchangeRate {
     }
 }
 
-impl SimpleFunction for ExchangeRate {
+impl Function for ExchangeRate {
     fn get_descriptor(&self) -> FunctionDescriptor {
         // TODO: 多分 [(String, String)] を受け取ってこっちで group_by した方が確実
         FunctionDescriptor {
@@ -62,8 +73,14 @@ impl SimpleFunction for ExchangeRate {
         }
     }
 
-    fn call<'a>(&'a self, _id: &str, params: Value) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
-        let parameters = match serde_json::from_value(params).map_err(FunctionError::by_serialization) {
+    fn call<'a>(
+        &'a self,
+        _context: &'a Context,
+        _incomplete: &'a IncompleteConversation,
+        _user_role: &'a UserRole,
+        tool_calling: MessageToolCalling,
+    ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
+        let parameters = match serde_json::from_value(tool_calling.arguments).map_err(FunctionError::by_serialization) {
             Ok(p) => p,
             Err(err) => return async { Err(FunctionError::Serialization(err.into())) }.boxed(),
         };

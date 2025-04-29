@@ -30,7 +30,16 @@ pub fn development() -> Result<()> {
     build_config()?;
     run_command_in_repository(
         "cargo",
-        &["run", "--bin", "lnb-server", "--", "-c", "data/config.generated.json"],
+        &[
+            "run",
+            "--bin",
+            "lnb-server",
+            "--",
+            "-c",
+            "data/config.generated.json",
+            "-r",
+            "data/rate-limits.generated.json",
+        ],
     )?;
     Ok(())
 }
@@ -53,5 +62,9 @@ pub fn development_api() -> Result<()> {
 
 pub fn build_config() -> Result<()> {
     run_command_in_repository("jsonnet", &["config.jsonnet", "-o", "data/config.generated.json"])?;
+    run_command_in_repository(
+        "jsonnet",
+        &["rate-limits.jsonnet", "-o", "data/rate-limits.generated.json"],
+    )?;
     Ok(())
 }

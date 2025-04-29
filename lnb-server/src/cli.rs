@@ -10,6 +10,10 @@ pub struct Arguments {
     #[clap(short, long, default_value = "./config.json")]
     pub config: PathBuf,
 
+    /// Specify path for config file.
+    #[clap(short, long, default_value = "./rate-limits.json")]
+    pub rate_limits: PathBuf,
+
     #[clap(short, long, value_parser = parse_debug_option)]
     pub debug_options: Vec<(String, DebugOptionValue)>,
 }

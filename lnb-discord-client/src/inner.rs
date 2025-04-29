@@ -141,7 +141,7 @@ impl<S: LnbServer> DiscordLnbClientInner<S> {
         let conversation_update = self
             .assistant
             .process_conversation(
-                LnbContext::default(),
+                LnbContext::new_user(format!("{CONTEXT_KEY_PREFIX}:{}", message.author.id)),
                 conversation_id,
                 new_messages.clone(),
                 UserRole::Normal,

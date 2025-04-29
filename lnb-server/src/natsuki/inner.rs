@@ -18,12 +18,15 @@ use lnb_core::{
         message::{AssistantMessage, FunctionResponseMessage, Message, MessageToolCalling},
     },
 };
+use lnb_rate_limiter::{RateLimiter, Rated};
+use time::UtcDateTime;
 use tracing::{debug, info, warn};
 
 const MAX_CONVERSATION_LOOP: usize = 8;
 
 pub struct NatsukiInner {
     storage: BoxConversationStorage,
+    rate_limiter: Option<RateLimiter>,
     llm_cache: LlmCache,
     function_store: FunctionStore,
     interceptions: Vec<BoxInterception>,
@@ -34,6 +37,7 @@ pub struct NatsukiInner {
 impl NatsukiInner {
     pub fn new(
         storage: BoxConversationStorage,
+        rate_limiter: Option<RateLimiter>,
         llm_cache: LlmCache,
         function_store: FunctionStore,
         interceptions: Vec<BoxInterception>,
@@ -41,6 +45,7 @@ impl NatsukiInner {
     ) -> Result<NatsukiInner, ServerError> {
         Ok(NatsukiInner {
             storage,
+            rate_limiter,
             llm_cache,
             function_store,
             interceptions,
@@ -56,6 +61,11 @@ impl NatsukiInner {
         new_messages: Vec<Message>,
         user_role: UserRole,
     ) -> Result<ConversationUpdate, ServerError> {
+        // TODO: Context に UserRole を統合する
+        if !self.ensure_in_rate(&context).await {
+            return Err(ServerError::RateLimitExceeded);
+        }
+
         if !matches!(new_messages.last(), Some(Message::User(_))) {
             return Err(ServerError::MustEndsWithUserMessage);
         }
@@ -169,6 +179,18 @@ impl NatsukiInner {
                 None => (original, false),
             },
         }
+    }
+
+    async fn ensure_in_rate(&self, context: &Context) -> bool {
+        let Some(rate_limiter) = &self.rate_limiter else {
+            return true;
+        };
+        let Some(identity) = context.identity() else {
+            return true;
+        };
+
+        let rated = rate_limiter.check(UtcDateTime::now(), identity).await;
+        matches!(rated, Rated::Success)
     }
 
     async fn process_tool_callings(

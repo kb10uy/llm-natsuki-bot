@@ -1,15 +1,23 @@
-use crate::function::ConfigurableSimpleFunction;
+use crate::function::ConfigurableFunction;
 
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use lnb_common::config::tools::ConfigToolsGetIllustUrl;
 use lnb_core::{
     error::FunctionError,
-    interface::function::{FunctionDescriptor, FunctionResponse, simple::SimpleFunction},
-    model::schema::DescribedSchema,
+    interface::{
+        Context,
+        function::{Function, FunctionDescriptor, FunctionResponse},
+    },
+    model::{
+        conversation::{IncompleteConversation, UserRole},
+        message::MessageToolCalling,
+        schema::DescribedSchema,
+    },
 };
+use lnb_rate_limiter::RateLimiter;
 use rand::{rng, seq::IndexedRandom};
 use serde::Serialize;
-use serde_json::{Value, json};
+use serde_json::json;
 use sqlx::{SqlitePool, prelude::FromRow};
 
 #[derive(Debug)]
@@ -17,12 +25,15 @@ pub struct GetIllustUrl {
     pool: SqlitePool,
 }
 
-impl ConfigurableSimpleFunction for GetIllustUrl {
+impl ConfigurableFunction for GetIllustUrl {
     const NAME: &'static str = stringify!(GetIllustUrl);
 
     type Configuration = ConfigToolsGetIllustUrl;
 
-    async fn configure(config: &ConfigToolsGetIllustUrl) -> Result<GetIllustUrl, FunctionError> {
+    async fn configure(
+        config: &ConfigToolsGetIllustUrl,
+        _: Option<RateLimiter>,
+    ) -> Result<GetIllustUrl, FunctionError> {
         let pool = SqlitePool::connect(&config.database_filepath)
             .map_err(FunctionError::by_external)
             .await?;
@@ -30,7 +41,7 @@ impl ConfigurableSimpleFunction for GetIllustUrl {
     }
 }
 
-impl SimpleFunction for GetIllustUrl {
+impl Function for GetIllustUrl {
     fn get_descriptor(&self) -> FunctionDescriptor {
         FunctionDescriptor {
             name: "get_illust_url".to_string(),
@@ -47,8 +58,14 @@ impl SimpleFunction for GetIllustUrl {
         }
     }
 
-    fn call<'a>(&'a self, _id: &str, params: Value) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
-        let count = params["count"].as_u64().unwrap_or(1) as usize;
+    fn call<'a>(
+        &'a self,
+        _context: &'a Context,
+        _incomplete: &'a IncompleteConversation,
+        _user_role: &'a UserRole,
+        tool_calling: MessageToolCalling,
+    ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
+        let count = tool_calling.arguments["count"].as_u64().unwrap_or(1) as usize;
         async move { self.get_illust_infos(count).await }.boxed()
     }
 }

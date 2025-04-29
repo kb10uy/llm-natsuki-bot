@@ -1,4 +1,4 @@
-use crate::ConfigurableSimpleFunction;
+use crate::function::ConfigurableFunction;
 
 use async_openai::{
     Client,
@@ -11,14 +11,22 @@ use lnb_common::config::tools::ConfigToolsImageGenerator;
 use lnb_core::{
     APP_USER_AGENT,
     error::FunctionError,
-    interface::function::{FunctionDescriptor, FunctionResponse, simple::SimpleFunction},
-    model::{conversation::ConversationAttachment, schema::DescribedSchema},
+    interface::{
+        Context,
+        function::{Function, FunctionDescriptor, FunctionResponse},
+    },
+    model::{
+        conversation::{ConversationAttachment, IncompleteConversation, UserRole},
+        message::MessageToolCalling,
+        schema::DescribedSchema,
+    },
 };
+use lnb_rate_limiter::{RateLimiter, Rated};
 use reqwest::{Client as ReqwestClient, ClientBuilder, header::HeaderMap, multipart::Form};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use tempfile::NamedTempFile;
 use thiserror::Error as ThisError;
+use time::UtcDateTime;
 use tokio::{fs::File, io::AsyncWriteExt};
 use tracing::{debug, info};
 use url::Url;
@@ -29,14 +37,18 @@ pub struct ImageGenerator {
     http_client: ReqwestClient,
     edit_endpoint: Url,
     model: String,
+    rate_limiter: Option<RateLimiter>,
 }
 
-impl ConfigurableSimpleFunction for ImageGenerator {
+impl ConfigurableFunction for ImageGenerator {
     const NAME: &'static str = stringify!(ImageGenerator);
 
     type Configuration = ConfigToolsImageGenerator;
 
-    async fn configure(config: &ConfigToolsImageGenerator) -> Result<ImageGenerator, FunctionError> {
+    async fn configure(
+        config: &ConfigToolsImageGenerator,
+        rate_limiter: Option<RateLimiter>,
+    ) -> Result<ImageGenerator, FunctionError> {
         let client = {
             let openai_config = OpenAIConfig::new()
                 .with_api_key(&config.token)
@@ -61,16 +73,18 @@ impl ConfigurableSimpleFunction for ImageGenerator {
         };
         let edit_endpoint =
             Url::parse(&format!("{}/images/edits", config.endpoint)).map_err(FunctionError::by_serialization)?;
+
         Ok(ImageGenerator {
             client,
             http_client,
             edit_endpoint,
             model: config.model.to_string(),
+            rate_limiter,
         })
     }
 }
 
-impl SimpleFunction for ImageGenerator {
+impl Function for ImageGenerator {
     fn get_descriptor(&self) -> FunctionDescriptor {
         FunctionDescriptor {
             name: "image_generator".to_string(),
@@ -102,13 +116,19 @@ impl SimpleFunction for ImageGenerator {
         }
     }
 
-    fn call<'a>(&'a self, _id: &str, params: Value) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
-        let parameters = match serde_json::from_value(params).map_err(FunctionError::by_serialization) {
+    fn call<'a>(
+        &'a self,
+        context: &'a Context,
+        _incomplete: &'a IncompleteConversation,
+        _user_role: &'a UserRole,
+        tool_calling: MessageToolCalling,
+    ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
+        let parameters = match serde_json::from_value(tool_calling.arguments).map_err(FunctionError::by_serialization) {
             Ok(p) => p,
             Err(err) => return async { Err(FunctionError::Serialization(err.into())) }.boxed(),
         };
         async move {
-            match self.execute(parameters).await {
+            match self.execute(parameters, context.identity()).await {
                 Ok(response) => Ok(response),
                 Err(IntermediateError::AsResponse(message)) => Ok(FunctionResponse {
                     result: serde_json::to_value(GenerationError {
@@ -125,9 +145,17 @@ impl SimpleFunction for ImageGenerator {
 }
 
 impl ImageGenerator {
-    async fn execute(&self, parameters: GenerationParameters) -> Result<FunctionResponse, IntermediateError> {
+    async fn execute(
+        &self,
+        parameters: GenerationParameters,
+        identity: Option<&str>,
+    ) -> Result<FunctionResponse, IntermediateError> {
+        if !self.ensure_in_rate(identity).await {
+            return Err(IntermediateError::response("rate limit exceeded"));
+        }
+
         if parameters.prompt.is_empty() {
-            return Err(IntermediateError::AsResponse("prompt is empty".to_string()));
+            return Err(IntermediateError::response("prompt is empty"));
         }
 
         let images_response = match parameters.mode {
@@ -139,7 +167,7 @@ impl ImageGenerator {
         };
 
         let Some(first_image) = images_response.data.first() else {
-            return Err(IntermediateError::AsResponse("no image was generated".to_string()));
+            return Err(IntermediateError::response("no image was generated"));
         };
         let (image_bytes, returning_prompt) = match first_image.as_ref() {
             Image::Url { url, revised_prompt } => {
@@ -272,6 +300,17 @@ impl ImageGenerator {
         let restored_file = async_file.into_std().await;
         Ok(NamedTempFile::from_parts(restored_file, temp_path))
     }
+
+    async fn ensure_in_rate(&self, identity: Option<&str>) -> bool {
+        let Some(rate_limiter) = &self.rate_limiter else {
+            return true;
+        };
+        let Some(identity) = identity else {
+            return false;
+        };
+        let rated = rate_limiter.check(UtcDateTime::now(), identity).await;
+        matches!(rated, Rated::Success)
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -312,4 +351,10 @@ enum IntermediateError {
 
     #[error("unrecoverable function error: {0}")]
     Unrecoverable(#[from] FunctionError),
+}
+
+impl IntermediateError {
+    pub fn response(message: impl Into<String>) -> IntermediateError {
+        IntermediateError::AsResponse(message.into())
+    }
 }

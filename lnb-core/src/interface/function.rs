@@ -1,10 +1,20 @@
-pub mod complex;
-pub mod simple;
+use crate::{
+    error::FunctionError,
+    interface::Context,
+    model::{
+        conversation::{ConversationAttachment, IncompleteConversation, UserRole},
+        message::MessageToolCalling,
+        schema::DescribedSchema,
+    },
+};
 
-use crate::model::{conversation::ConversationAttachment, schema::DescribedSchema};
+use std::{fmt::Debug, sync::Arc};
 
+use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
+pub type ArcFunction = Arc<dyn Function + 'static>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FunctionDescriptor {
@@ -17,4 +27,18 @@ pub struct FunctionDescriptor {
 pub struct FunctionResponse {
     pub result: Value,
     pub attachments: Vec<ConversationAttachment>,
+}
+
+pub trait Function: Send + Sync {
+    /// この `ComplexFunction` のディスクリプタを返す。
+    fn get_descriptor(&self) -> FunctionDescriptor;
+
+    /// Function を実行する。
+    fn call<'a>(
+        &'a self,
+        context: &'a Context,
+        incomplete: &'a IncompleteConversation,
+        user_role: &'a UserRole,
+        tool_calling: MessageToolCalling,
+    ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>>;
 }

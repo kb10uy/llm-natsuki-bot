@@ -5,6 +5,7 @@ mod llm_cache;
 pub use function_store::FunctionStore;
 pub use llm_cache::LlmCache;
 use lnb_common::config::assistant::ConfigAssistant;
+use lnb_rate_limiter::RateLimiter;
 
 use crate::natsuki::inner::NatsukiInner;
 
@@ -26,6 +27,7 @@ pub struct Natsuki(Arc<NatsukiInner>);
 impl Natsuki {
     pub async fn new(
         storage: BoxConversationStorage,
+        rate_limiter: Option<RateLimiter>,
         llm_cache: llm_cache::LlmCache,
         function_store: function_store::FunctionStore,
         interceptions: impl IntoIterator<Item = BoxInterception>,
@@ -33,6 +35,7 @@ impl Natsuki {
     ) -> Result<Natsuki, ServerError> {
         let inner = NatsukiInner::new(
             storage,
+            rate_limiter,
             llm_cache,
             function_store,
             interceptions.into_iter().collect(),

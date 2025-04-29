@@ -14,12 +14,27 @@ use std::{
 // TODO: Serialize/Deserialize にしないと RPC 化に対応できない
 #[derive(Debug)]
 pub struct Context {
+    unique_identity: Option<String>,
     values: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
 }
 
 impl Context {
-    pub fn new() -> Context {
-        Context { values: HashMap::new() }
+    pub fn new_user(unique_identity: impl Into<String>) -> Context {
+        Context {
+            unique_identity: Some(unique_identity.into()),
+            values: HashMap::new(),
+        }
+    }
+
+    pub fn new_system() -> Context {
+        Context {
+            unique_identity: None,
+            values: HashMap::new(),
+        }
+    }
+
+    pub fn identity(&self) -> Option<&str> {
+        self.unique_identity.as_deref()
     }
 
     pub fn set<T: Any + Send + Sync>(&mut self, value: T) {
@@ -28,11 +43,5 @@ impl Context {
 
     pub fn get<T: Any + Send + Sync>(&self) -> Option<&T> {
         self.values.get(&TypeId::of::<T>()).and_then(|v| v.downcast_ref())
-    }
-}
-
-impl Default for Context {
-    fn default() -> Self {
-        Self::new()
     }
 }
