@@ -252,6 +252,7 @@ impl ImageGenerator {
             Some("image/jpeg") => NamedTempFile::with_suffix(".jpg").map_err(FunctionError::by_external)?,
             Some("image/png") => NamedTempFile::with_suffix(".png").map_err(FunctionError::by_external)?,
             Some("image/gif") => NamedTempFile::with_suffix(".gif").map_err(FunctionError::by_external)?,
+            Some("image/webp") => NamedTempFile::with_suffix(".webp").map_err(FunctionError::by_external)?,
             Some(otherwise) => {
                 return Err(FunctionError::External(format!("invalid MIME detected: {otherwise}").into()).into());
             }
