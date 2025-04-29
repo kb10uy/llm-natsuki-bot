@@ -141,7 +141,7 @@ impl ShiyuDispatcher {
         };
         let update = server
             .process_conversation(
-                Context::default(),
+                Context::new_system(),
                 conversation_id,
                 vec![user_message.into()],
                 UserRole::Normal,
