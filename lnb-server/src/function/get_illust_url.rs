@@ -1,12 +1,13 @@
 use crate::function::ConfigurableSimpleFunction;
 
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
-use lnb_common::{config::tools::ConfigToolsGetIllustUrl, rate_limits::RateLimitsCategory};
+use lnb_common::config::tools::ConfigToolsGetIllustUrl;
 use lnb_core::{
     error::FunctionError,
     interface::function::{FunctionDescriptor, FunctionResponse, simple::SimpleFunction},
     model::schema::DescribedSchema,
 };
+use lnb_rate_limiter::RateLimiter;
 use rand::{rng, seq::IndexedRandom};
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -24,7 +25,7 @@ impl ConfigurableSimpleFunction for GetIllustUrl {
 
     async fn configure(
         config: &ConfigToolsGetIllustUrl,
-        _: Option<&RateLimitsCategory>,
+        _: Option<RateLimiter>,
     ) -> Result<GetIllustUrl, FunctionError> {
         let pool = SqlitePool::connect(&config.database_filepath)
             .map_err(FunctionError::by_external)

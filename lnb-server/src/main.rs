@@ -99,7 +99,15 @@ async fn initialize_natsuki(config: &Config, rate_limits: &RateLimits) -> Result
     // Interceptions
     let interceptions = initialize_interceptions().await?;
 
-    let natsuki = Natsuki::new(storage, llm_cache, function_store, interceptions, &config.assistant).await?;
+    let natsuki = Natsuki::new(
+        storage,
+        Some(rate_limits.conversation.clone().try_into()?),
+        llm_cache,
+        function_store,
+        interceptions,
+        &config.assistant,
+    )
+    .await?;
     Ok((natsuki, shiyu))
 }
 
@@ -140,8 +148,9 @@ where
     let Some(config) = config else {
         return Ok(None);
     };
+    let rate_limiter = rate_limits_category.cloned().map(TryInto::try_into).transpose();
 
-    let simple_function = F::configure(config, rate_limits_category).await?;
+    let simple_function = F::configure(config, rate_limiter?).await?;
     info!("simple function configured: {}", F::NAME);
     Ok(Some(Arc::new(simple_function)))
 }

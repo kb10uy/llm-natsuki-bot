@@ -62,6 +62,9 @@ pub enum ServerError {
     /// 追加された Message の末尾が User ではない。
     #[error("new messages must have at least 1 element and last must be UserMessage")]
     MustEndsWithUserMessage,
+
+    #[error("rate limit exceeded; try later")]
+    RateLimitExceeded,
 }
 
 impl ServerError {

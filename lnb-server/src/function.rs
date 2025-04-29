@@ -9,12 +9,12 @@ pub use daily_private::DailyPrivate;
 pub use exchange_rate::ExchangeRate;
 pub use get_illust_url::GetIllustUrl;
 pub use image_generator::ImageGenerator;
+use lnb_rate_limiter::RateLimiter;
 pub use local_info::LocalInfo;
 pub use self_info::SelfInfo;
 
 use std::fmt::Debug;
 
-use lnb_common::rate_limits::RateLimitsCategory;
 use lnb_core::{error::FunctionError, interface::function::simple::SimpleFunction};
 use serde::de::DeserializeOwned;
 
@@ -29,8 +29,5 @@ where
     type Configuration: Debug + DeserializeOwned;
 
     /// Configures new instance.
-    async fn configure(
-        config: &Self::Configuration,
-        rate_limits: Option<&RateLimitsCategory>,
-    ) -> Result<Self, FunctionError>;
+    async fn configure(config: &Self::Configuration, rate_limits: Option<RateLimiter>) -> Result<Self, FunctionError>;
 }

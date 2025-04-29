@@ -1,6 +1,6 @@
 use std::{fs::read_to_string, io::Error as IoError, path::Path};
 
-use lnb_rate_limiter::{Rate, RateFilter};
+use lnb_rate_limiter::{Rate, RateFilter, RateLimiter};
 use regex::{Error as RegexError, Regex};
 use serde::Deserialize;
 use serde_json::Error as SerdeJsonError;
@@ -42,6 +42,15 @@ pub fn load_rate_limits(path: impl AsRef<Path>) -> Result<RateLimits, RateLimits
     let config_str = read_to_string(path).map_err(RateLimitsError::Io)?;
     let config = serde_json::from_str(&config_str).map_err(RateLimitsError::Serialization)?;
     Ok(config)
+}
+
+impl TryFrom<RateLimitsCategory> for RateLimiter {
+    type Error = RateLimitsError;
+
+    fn try_from(value: RateLimitsCategory) -> Result<RateLimiter, RateLimitsError> {
+        let filters: Result<Vec<_>, _> = value.filters.into_iter().map(|f| f.try_into()).collect();
+        Ok(RateLimiter::new(value.default.into(), filters?))
+    }
 }
 
 impl TryFrom<RateLimitsFilterDefinition> for RateFilter {

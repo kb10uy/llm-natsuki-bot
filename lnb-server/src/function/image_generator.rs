@@ -7,10 +7,7 @@ use async_openai::{
 };
 use base64::prelude::*;
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
-use lnb_common::{
-    config::tools::ConfigToolsImageGenerator,
-    rate_limits::{RateLimitsCategory, RateLimitsError},
-};
+use lnb_common::config::tools::ConfigToolsImageGenerator;
 use lnb_core::{
     APP_USER_AGENT,
     error::FunctionError,
@@ -44,7 +41,7 @@ impl ConfigurableSimpleFunction for ImageGenerator {
 
     async fn configure(
         config: &ConfigToolsImageGenerator,
-        rate_limits_category: Option<&RateLimitsCategory>,
+        rate_limiter: Option<RateLimiter>,
     ) -> Result<ImageGenerator, FunctionError> {
         let client = {
             let openai_config = OpenAIConfig::new()
@@ -71,19 +68,12 @@ impl ConfigurableSimpleFunction for ImageGenerator {
         let edit_endpoint =
             Url::parse(&format!("{}/images/edits", config.endpoint)).map_err(FunctionError::by_serialization)?;
 
-        let rate_limiter: Result<_, RateLimitsError> = rate_limits_category
-            .map(|rlc| {
-                let filters: Result<Vec<_>, _> = rlc.filters.iter().cloned().map(|f| f.try_into()).collect();
-                Ok(RateLimiter::new(rlc.default.clone().into(), filters?))
-            })
-            .transpose();
-
         Ok(ImageGenerator {
             client,
             http_client,
             edit_endpoint,
             model: config.model.to_string(),
-            rate_limiter: rate_limiter.map_err(FunctionError::by_serialization)?,
+            rate_limiter,
         })
     }
 }
