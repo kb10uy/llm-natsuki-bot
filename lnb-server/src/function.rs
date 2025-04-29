@@ -15,10 +15,10 @@ pub use self_info::SelfInfo;
 
 use std::fmt::Debug;
 
-use lnb_core::{error::FunctionError, interface::function::simple::SimpleFunction};
+use lnb_core::{error::FunctionError, interface::function::Function};
 use serde::de::DeserializeOwned;
 
-pub trait ConfigurableSimpleFunction: SimpleFunction
+pub trait ConfigurableFunction: Function
 where
     Self: Sized,
 {

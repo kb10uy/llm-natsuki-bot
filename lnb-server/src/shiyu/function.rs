@@ -4,7 +4,7 @@ use lnb_core::{
     error::FunctionError,
     interface::{
         Context,
-        function::{FunctionDescriptor, FunctionResponse, complex::ComplexFunction},
+        function::{Function, FunctionDescriptor, FunctionResponse},
         reminder::{Remind, RemindableContext, Reminder},
     },
     model::{
@@ -28,7 +28,7 @@ pub struct ShiyuProvider {
     max_seconds: i64,
 }
 
-impl ComplexFunction for ShiyuProvider {
+impl Function for ShiyuProvider {
     fn get_descriptor(&self) -> FunctionDescriptor {
         FunctionDescriptor {
             name: "shiyu_provider".to_string(),

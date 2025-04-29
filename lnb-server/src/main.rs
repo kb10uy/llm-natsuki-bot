@@ -8,9 +8,7 @@ mod storage;
 
 use crate::{
     bang_command::initialize_bang_command,
-    function::{
-        ConfigurableSimpleFunction, DailyPrivate, ExchangeRate, GetIllustUrl, ImageGenerator, LocalInfo, SelfInfo,
-    },
+    function::{ConfigurableFunction, DailyPrivate, ExchangeRate, GetIllustUrl, ImageGenerator, LocalInfo, SelfInfo},
     natsuki::{FunctionStore, LlmCache, Natsuki},
     shiyu::{Shiyu, ShiyuProvider},
     storage::initialize_storage,
@@ -25,11 +23,7 @@ use lnb_common::{
     config::{Config, load_config, tools::ConfigTools},
     rate_limits::{RateLimits, RateLimitsCategory, load_rate_limits},
 };
-use lnb_core::interface::{
-    client::LnbClient,
-    function::{complex::ArcComplexFunction, simple::ArcSimpleFunction},
-    interception::BoxInterception,
-};
+use lnb_core::interface::{client::LnbClient, function::ArcFunction, interception::BoxInterception};
 use lnb_discord_client::DiscordLnbClient;
 use lnb_mastodon_client::MastodonLnbClient;
 use tokio::spawn;
@@ -92,9 +86,9 @@ async fn initialize_natsuki(config: &Config, rate_limits: &RateLimits) -> Result
     info!("{} LLM backend definitions loaded", config.llm.models.len());
 
     // Functions
-    let simple_functions = initialize_simple_functions(&config.tools, rate_limits).await?;
-    let complex_functions: Vec<ArcComplexFunction> = vec![Arc::new(shiyu_provider)];
-    let function_store = FunctionStore::new(simple_functions, complex_functions);
+    let mut functions = initialize_functions(&config.tools, rate_limits).await?;
+    functions.push(Arc::new(shiyu_provider));
+    let function_store = FunctionStore::new(functions);
 
     // Interceptions
     let interceptions = initialize_interceptions().await?;
@@ -111,25 +105,19 @@ async fn initialize_natsuki(config: &Config, rate_limits: &RateLimits) -> Result
     Ok((natsuki, shiyu))
 }
 
-async fn initialize_simple_functions(
-    tool_config: &ConfigTools,
-    rate_limits: &RateLimits,
-) -> Result<Vec<ArcSimpleFunction>> {
-    let mut functions: Vec<ArcSimpleFunction> = vec![];
+async fn initialize_functions(tool_config: &ConfigTools, rate_limits: &RateLimits) -> Result<Vec<ArcFunction>> {
+    let mut functions: Vec<ArcFunction> = vec![];
 
     functions.push(Arc::new(SelfInfo::new()));
     functions.push(Arc::new(LocalInfo::new()?));
 
     functions.extend(
-        configure_simple_function::<ImageGenerator>(
-            tool_config.image_generator.as_ref(),
-            Some(&rate_limits.image_generator),
-        )
-        .await?,
+        configure_function::<ImageGenerator>(tool_config.image_generator.as_ref(), Some(&rate_limits.image_generator))
+            .await?,
     );
-    functions.extend(configure_simple_function::<ExchangeRate>(tool_config.exchange_rate.as_ref(), None).await?);
-    functions.extend(configure_simple_function::<GetIllustUrl>(tool_config.get_illust_url.as_ref(), None).await?);
-    functions.extend(configure_simple_function::<DailyPrivate>(tool_config.daily_private.as_ref(), None).await?);
+    functions.extend(configure_function::<ExchangeRate>(tool_config.exchange_rate.as_ref(), None).await?);
+    functions.extend(configure_function::<GetIllustUrl>(tool_config.get_illust_url.as_ref(), None).await?);
+    functions.extend(configure_function::<DailyPrivate>(tool_config.daily_private.as_ref(), None).await?);
 
     Ok(functions)
 }
@@ -138,12 +126,12 @@ async fn initialize_interceptions() -> Result<Vec<BoxInterception>> {
     Ok(vec![initialize_bang_command().await.into()])
 }
 
-async fn configure_simple_function<F>(
+async fn configure_function<F>(
     config: Option<&F::Configuration>,
     rate_limits_category: Option<&RateLimitsCategory>,
-) -> Result<Option<ArcSimpleFunction>>
+) -> Result<Option<ArcFunction>>
 where
-    F: ConfigurableSimpleFunction + 'static,
+    F: ConfigurableFunction + 'static,
 {
     let Some(config) = config else {
         return Ok(None);

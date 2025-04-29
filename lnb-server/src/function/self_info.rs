@@ -1,15 +1,22 @@
 use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
     error::FunctionError,
-    interface::function::{FunctionDescriptor, FunctionResponse, simple::SimpleFunction},
-    model::schema::DescribedSchema,
+    interface::{
+        Context,
+        function::{Function, FunctionDescriptor, FunctionResponse},
+    },
+    model::{
+        conversation::{IncompleteConversation, UserRole},
+        message::MessageToolCalling,
+        schema::DescribedSchema,
+    },
 };
-use serde_json::{Value, json};
+use serde_json::json;
 
 #[derive(Debug)]
 pub struct SelfInfo {}
 
-impl SimpleFunction for SelfInfo {
+impl Function for SelfInfo {
     fn get_descriptor(&self) -> FunctionDescriptor {
         FunctionDescriptor {
             name: "self_info".to_string(),
@@ -24,7 +31,13 @@ impl SimpleFunction for SelfInfo {
         }
     }
 
-    fn call<'a>(&'a self, _id: &str, _params: Value) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
+    fn call<'a>(
+        &'a self,
+        _context: &'a Context,
+        _incomplete: &'a IncompleteConversation,
+        _user_role: &'a UserRole,
+        _tool_calling: MessageToolCalling,
+    ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
         async { self.get_info() }.boxed()
     }
 }
