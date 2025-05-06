@@ -13,7 +13,7 @@ use lnb_core::{
     },
     model::{
         conversation::{
-            Conversation, ConversationAttachment, ConversationId, ConversationUpdate, IncompleteConversation, UserRole,
+            Conversation, ConversationAttachment, ConversationId, ConversationUpdate, IncompleteConversation,
         },
         message::{AssistantMessage, FunctionResponseMessage, Message, MessageToolCalling},
     },
@@ -59,7 +59,6 @@ impl NatsukiInner {
         context: Context,
         conversation_id: ConversationId,
         new_messages: Vec<Message>,
-        user_role: UserRole,
     ) -> Result<ConversationUpdate, ServerError> {
         // TODO: Context に UserRole を統合する
         if !self.ensure_in_rate(&context).await {
@@ -81,9 +80,7 @@ impl NatsukiInner {
         // interception updates
         // 後から追加した方が前のものを "wrap" する (axum などと同じ)ので逆順
         for interception in self.interceptions.iter().rev() {
-            let status = interception
-                .before_llm(&context, &mut incomplete_conversation, &user_role)
-                .await?;
+            let status = interception.before_llm(&context, &mut incomplete_conversation).await?;
             match status {
                 InterceptionStatus::Continue => continue,
                 InterceptionStatus::Bypass => break,

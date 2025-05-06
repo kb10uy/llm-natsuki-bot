@@ -1,10 +1,7 @@
 use crate::{
     error::LlmError,
     interface::Context,
-    model::{
-        conversation::{IncompleteConversation, UserRole},
-        message::AssistantMessage,
-    },
+    model::{conversation::IncompleteConversation, message::AssistantMessage},
 };
 
 use futures::future::BoxFuture;
@@ -17,7 +14,6 @@ pub trait Interception: Send + Sync {
         &'a self,
         context: &'a Context,
         incomplete: &'a mut IncompleteConversation,
-        user_role: &'a UserRole,
     ) -> BoxFuture<'a, Result<InterceptionStatus, LlmError>>;
 }
 

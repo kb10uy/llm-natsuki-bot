@@ -138,7 +138,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         let context = self.create_context(&status).await?;
         let conversation_update = self
             .assistant
-            .process_conversation(context, conversation_id, new_messages.clone(), UserRole::Normal)
+            .process_conversation(context, conversation_id, new_messages.clone())
             .await;
 
         // 返信処理

@@ -141,7 +141,7 @@ impl<S: LnbServer> DiscordLnbClientInner<S> {
         let context = self.create_context(&message).await?;
         let conversation_update = self
             .assistant
-            .process_conversation(context, conversation_id, new_messages.clone(), UserRole::Normal)
+            .process_conversation(context, conversation_id, new_messages.clone())
             .await;
 
         let recovered_update = match conversation_update {

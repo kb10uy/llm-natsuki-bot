@@ -11,10 +11,7 @@ use lnb_core::{
         reminder::{Remind, Remindable},
         server::LnbServer,
     },
-    model::{
-        conversation::UserRole,
-        message::{UserMessage, UserMessageContent},
-    },
+    model::message::{UserMessage, UserMessageContent},
 };
 use serde::{Deserialize, Serialize};
 use time::UtcDateTime;
@@ -140,12 +137,7 @@ impl ShiyuDispatcher {
             ..Default::default()
         };
         let update = server
-            .process_conversation(
-                Context::new_system(),
-                conversation_id,
-                vec![user_message.into()],
-                UserRole::Normal,
-            )
+            .process_conversation(Context::new_system(), conversation_id, vec![user_message.into()])
             .map_err(ReminderError::by_internal)
             .await?;
         remindable
