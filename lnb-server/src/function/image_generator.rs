@@ -1,10 +1,6 @@
 use crate::function::ConfigurableFunction;
 
-use async_openai::{
-    Client,
-    config::OpenAIConfig,
-    types::{CreateImageRequest, Image, ImageModel, ImagesResponse},
-};
+use async_openai::types::{Image, ImagesResponse};
 use base64::prelude::*;
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use lnb_common::config::tools::ConfigToolsImageGenerator;
@@ -22,8 +18,9 @@ use lnb_core::{
     },
 };
 use lnb_rate_limiter::{RateLimiter, Rated};
-use reqwest::{Client as ReqwestClient, ClientBuilder, header::HeaderMap, multipart::Form};
-use serde::{Deserialize, Serialize};
+use reqwest::{Client as ReqwestClient, ClientBuilder, Response, header::HeaderMap, multipart::Form};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde_json::{Value, json};
 use tempfile::NamedTempFile;
 use thiserror::Error as ThisError;
 use time::UtcDateTime;
@@ -35,8 +32,8 @@ pub const LOW_MODERATION_SCOPE: &str = "image_generator:low_moderation";
 
 #[derive(Debug)]
 pub struct ImageGenerator {
-    client: Client<OpenAIConfig>,
     http_client: ReqwestClient,
+    generate_endpoint: Url,
     edit_endpoint: Url,
     model: String,
     rate_limiter: Option<RateLimiter>,
@@ -51,16 +48,6 @@ impl ConfigurableFunction for ImageGenerator {
         config: &ConfigToolsImageGenerator,
         rate_limiter: Option<RateLimiter>,
     ) -> Result<ImageGenerator, FunctionError> {
-        let client = {
-            let openai_config = OpenAIConfig::new()
-                .with_api_key(&config.token)
-                .with_api_base(&config.endpoint);
-            let http_client = ClientBuilder::new()
-                .user_agent(APP_USER_AGENT)
-                .build()
-                .map_err(|e| FunctionError::External(e.into()))?;
-            Client::with_config(openai_config).with_http_client(http_client)
-        };
         let http_client = {
             let mut headers = HeaderMap::new();
             headers.insert(
@@ -73,12 +60,14 @@ impl ConfigurableFunction for ImageGenerator {
                 .build()
                 .map_err(FunctionError::by_external)?
         };
+        let generate_endpoint =
+            Url::parse(&format!("{}/images/generations", config.endpoint)).map_err(FunctionError::by_serialization)?;
         let edit_endpoint =
             Url::parse(&format!("{}/images/edits", config.endpoint)).map_err(FunctionError::by_serialization)?;
 
         Ok(ImageGenerator {
-            client,
             http_client,
+            generate_endpoint,
             edit_endpoint,
             model: config.model.to_string(),
             rate_limiter,
@@ -129,7 +118,7 @@ impl Function for ImageGenerator {
             Err(err) => return async { Err(FunctionError::Serialization(err.into())) }.boxed(),
         };
         async move {
-            match self.execute(parameters, context.identity()).await {
+            match self.execute(context, parameters).await {
                 Ok(response) => Ok(response),
                 Err(IntermediateError::AsResponse(message)) => Ok(FunctionResponse {
                     result: serde_json::to_value(GenerationError {
@@ -148,10 +137,10 @@ impl Function for ImageGenerator {
 impl ImageGenerator {
     async fn execute(
         &self,
+        context: &Context,
         parameters: GenerationParameters,
-        identity: Option<&str>,
     ) -> Result<FunctionResponse, IntermediateError> {
-        if !self.ensure_in_rate(identity).await {
+        if !self.ensure_in_rate(context.identity()).await {
             return Err(IntermediateError::response("rate limit exceeded"));
         }
 
@@ -160,9 +149,9 @@ impl ImageGenerator {
         }
 
         let images_response = match parameters.mode {
-            GenerationMode::Generate => self.generate_image(parameters.prompt.clone()).await?,
+            GenerationMode::Generate => self.generate_image(context, parameters.prompt.clone()).await?,
             GenerationMode::Edit => {
-                self.edit_image(parameters.prompt.clone(), parameters.input_image_urls)
+                self.edit_image(context, parameters.prompt.clone(), parameters.input_image_urls)
                     .await?
             }
         };
@@ -208,23 +197,35 @@ impl ImageGenerator {
         })
     }
 
-    async fn generate_image(&self, prompt: String) -> Result<ImagesResponse, IntermediateError> {
+    async fn generate_image(&self, context: &Context, prompt: String) -> Result<ImagesResponse, IntermediateError> {
         info!("generating image with {prompt:?}");
 
-        let request = CreateImageRequest {
-            prompt: prompt.clone(),
-            model: Some(ImageModel::Other(self.model.clone())),
-            ..Default::default()
+        let moderation = if context.role().accepts(LOW_MODERATION_SCOPE) {
+            "low"
+        } else {
+            "auto"
         };
-        self.client
-            .images()
-            .create(request)
-            .map_err(|e| IntermediateError::AsResponse(e.to_string()))
-            .await
+        let request = json!({
+            "model": self.model,
+            "prompt": prompt,
+            "moderation": moderation,
+            "user": context.identity().unwrap_or("system"),
+        });
+
+        let raw_response = self
+            .http_client
+            .post(self.generate_endpoint.clone())
+            .json(&request)
+            .send()
+            .map_err(FunctionError::by_external)
+            .await?;
+
+        deserialize_openai_response(raw_response).await
     }
 
     async fn edit_image(
         &self,
+        context: &Context,
         prompt: String,
         input_image_urls: Vec<String>,
     ) -> Result<ImagesResponse, IntermediateError> {
@@ -237,7 +238,10 @@ impl ImageGenerator {
         }
 
         let form = {
-            let mut f = Form::new().text("model", self.model.clone()).text("prompt", prompt);
+            let mut f = Form::new()
+                .text("model", self.model.clone())
+                .text("prompt", prompt)
+                .text("user", context.identity().unwrap_or("system").to_string());
             for image in &downloaded_images {
                 f = f
                     .file("image[]", image.path())
@@ -258,8 +262,7 @@ impl ImageGenerator {
             drop(image);
         }
 
-        let response = raw_response.json().map_err(FunctionError::by_serialization).await?;
-        Ok(response)
+        deserialize_openai_response(raw_response).await
     }
 
     async fn download_temporary_image(&self, url: String) -> Result<NamedTempFile, IntermediateError> {
@@ -311,6 +314,21 @@ impl ImageGenerator {
         };
         let rated = rate_limiter.check(UtcDateTime::now(), identity).await;
         matches!(rated, Rated::Success)
+    }
+}
+
+async fn deserialize_openai_response<T: DeserializeOwned>(response: Response) -> Result<T, IntermediateError> {
+    let is_success = response.status().is_success();
+    let json_value: Value = response.json().map_err(FunctionError::by_serialization).await?;
+    if is_success {
+        let value = serde_json::from_value(json_value).map_err(FunctionError::by_serialization)?;
+        Ok(value)
+    } else {
+        let error_message = json_value
+            .pointer("/error/message")
+            .and_then(|m| m.as_str())
+            .unwrap_or("unknown error");
+        Err(IntermediateError::AsResponse(error_message.to_string()))
     }
 }
 
