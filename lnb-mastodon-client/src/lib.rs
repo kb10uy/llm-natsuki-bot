@@ -6,7 +6,7 @@ use crate::inner::MastodonLnbClientInner;
 use std::{collections::HashMap, sync::Arc};
 
 use futures::{future::BoxFuture, prelude::*};
-use lnb_common::config::client::ConfigClientMastodon;
+use lnb_common::{config::client::ConfigClientMastodon, user_roles::UserRolesGroup};
 use lnb_core::{
     DebugOptionValue,
     error::{ClientError, ReminderError},
@@ -22,10 +22,11 @@ pub struct MastodonLnbClient<S>(Arc<MastodonLnbClientInner<S>>);
 impl<S: LnbServer> MastodonLnbClient<S> {
     pub async fn new(
         config: &ConfigClientMastodon,
+        roles_group: UserRolesGroup,
         debug_options: &HashMap<String, DebugOptionValue>,
         assistant: S,
     ) -> Result<MastodonLnbClient<S>, ClientError> {
-        let inner = MastodonLnbClientInner::new(config, debug_options, assistant).await?;
+        let inner = MastodonLnbClientInner::new(config, roles_group, debug_options, assistant).await?;
         Ok(MastodonLnbClient(Arc::new(inner)))
     }
 }

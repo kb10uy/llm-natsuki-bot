@@ -6,22 +6,29 @@ pub mod reminder;
 pub mod server;
 pub mod storage;
 
-use std::{
-    any::{Any, TypeId},
-    collections::HashMap,
-};
+use std::collections::HashMap;
 
-// TODO: Serialize/Deserialize にしないと RPC 化に対応できない
-#[derive(Debug)]
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde_json::{Error as SerdeJsonError, Value};
+
+use crate::model::user_role::UserRole;
+
+pub trait Extension: Serialize + DeserializeOwned {
+    const NAME: &'static str;
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Context {
     unique_identity: Option<String>,
-    values: HashMap<TypeId, Box<dyn Any + Send + Sync>>,
+    role: UserRole,
+    values: HashMap<String, Value>,
 }
 
 impl Context {
-    pub fn new_user(unique_identity: impl Into<String>) -> Context {
+    pub fn new_user(unique_identity: impl Into<String>, role: UserRole) -> Context {
         Context {
             unique_identity: Some(unique_identity.into()),
+            role,
             values: HashMap::new(),
         }
     }
@@ -29,6 +36,7 @@ impl Context {
     pub fn new_system() -> Context {
         Context {
             unique_identity: None,
+            role: UserRole::Privileged,
             values: HashMap::new(),
         }
     }
@@ -37,11 +45,20 @@ impl Context {
         self.unique_identity.as_deref()
     }
 
-    pub fn set<T: Any + Send + Sync>(&mut self, value: T) {
-        self.values.insert(TypeId::of::<T>(), Box::new(value));
+    pub fn role(&self) -> &UserRole {
+        &self.role
     }
 
-    pub fn get<T: Any + Send + Sync>(&self) -> Option<&T> {
-        self.values.get(&TypeId::of::<T>()).and_then(|v| v.downcast_ref())
+    pub fn set<T: Extension>(&mut self, value: T) -> Result<(), SerdeJsonError> {
+        let value = serde_json::to_value(value)?;
+        self.values.insert(T::NAME.to_string(), value);
+        Ok(())
+    }
+
+    pub fn get<T: Extension>(&self) -> Result<Option<T>, SerdeJsonError> {
+        self.values
+            .get(T::NAME)
+            .map(|v| serde_json::from_value(v.clone()))
+            .transpose()
     }
 }

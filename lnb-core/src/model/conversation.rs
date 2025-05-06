@@ -1,7 +1,5 @@
 use crate::model::message::{AssistantMessage, Message, UserMessage};
 
-use std::collections::BTreeSet;
-
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -229,18 +227,4 @@ pub enum ConversationAttachment {
         bytes: Vec<u8>,
         description: Option<String>,
     },
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case", tag = "kind", content = "value")]
-pub enum UserRole {
-    Privileged,
-    Scoped(BTreeSet<String>),
-    Normal,
-}
-
-impl UserRole {
-    pub fn scoped_with(scopes: impl IntoIterator<Item = impl Into<String>>) -> UserRole {
-        UserRole::Scoped(scopes.into_iter().map(|s| s.into()).collect())
-    }
 }

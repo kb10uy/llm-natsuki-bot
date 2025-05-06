@@ -2,7 +2,7 @@ use crate::{
     error::FunctionError,
     interface::Context,
     model::{
-        conversation::{ConversationAttachment, IncompleteConversation, UserRole},
+        conversation::{ConversationAttachment, IncompleteConversation},
         message::MessageToolCalling,
         schema::DescribedSchema,
     },
@@ -38,7 +38,6 @@ pub trait Function: Send + Sync {
         &'a self,
         context: &'a Context,
         incomplete: &'a IncompleteConversation,
-        user_role: &'a UserRole,
         tool_calling: MessageToolCalling,
     ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>>;
 }

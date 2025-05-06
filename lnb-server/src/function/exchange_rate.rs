@@ -11,11 +11,7 @@ use lnb_core::{
         Context,
         function::{Function, FunctionDescriptor, FunctionResponse},
     },
-    model::{
-        conversation::{IncompleteConversation, UserRole},
-        message::MessageToolCalling,
-        schema::DescribedSchema,
-    },
+    model::{conversation::IncompleteConversation, message::MessageToolCalling, schema::DescribedSchema},
 };
 use lnb_rate_limiter::RateLimiter;
 use reqwest::{Client, ClientBuilder};
@@ -77,7 +73,6 @@ impl Function for ExchangeRate {
         &'a self,
         _context: &'a Context,
         _incomplete: &'a IncompleteConversation,
-        _user_role: &'a UserRole,
         tool_calling: MessageToolCalling,
     ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
         let parameters = match serde_json::from_value(tool_calling.arguments).map_err(FunctionError::by_serialization) {

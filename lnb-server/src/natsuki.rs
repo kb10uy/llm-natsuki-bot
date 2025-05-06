@@ -16,7 +16,7 @@ use lnb_core::{
     error::ServerError,
     interface::{Context, interception::BoxInterception, server::LnbServer, storage::BoxConversationStorage},
     model::{
-        conversation::{ConversationId, ConversationUpdate, UserRole},
+        conversation::{ConversationId, ConversationUpdate},
         message::Message,
     },
 };
@@ -70,11 +70,10 @@ impl LnbServer for Natsuki {
         context: Context,
         conversation_id: ConversationId,
         user_message: Vec<Message>,
-        user_role: UserRole,
     ) -> BoxFuture<'_, Result<ConversationUpdate, ServerError>> {
         async move {
             self.0
-                .process_conversation(context, conversation_id, user_message, user_role)
+                .process_conversation(context, conversation_id, user_message)
                 .await
         }
         .boxed()

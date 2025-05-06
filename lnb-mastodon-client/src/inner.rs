@@ -6,13 +6,13 @@ use crate::{
 use std::{collections::HashMap, iter::once, sync::Arc, time::Duration};
 
 use futures::prelude::*;
-use lnb_common::config::client::ConfigClientMastodon;
+use lnb_common::{config::client::ConfigClientMastodon, user_roles::UserRolesGroup};
 use lnb_core::{
     APP_USER_AGENT, DebugOptionValue,
     error::ClientError,
     interface::{Context, reminder::RemindableContext, server::LnbServer},
     model::{
-        conversation::{ConversationAttachment, ConversationId, ConversationUpdate, UserRole},
+        conversation::{ConversationAttachment, ConversationId, ConversationUpdate},
         message::{AssistantMessage, Message, UserMessage, UserMessageContent},
     },
 };
@@ -35,6 +35,7 @@ const RECONNECT_SLEEP: Duration = Duration::from_secs(120);
 #[derive(Debug)]
 pub struct MastodonLnbClientInner<S> {
     assistant: S,
+    roles_group: UserRolesGroup,
     mastodon: Mastodon,
     self_account: Account,
     sensitive_spoiler: String,
@@ -45,6 +46,7 @@ pub struct MastodonLnbClientInner<S> {
 impl<S: LnbServer> MastodonLnbClientInner<S> {
     pub async fn new(
         config: &ConfigClientMastodon,
+        roles_group: UserRolesGroup,
         debug_options: &HashMap<String, DebugOptionValue>,
         assistant: S,
     ) -> Result<MastodonLnbClientInner<S>, ClientError> {
@@ -64,6 +66,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
 
         Ok(MastodonLnbClientInner {
             assistant,
+            roles_group,
             mastodon,
             self_account,
             sensitive_spoiler: config.sensitive_spoiler.clone(),
@@ -135,10 +138,10 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         let (conversation_id, new_messages) = self.get_conversation(&status).await?;
 
         // Conversation の更新・呼出し
-        let context = create_context(&status)?;
+        let context = self.create_context(&status).await?;
         let conversation_update = self
             .assistant
-            .process_conversation(context, conversation_id, new_messages.clone(), UserRole::Normal)
+            .process_conversation(context, conversation_id, new_messages.clone())
             .await;
 
         // 返信処理
@@ -425,19 +428,22 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
 
         Ok(())
     }
-}
 
-fn create_context(status: &Status) -> Result<Context, ClientError> {
-    let mut context = Context::new_user(format!("{CONTEXT_KEY_PREFIX}:{}", status.account.acct));
-    context.set(RemindableContext {
-        context: CONTEXT_KEY_PREFIX.to_string(),
-        requester: serde_json::to_string(&RemindRequester {
-            acct: status.account.acct.clone(),
-            visibility: status.visibility,
-        })
-        .map_err(ClientError::by_external)?,
-    });
-    Ok(context)
+    async fn create_context(&self, status: &Status) -> Result<Context, ClientError> {
+        let identity = format!("{CONTEXT_KEY_PREFIX}:{}", status.account.acct);
+        let remindable = RemindableContext {
+            context: CONTEXT_KEY_PREFIX.to_string(),
+            requester: serde_json::to_string(&RemindRequester {
+                acct: status.account.acct.clone(),
+                visibility: status.visibility,
+            })
+            .map_err(ClientError::by_external)?,
+        };
+
+        let mut context = Context::new_user(identity, self.roles_group.get(&status.account.acct).clone());
+        context.set(remindable).map_err(ClientError::by_external)?;
+        Ok(context)
+    }
 }
 
 /// `Remindable` に付与する requester。

@@ -4,7 +4,7 @@ use crate::{
     error::ServerError,
     interface::Context,
     model::{
-        conversation::{ConversationId, ConversationUpdate, UserRole},
+        conversation::{ConversationId, ConversationUpdate},
         message::Message,
     },
 };
@@ -32,6 +32,5 @@ pub trait LnbServer: Send + Sync + 'static {
         context: Context,
         conversation_id: ConversationId,
         user_message: Vec<Message>,
-        user_role: UserRole,
     ) -> BoxFuture<'_, Result<ConversationUpdate, ServerError>>;
 }

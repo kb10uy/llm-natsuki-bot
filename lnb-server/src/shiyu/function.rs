@@ -7,11 +7,7 @@ use lnb_core::{
         function::{Function, FunctionDescriptor, FunctionResponse},
         reminder::{Remind, RemindableContext, Reminder},
     },
-    model::{
-        conversation::{IncompleteConversation, UserRole},
-        message::MessageToolCalling,
-        schema::DescribedSchema,
-    },
+    model::{conversation::IncompleteConversation, message::MessageToolCalling, schema::DescribedSchema},
 };
 use serde::{Deserialize, Serialize};
 use time::{
@@ -66,7 +62,6 @@ impl Function for ShiyuProvider {
         &'a self,
         context: &'a Context,
         _incomplete: &'a IncompleteConversation,
-        _user_role: &'a UserRole,
         tool_calling: MessageToolCalling,
     ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
         let parameters = match serde_json::from_value(tool_calling.arguments).map_err(FunctionError::by_serialization) {
@@ -90,7 +85,10 @@ impl ShiyuProvider {
         context: &Context,
         parameters: ReminderParameters,
     ) -> Result<FunctionResponse, FunctionError> {
-        let Some(remindable) = context.get::<RemindableContext>() else {
+        let Some(remindable) = context
+            .get::<RemindableContext>()
+            .map_err(FunctionError::by_serialization)?
+        else {
             return self.error(ReminderResponse::UnsupportedPlatform).await;
         };
 
@@ -115,7 +113,7 @@ impl ShiyuProvider {
             return self.error(ReminderResponse::DueLimitExceeded).await;
         }
 
-        self.register(remindable, complete_remind_at, parameters.content).await
+        self.register(&remindable, complete_remind_at, parameters.content).await
     }
 
     async fn register(

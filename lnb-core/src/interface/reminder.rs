@@ -1,4 +1,4 @@
-use crate::{error::ReminderError, model::conversation::ConversationUpdate};
+use crate::{error::ReminderError, interface::Extension, model::conversation::ConversationUpdate};
 
 use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
@@ -27,6 +27,10 @@ pub trait Reminder: Send + Sync + 'static {
 pub struct RemindableContext {
     pub context: String,
     pub requester: String,
+}
+
+impl Extension for RemindableContext {
+    const NAME: &'static str = stringify!(RemindableContext);
 }
 
 /// Reminder を送信可能なクライアントが実装する。
