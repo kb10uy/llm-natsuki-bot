@@ -1,10 +1,10 @@
 {
   mastodon: {
     default: 'normal',
-    definitions: [],
+    filters: [],
   },
   discord: {
     default: 'normal',
-    definitions: [],
+    filters: [],
   },
 }
