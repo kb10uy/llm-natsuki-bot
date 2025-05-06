@@ -63,14 +63,14 @@ pub fn development_api() -> Result<()> {
 }
 
 pub fn build_config() -> Result<()> {
-    run_command_in_repository("jsonnet", &["config.jsonnet", "-o", "data/config.generated.json"])?;
+    run_command_in_repository("jsonnet", &["config/config.jsonnet", "-o", "data/config.generated.json"])?;
     run_command_in_repository(
         "jsonnet",
-        &["rate-limits.jsonnet", "-o", "data/rate-limits.generated.json"],
+        &["config/rate-limits.jsonnet", "-o", "data/rate-limits.generated.json"],
     )?;
     run_command_in_repository(
         "jsonnet",
-        &["user-roles.jsonnet", "-o", "data/user-roles.generated.json"],
+        &["config/user-roles.jsonnet", "-o", "data/user-roles.generated.json"],
     )?;
     Ok(())
 }
