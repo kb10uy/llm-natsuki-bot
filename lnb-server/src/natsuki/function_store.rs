@@ -6,10 +6,7 @@ use lnb_core::{
         Context,
         function::{ArcFunction, FunctionDescriptor, FunctionResponse},
     },
-    model::{
-        conversation::{IncompleteConversation, UserRole},
-        message::MessageToolCalling,
-    },
+    model::{conversation::IncompleteConversation, message::MessageToolCalling},
 };
 
 #[derive(Clone)]
@@ -40,10 +37,9 @@ impl FunctionStore {
         tool_calling: MessageToolCalling,
         context: &Context,
         incomplete: &IncompleteConversation,
-        role: &UserRole,
     ) -> Option<Result<FunctionResponse, FunctionError>> {
         if let Some((function, _)) = self.functions.get(&tool_calling.name) {
-            let result = function.call(context, incomplete, role, tool_calling).await;
+            let result = function.call(context, incomplete, tool_calling).await;
             Some(result)
         } else {
             None

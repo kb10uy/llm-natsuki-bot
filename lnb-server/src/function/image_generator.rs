@@ -16,7 +16,7 @@ use lnb_core::{
         function::{Function, FunctionDescriptor, FunctionResponse},
     },
     model::{
-        conversation::{ConversationAttachment, IncompleteConversation, UserRole},
+        conversation::{ConversationAttachment, IncompleteConversation},
         message::MessageToolCalling,
         schema::DescribedSchema,
     },
@@ -30,6 +30,8 @@ use time::UtcDateTime;
 use tokio::{fs::File, io::AsyncWriteExt};
 use tracing::{debug, info};
 use url::Url;
+
+pub const LOW_MODERATION_SCOPE: &str = "image_generator:low_moderation";
 
 #[derive(Debug)]
 pub struct ImageGenerator {
@@ -120,7 +122,6 @@ impl Function for ImageGenerator {
         &'a self,
         context: &'a Context,
         _incomplete: &'a IncompleteConversation,
-        _user_role: &'a UserRole,
         tool_calling: MessageToolCalling,
     ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
         let parameters = match serde_json::from_value(tool_calling.arguments).map_err(FunctionError::by_serialization) {

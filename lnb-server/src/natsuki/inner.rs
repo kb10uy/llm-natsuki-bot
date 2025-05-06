@@ -148,7 +148,7 @@ impl NatsukiInner {
                     debug!("conversation requested tool calling");
                     let call_message = Message::new_function_calls(tool_callings.clone());
                     let (response_messages, called_attachments) = self
-                        .process_tool_callings(&context, &incomplete_conversation, &user_role, tool_callings)
+                        .process_tool_callings(&context, &incomplete_conversation, tool_callings)
                         .await?;
 
                     let extending_messages = once(call_message).chain(response_messages.into_iter().map(|m| m.into()));
@@ -197,7 +197,6 @@ impl NatsukiInner {
         &self,
         context: &Context,
         incomplete_conversation: &IncompleteConversation,
-        user_role: &UserRole,
         tool_callings: Vec<MessageToolCalling>,
     ) -> Result<(Vec<FunctionResponseMessage>, Vec<ConversationAttachment>), ServerError> {
         let mut responses = vec![];
@@ -208,7 +207,7 @@ impl NatsukiInner {
 
             let Some(response) = self
                 .function_store
-                .find_call(tool_calling, context, incomplete_conversation, user_role)
+                .find_call(tool_calling, context, incomplete_conversation)
                 .await
             else {
                 warn!("tool {name} not found, skipping");

@@ -8,11 +8,7 @@ use lnb_core::{
         Context,
         function::{Function, FunctionDescriptor, FunctionResponse},
     },
-    model::{
-        conversation::{IncompleteConversation, UserRole},
-        message::MessageToolCalling,
-        schema::DescribedSchema,
-    },
+    model::{conversation::IncompleteConversation, message::MessageToolCalling, schema::DescribedSchema},
 };
 use lnb_rate_limiter::RateLimiter;
 use rand::{rng, seq::IndexedRandom};
@@ -62,7 +58,6 @@ impl Function for GetIllustUrl {
         &'a self,
         _context: &'a Context,
         _incomplete: &'a IncompleteConversation,
-        _user_role: &'a UserRole,
         tool_calling: MessageToolCalling,
     ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
         let count = tool_calling.arguments["count"].as_u64().unwrap_or(1) as usize;

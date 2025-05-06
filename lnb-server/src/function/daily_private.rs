@@ -8,11 +8,7 @@ use lnb_core::{
         Context,
         function::{Function, FunctionDescriptor, FunctionResponse},
     },
-    model::{
-        conversation::{IncompleteConversation, UserRole},
-        message::MessageToolCalling,
-        schema::DescribedSchema,
-    },
+    model::{conversation::IncompleteConversation, message::MessageToolCalling, schema::DescribedSchema},
 };
 use lnb_daily_private::{
     day_routine::{DayRoutineConfiguration, DayStep},
@@ -102,7 +98,6 @@ impl Function for DailyPrivate {
         &'a self,
         _context: &'a Context,
         _incomplete: &'a IncompleteConversation,
-        _user_role: &'a UserRole,
         _tool_calling: MessageToolCalling,
     ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
         async move { self.get_daily_info().await }.boxed()

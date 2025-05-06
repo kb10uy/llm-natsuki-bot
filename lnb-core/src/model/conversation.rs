@@ -243,4 +243,12 @@ impl UserRole {
     pub fn scoped_with(scopes: impl IntoIterator<Item = impl Into<String>>) -> UserRole {
         UserRole::Scoped(scopes.into_iter().map(|s| s.into()).collect())
     }
+
+    pub fn accepts(&self, scope: &str) -> bool {
+        match self {
+            UserRole::Privileged => true,
+            UserRole::Scoped(scopes) => scopes.contains(scope),
+            UserRole::Normal => false,
+        }
+    }
 }
