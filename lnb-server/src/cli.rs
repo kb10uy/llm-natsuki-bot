@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use clap::Parser;
-use lnb_core::{DebugOptionValue, parse_debug_option};
+use lnb_common::debug::{DebugOptionValue, parse_debug_option};
 
 #[derive(Debug, Clone, Parser)]
 #[clap(author, version)]
