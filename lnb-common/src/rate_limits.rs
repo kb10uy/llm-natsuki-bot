@@ -21,7 +21,8 @@ pub struct RateLimitsCategory {
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct RateLimitsFilterDefinition {
-    pub pattern: String,
+    pub identity: Option<String>,
+    pub pattern: Option<String>,
     pub rate: RateLimitsRateDefinition,
 }
 
@@ -57,10 +58,20 @@ impl TryFrom<RateLimitsFilterDefinition> for RateFilter {
     type Error = RateLimitsError;
 
     fn try_from(value: RateLimitsFilterDefinition) -> Result<RateFilter, RateLimitsError> {
-        Ok(RateFilter::new(
-            Regex::new(&value.pattern).map_err(RateLimitsError::Regex)?,
-            value.rate.into(),
-        ))
+        let filter_regex = match (value.identity, value.pattern) {
+            (None, Some(pattern)) => Regex::new(&pattern).map_err(RateLimitsError::Regex)?,
+            (Some(identity), None) => {
+                let pattern = format!("^{}$", regex::escape(&identity));
+                Regex::new(&pattern).map_err(RateLimitsError::Regex)?
+            }
+            (Some(_), Some(_)) => {
+                return Err(RateLimitsError::Other(
+                    "both identity and pattern specified".to_string(),
+                ));
+            }
+            (None, None) => return Err(RateLimitsError::Other("identity or pattern must exist".to_string())),
+        };
+        Ok(RateFilter::new(filter_regex, value.rate.into()))
     }
 }
 
@@ -90,4 +101,7 @@ pub enum RateLimitsError {
 
     #[error("regex error: {0}")]
     Regex(RegexError),
+
+    #[error("other error: {0}")]
+    Other(String),
 }
