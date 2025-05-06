@@ -138,14 +138,10 @@ impl<S: LnbServer> DiscordLnbClientInner<S> {
             }
             .into(),
         ];
+        let context = self.create_context(&message).await?;
         let conversation_update = self
             .assistant
-            .process_conversation(
-                LnbContext::new_user(format!("{CONTEXT_KEY_PREFIX}:{}", message.author.id)),
-                conversation_id,
-                new_messages.clone(),
-                UserRole::Normal,
-            )
+            .process_conversation(context, conversation_id, new_messages.clone(), UserRole::Normal)
             .await;
 
         let recovered_update = match conversation_update {
@@ -198,5 +194,12 @@ impl<S: LnbServer> DiscordLnbClientInner<S> {
             .await?;
 
         Ok(())
+    }
+
+    async fn create_context(&self, message: &MessageCreate) -> Result<LnbContext, ClientError> {
+        let identity = format!("{CONTEXT_KEY_PREFIX}:{}", message.author.id);
+
+        let context = LnbContext::new_user(identity, UserRole::Normal);
+        Ok(context)
     }
 }

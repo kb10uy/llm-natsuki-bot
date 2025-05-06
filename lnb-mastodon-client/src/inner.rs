@@ -135,7 +135,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         let (conversation_id, new_messages) = self.get_conversation(&status).await?;
 
         // Conversation の更新・呼出し
-        let context = create_context(&status)?;
+        let context = self.create_context(&status).await?;
         let conversation_update = self
             .assistant
             .process_conversation(context, conversation_id, new_messages.clone(), UserRole::Normal)
@@ -425,19 +425,22 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
 
         Ok(())
     }
-}
 
-fn create_context(status: &Status) -> Result<Context, ClientError> {
-    let mut context = Context::new_user(format!("{CONTEXT_KEY_PREFIX}:{}", status.account.acct));
-    context.set(RemindableContext {
-        context: CONTEXT_KEY_PREFIX.to_string(),
-        requester: serde_json::to_string(&RemindRequester {
-            acct: status.account.acct.clone(),
-            visibility: status.visibility,
-        })
-        .map_err(ClientError::by_external)?,
-    });
-    Ok(context)
+    async fn create_context(&self, status: &Status) -> Result<Context, ClientError> {
+        let identity = format!("{CONTEXT_KEY_PREFIX}:{}", status.account.acct);
+        let remindable = RemindableContext {
+            context: CONTEXT_KEY_PREFIX.to_string(),
+            requester: serde_json::to_string(&RemindRequester {
+                acct: status.account.acct.clone(),
+                visibility: status.visibility,
+            })
+            .map_err(ClientError::by_external)?,
+        };
+
+        let mut context = Context::new_user(identity, UserRole::Normal);
+        context.set(remindable).map_err(ClientError::by_external)?;
+        Ok(context)
+    }
 }
 
 /// `Remindable` に付与する requester。

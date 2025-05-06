@@ -90,7 +90,10 @@ impl ShiyuProvider {
         context: &Context,
         parameters: ReminderParameters,
     ) -> Result<FunctionResponse, FunctionError> {
-        let Some(remindable) = context.get::<RemindableContext>() else {
+        let Some(remindable) = context
+            .get::<RemindableContext>()
+            .map_err(FunctionError::by_serialization)?
+        else {
             return self.error(ReminderResponse::UnsupportedPlatform).await;
         };
 
@@ -115,7 +118,7 @@ impl ShiyuProvider {
             return self.error(ReminderResponse::DueLimitExceeded).await;
         }
 
-        self.register(remindable, complete_remind_at, parameters.content).await
+        self.register(&remindable, complete_remind_at, parameters.content).await
     }
 
     async fn register(
