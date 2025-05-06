@@ -83,7 +83,7 @@ local tool_config = {
       cycle_mu_sigma: [30, 2],
       bleeding_days: 7,
       ovulation_day: 14,
-      pad_length_variations: [
+      pad_variations: [
         { length_centimeters: 17, has_wing: false, thickness: 'very_thin' },
       ],
     },
