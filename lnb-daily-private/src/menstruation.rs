@@ -7,7 +7,25 @@ pub struct MenstruationConfiguration {
     pub cycle_mu_sigma: (f64, f64),
     pub bleeding_days: u16,
     pub ovulation_day: u16,
-    pub pad_length_variations: Vec<usize>,
+    pub pad_variations: Vec<PadVariation>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct PadVariation {
+    pub length_centimeters: f64,
+    pub has_wing: bool,
+    pub thickness: PadThickness,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, Hash)]
+#[serde(rename_all = "snake_case")]
+#[repr(u8)]
+pub enum PadThickness {
+    VeryThin,
+    Thin,
+    Normal,
+    Thick,
+    VeryThick,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]
@@ -23,7 +41,7 @@ pub enum MensePhase {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case", tag = "type", content = "details")]
 pub enum MenstruationAbsorbent {
-    Pad { length_centimeters: usize, has_wing: bool },
+    Pad(PadVariation),
     Tampon,
     Cup,
 }
@@ -79,15 +97,13 @@ impl MenstruationConfiguration {
         let bleeding_days = (cycle_days < self.bleeding_days).then_some(cycle_days + 1);
 
         let absorbent = {
-            let length = self.pad_length_variations.choose(rng).unwrap_or(&0);
-            let has_wing = rng.random();
-            match (0..2).choose(rng).expect("variant error") {
-                0 => MenstruationAbsorbent::Pad {
-                    length_centimeters: *length,
-                    has_wing,
-                },
-                1 => MenstruationAbsorbent::Tampon,
-                2 => MenstruationAbsorbent::Cup,
+            let variant = (0..2).choose(rng).expect("variant error");
+            let pad_variation = self.pad_variations.choose(rng);
+            match (variant, pad_variation) {
+                (0, Some(pad)) => Some(MenstruationAbsorbent::Pad(pad.clone())),
+                (0, None) => None,
+                (1, _) => Some(MenstruationAbsorbent::Tampon),
+                (2, _) => Some(MenstruationAbsorbent::Cup),
                 _ => unreachable!("invalid range"),
             }
         };
@@ -95,7 +111,7 @@ impl MenstruationConfiguration {
         MenstruationStatus {
             phase,
             bleeding_days,
-            absorbent: bleeding_days.and(Some(absorbent)),
+            absorbent: bleeding_days.and(absorbent),
         }
     }
 }
