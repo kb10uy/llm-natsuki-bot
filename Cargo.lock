@@ -1667,6 +1667,7 @@ dependencies = [
  "rand 0.9.1",
  "rand_distr",
  "serde",
+ "thiserror 2.0.12",
  "time",
 ]
 

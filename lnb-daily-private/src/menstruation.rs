@@ -1,12 +1,14 @@
+use crate::DailyPrivateError;
+
 use rand::prelude::*;
 use rand_distr::Normal;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MenstruationConfiguration {
-    pub cycle_mu_sigma: (f64, f64),
-    pub bleeding_days: u16,
-    pub ovulation_day: u16,
+    pub cycle_mu_sigma: (u64, f64),
+    pub bleeding_days: i64,
+    pub ovulation_day: i64,
     pub pad_variations: Vec<PadVariation>,
 }
 
@@ -51,40 +53,61 @@ pub struct MenstruationStatus {
     #[serde(skip_serializing)]
     pub phase: MensePhase,
 
-    pub bleeding_days: Option<u16>,
+    pub bleeding_days: Option<i64>,
     pub absorbent: Option<MenstruationAbsorbent>,
 }
 
 impl MenstruationConfiguration {
-    pub fn calculate_cycles<R: RngCore + ?Sized>(&self, annual_rng: &mut R) -> Vec<(u16, u16)> {
-        let cycle_distr = {
-            let (mu, sigma) = self.cycle_mu_sigma;
-            Normal::new(mu, sigma).expect("invalid distribution")
-        };
-
-        let mut next_starting_ordinal = 1;
-        let mut starting_ordinals = vec![];
-        while next_starting_ordinal <= 366 {
-            let cycle_length = cycle_distr.sample(annual_rng).max(1.0).round_ties_even() as u16;
-            starting_ordinals.push((next_starting_ordinal, cycle_length));
-            next_starting_ordinal += cycle_length;
+    pub fn calculate_cycles<R: RngCore + ?Sized>(
+        &self,
+        long_term_rng: &mut R,
+        long_term_days: u64,
+    ) -> Result<Vec<(i64, i64)>, DailyPrivateError> {
+        // 長期収束のために割り切れれて正の商になる必要がある
+        if long_term_days % self.cycle_mu_sigma.0 != 0 || long_term_days < self.cycle_mu_sigma.0 {
+            return Err(DailyPrivateError::LongTermMismatch);
         }
-        starting_ordinals
+        let long_term_cycles = (long_term_days / self.cycle_mu_sigma.0) as usize;
+
+        // ジッターの各周期後の総和が 2σ を超えないように生成
+        let jitter_distr = Normal::new(0.0, self.cycle_mu_sigma.1).expect("invalid distribution");
+        let jitter_limit = (self.cycle_mu_sigma.1 * 2.0).round() as i64;
+        let mut jitters = vec![0i64; long_term_cycles];
+        let mut jitter_sum = 0i64;
+        for jitter in &mut jitters {
+            let jitter_candidate = jitter_distr.sample(long_term_rng).round() as i64;
+            let clamped_jitter = jitter_candidate.clamp(-jitter_limit - jitter_sum, jitter_limit - jitter_sum);
+            *jitter = clamped_jitter;
+            jitter_sum += clamped_jitter;
+        }
+        // 最後だけ合わせる
+        jitters[long_term_cycles - 1] -= jitter_sum;
+
+        let (cycles, total_length) = jitters.iter().map(|j| j + self.cycle_mu_sigma.0 as i64).fold(
+            (Vec::with_capacity(long_term_cycles), 0),
+            |(mut cycles, sum), length| {
+                cycles.push((sum, length));
+                (cycles, sum + length)
+            },
+        );
+        debug_assert_eq!(total_length, long_term_days as i64);
+
+        Ok(cycles)
     }
 
     pub fn construct_status<R: RngCore + ?Sized>(
         &self,
         rng: &mut R,
-        cycles: &[(u16, u16)],
-        logical_ordinal: u16,
+        cycles: &[(i64, i64)],
+        logical_in_long_term: i64,
         day_progress: f64,
     ) -> MenstruationStatus {
-        let (starting_ordinal, cycle_length) = cycles
+        let (starting_day, cycle_length) = cycles
             .iter()
-            .filter(|so| logical_ordinal >= so.0)
+            .filter(|so| logical_in_long_term >= so.0)
             .max()
             .expect("at least one cycle");
-        let cycle_days = logical_ordinal - starting_ordinal;
+        let cycle_days = logical_in_long_term - starting_day;
 
         let phase = if cycle_days < self.ovulation_day {
             let phase_progress = (cycle_days as f64 + day_progress) / self.ovulation_day as f64;

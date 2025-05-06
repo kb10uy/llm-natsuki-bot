@@ -30,7 +30,7 @@ impl MasturbationConfiguration {
     pub fn calculate_daily_playing_ranges<R: RngCore + ?Sized>(
         &self,
         rng: &mut R,
-        bleeding_days: Option<u16>,
+        bleeding_days: Option<i64>,
         logical_date: Date,
     ) -> Vec<Range<f64>> {
         let total_lambda = {
