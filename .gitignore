@@ -6,3 +6,5 @@
 !/config.template.*
 /rate-limits.*
 !/rate-limits.template.*
+/user-roles.*
+!/user-roles.template.*
