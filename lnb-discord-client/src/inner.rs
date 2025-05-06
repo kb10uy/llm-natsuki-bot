@@ -2,12 +2,12 @@ use std::sync::Arc;
 
 use crate::text::{sanitize_discord_message, sanitize_markdown_for_discord};
 
-use lnb_common::config::client::ConfigClientDiscord;
+use lnb_common::{config::client::ConfigClientDiscord, user_roles::UserRolesGroup};
 use lnb_core::{
     error::ClientError,
     interface::{Context as LnbContext, server::LnbServer},
     model::{
-        conversation::{ConversationUpdate, UserRole},
+        conversation::ConversationUpdate,
         message::{AssistantMessage, UserMessage, UserMessageContent},
     },
 };
@@ -26,16 +26,22 @@ const CONTEXT_KEY_PREFIX: &str = "discord";
 #[derive(Debug)]
 pub struct DiscordLnbClientInner<S> {
     client: Client,
+    roles_group: UserRolesGroup,
     bot_user: RwLock<Option<CurrentUser>>,
     max_length: usize,
     assistant: S,
 }
 
 impl<S: LnbServer> DiscordLnbClientInner<S> {
-    pub async fn new(config: &ConfigClientDiscord, assistant: S) -> Result<DiscordLnbClientInner<S>, ClientError> {
+    pub async fn new(
+        config: &ConfigClientDiscord,
+        roles_group: UserRolesGroup,
+        assistant: S,
+    ) -> Result<DiscordLnbClientInner<S>, ClientError> {
         let client = Client::new(config.token.clone());
         let inner = DiscordLnbClientInner {
             client,
+            roles_group,
             bot_user: RwLock::new(None),
             max_length: config.max_length,
             assistant,
@@ -199,7 +205,7 @@ impl<S: LnbServer> DiscordLnbClientInner<S> {
     async fn create_context(&self, message: &MessageCreate) -> Result<LnbContext, ClientError> {
         let identity = format!("{CONTEXT_KEY_PREFIX}:{}", message.author.id);
 
-        let context = LnbContext::new_user(identity, UserRole::Normal);
+        let context = LnbContext::new_user(identity, self.roles_group.get(&message.author.id.to_string()).clone());
         Ok(context)
     }
 }

@@ -22,6 +22,7 @@ use futures::future::{join, join_all};
 use lnb_common::{
     config::{Config, load_config, tools::ConfigTools},
     rate_limits::{RateLimits, RateLimitsCategory, load_rate_limits},
+    user_roles::load_user_roles,
 };
 use lnb_core::interface::{client::LnbClient, function::ArcFunction, interception::BoxInterception};
 use lnb_discord_client::DiscordLnbClient;
@@ -36,6 +37,7 @@ async fn main() -> Result<()> {
     let debug_options: HashMap<_, _> = args.debug_options.into_iter().collect();
     let config = load_config(args.config)?;
     let rate_limits = load_rate_limits(args.rate_limits)?;
+    let user_roles = load_user_roles(args.user_roles)?;
 
     let (natsuki, shiyu) = initialize_natsuki(&config, &rate_limits).await?;
 
@@ -44,7 +46,8 @@ async fn main() -> Result<()> {
     // Mastodon
     if let Some(mastodon_config) = &config.client.mastodon {
         info!("starting Mastodon client");
-        let mastodon_client = MastodonLnbClient::new(mastodon_config, &debug_options, natsuki.clone()).await?;
+        let mastodon_client =
+            MastodonLnbClient::new(mastodon_config, user_roles.mastodon, &debug_options, natsuki.clone()).await?;
         shiyu.register_remindable(mastodon_client.clone()).await;
 
         let mastodon_task = spawn(mastodon_client.execute());
@@ -54,7 +57,7 @@ async fn main() -> Result<()> {
     // Discord
     if let Some(dicsord_config) = &config.client.discord {
         info!("starting Discord client");
-        let discord_client = DiscordLnbClient::new(dicsord_config, natsuki.clone()).await?;
+        let discord_client = DiscordLnbClient::new(dicsord_config, user_roles.discord, natsuki.clone()).await?;
 
         let discord_task = spawn(discord_client.execute());
         client_tasks.push(Box::new(discord_task));

@@ -6,7 +6,7 @@ use crate::inner::DiscordLnbClientInner;
 use std::sync::Arc;
 
 use futures::{future::BoxFuture, prelude::*};
-use lnb_common::config::client::ConfigClientDiscord;
+use lnb_common::{config::client::ConfigClientDiscord, user_roles::UserRolesGroup};
 use lnb_core::{
     error::ClientError,
     interface::{client::LnbClient, server::LnbServer},
@@ -15,8 +15,12 @@ use lnb_core::{
 pub struct DiscordLnbClient<S>(Arc<inner::DiscordLnbClientInner<S>>);
 
 impl<S: LnbServer> DiscordLnbClient<S> {
-    pub async fn new(config: &ConfigClientDiscord, assistant: S) -> Result<DiscordLnbClient<S>, ClientError> {
-        let inner_discord = DiscordLnbClientInner::new(config, assistant).await?;
+    pub async fn new(
+        config: &ConfigClientDiscord,
+        roles_group: UserRolesGroup,
+        assistant: S,
+    ) -> Result<DiscordLnbClient<S>, ClientError> {
+        let inner_discord = DiscordLnbClientInner::new(config, roles_group, assistant).await?;
         Ok(DiscordLnbClient(Arc::new(inner_discord)))
     }
 }

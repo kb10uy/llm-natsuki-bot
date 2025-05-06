@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::{Error as SerdeJsonError, Value};
 
-use crate::model::conversation::UserRole;
+use crate::model::user_role::UserRole;
 
 pub trait Extension: Serialize + DeserializeOwned {
     const NAME: &'static str;
