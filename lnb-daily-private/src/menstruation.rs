@@ -119,22 +119,24 @@ impl MenstruationConfiguration {
         };
         let bleeding_days = (cycle_days < self.bleeding_days).then_some(cycle_days + 1);
 
-        let absorbent = {
-            let variant = (0..2).choose(rng).expect("variant error");
-            let pad_variation = self.pad_variations.choose(rng);
-            match (variant, pad_variation) {
-                (0, Some(pad)) => Some(MenstruationAbsorbent::Pad(pad.clone())),
-                (0, None) => None,
-                (1, _) => Some(MenstruationAbsorbent::Tampon),
-                (2, _) => Some(MenstruationAbsorbent::Cup),
-                _ => unreachable!("invalid range"),
-            }
-        };
+        let absorbent = self.choose_absorbent(rng);
 
         MenstruationStatus {
             phase,
             bleeding_days,
             absorbent: bleeding_days.and(absorbent),
         }
+    }
+
+    fn choose_absorbent<R: RngCore + ?Sized>(&self, rng: &mut R) -> Option<MenstruationAbsorbent> {
+        let variant = (0..2).choose(rng).expect("variant error");
+        let pad_variation = self.pad_variations.choose(rng)?;
+        let absorbent = match (variant, pad_variation) {
+            (0, pad) => MenstruationAbsorbent::Pad(pad.clone()),
+            (1, _) => MenstruationAbsorbent::Tampon,
+            (2, _) => MenstruationAbsorbent::Cup,
+            _ => unreachable!("invalid range"),
+        };
+        Some(absorbent)
     }
 }
