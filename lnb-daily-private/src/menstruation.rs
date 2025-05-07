@@ -1,5 +1,7 @@
 use crate::DailyPrivateError;
 
+use std::ops::Range;
+
 use rand::prelude::*;
 use rand_distr::Normal;
 use serde::{Deserialize, Serialize};
@@ -61,7 +63,7 @@ impl MenstruationConfiguration {
         &self,
         long_term_rng: &mut R,
         long_term_days: u64,
-    ) -> Result<Vec<(i64, i64)>, DailyPrivateError> {
+    ) -> Result<Vec<Range<i64>>, DailyPrivateError> {
         // 長期収束のために割り切れれて正の商になる必要がある
         if long_term_days % self.cycle_mu_sigma.0 != 0 || long_term_days < self.cycle_mu_sigma.0 {
             return Err(DailyPrivateError::LongTermMismatch);
@@ -82,31 +84,31 @@ impl MenstruationConfiguration {
         // 最後だけ合わせる
         jitters[long_term_cycles - 1] -= jitter_sum;
 
-        let (cycles, total_length) = jitters.iter().map(|j| j + self.cycle_mu_sigma.0 as i64).fold(
-            (Vec::with_capacity(long_term_cycles), 0),
-            |(mut cycles, sum), length| {
-                cycles.push((sum, length));
-                (cycles, sum + length)
-            },
-        );
-        debug_assert_eq!(total_length, long_term_days as i64);
-
+        let cycles = jitters
+            .iter()
+            .map(|j| j + self.cycle_mu_sigma.0 as i64)
+            .scan(0i64, |prev_end, length| {
+                let range = *prev_end..(*prev_end + length);
+                *prev_end += length;
+                Some(range)
+            })
+            .collect();
         Ok(cycles)
     }
 
     pub fn construct_status<R: RngCore + ?Sized>(
         &self,
         rng: &mut R,
-        cycles: &[(i64, i64)],
+        cycles: &[Range<i64>],
         logical_in_long_term: i64,
         day_progress: f64,
     ) -> MenstruationStatus {
-        let (starting_day, cycle_length) = cycles
+        let cycle_range = cycles
             .iter()
-            .filter(|so| logical_in_long_term >= so.0)
-            .max()
-            .expect("at least one cycle");
-        let cycle_days = logical_in_long_term - starting_day;
+            .find(|r| r.contains(&logical_in_long_term))
+            .expect("invalid cycles");
+        let cycle_length = cycle_range.end - cycle_range.start;
+        let cycle_days = logical_in_long_term - cycle_range.start;
 
         let phase = if cycle_days < self.ovulation_day {
             let phase_progress = (cycle_days as f64 + day_progress) / self.ovulation_day as f64;
@@ -128,13 +130,16 @@ impl MenstruationConfiguration {
     }
 
     fn choose_absorbent<R: RngCore + ?Sized>(&self, rng: &mut R) -> Option<MenstruationAbsorbent> {
-        let variant = (0..2).choose(rng).expect("variant error");
-        let pad_variation = self.pad_variations.choose(rng)?;
-        let absorbent = match (variant, pad_variation) {
-            (0, pad) => MenstruationAbsorbent::Pad(pad.clone()),
-            (1, _) => MenstruationAbsorbent::Tampon,
-            _ => unreachable!("invalid range"),
-        };
-        Some(absorbent)
+        let pad_variation = self.pad_variations.choose(rng);
+        let should_use_tampon = self.should_use_tampon(rng);
+        if should_use_tampon {
+            return Some(MenstruationAbsorbent::Tampon);
+        }
+        pad_variation.cloned().map(MenstruationAbsorbent::Pad)
+    }
+
+    fn should_use_tampon<R: RngCore + ?Sized>(&self, _rng: &mut R) -> bool {
+        // TODO: なんか作る
+        false
     }
 }
