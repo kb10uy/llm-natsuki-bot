@@ -31,7 +31,7 @@ pub fn debug_option_value(name: &str) -> Option<String> {
     Some(debug_options.get(name).and_then(DebugOptionValue::value)?.to_string())
 }
 
-pub fn debug_option_parsed<T: FromStr>(name: &str) -> Result<Option<String>, DebugOptionError> {
+pub fn debug_option_parsed<T: FromStr>(name: &str) -> Result<Option<T>, DebugOptionError> {
     let debug_options = DEBUG_OPTIONS.read().expect("poisoned");
     debug_options
         .get(name)

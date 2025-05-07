@@ -1,7 +1,7 @@
 use crate::function::ConfigurableFunction;
 
 use futures::{FutureExt, future::BoxFuture};
-use lnb_common::config::tools::ConfigToolsDailyPrivate;
+use lnb_common::{config::tools::ConfigToolsDailyPrivate, debug::debug_option_parsed};
 use lnb_core::{
     error::FunctionError,
     interface::{
@@ -26,7 +26,7 @@ use time::{
     format_description::{BorrowedFormatItem, well_known::Rfc3339},
     macros::format_description,
 };
-use tracing::info;
+use tracing::{info, warn};
 
 const TIME_FORMAT: &[BorrowedFormatItem<'static>] = format_description!("[hour]:[minute]:[second]");
 
@@ -49,6 +49,8 @@ pub struct DailyPrivate {
     temperature: TemperatureConfiguration,
     masturbation: MasturbationConfiguration,
     underwear: UnderwearConfiguration,
+
+    debug_offset: Duration,
 }
 
 impl ConfigurableFunction for DailyPrivate {
@@ -65,6 +67,15 @@ impl ConfigurableFunction for DailyPrivate {
             morning_preparation: Duration::minutes(config.day_routine.morning_preparation_minutes as i64),
             bathtime_duration: Duration::minutes(config.day_routine.bathtime_minutes as i64),
         };
+        let debug_offset = {
+            let offset_days = debug_option_parsed("daily_private_offset")
+                .map_err(FunctionError::by_serialization)?
+                .unwrap_or(0);
+            if offset_days != 0 {
+                warn!("day offset: {offset_days}");
+            }
+            Duration::days(offset_days)
+        };
         Ok(DailyPrivate {
             rng_salt: config.daily_rng_salt.clone(),
             long_term_days: config.long_term_days,
@@ -73,6 +84,8 @@ impl ConfigurableFunction for DailyPrivate {
             masturbation: config.masturbation.clone(),
             menstruation: config.menstruation.clone(),
             temperature: config.temperature.clone(),
+
+            debug_offset,
         })
     }
 }
@@ -108,7 +121,7 @@ impl Function for DailyPrivate {
 
 impl DailyPrivate {
     async fn get_daily_info(&self) -> Result<FunctionResponse, FunctionError> {
-        let now = OffsetDateTime::now_local().map_err(FunctionError::by_external)?;
+        let now = OffsetDateTime::now_local().map_err(FunctionError::by_external)? + self.debug_offset;
         let local_now = PrimitiveDateTime::new(now.date(), now.time());
         let logical_date = self.day_routine.logical_date(local_now);
         let logical_day_start = self.day_routine.day_part_start(logical_date);
