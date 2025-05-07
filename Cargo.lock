@@ -1630,6 +1630,7 @@ dependencies = [
 name = "lnb-common"
 version = "0.14.0"
 dependencies = [
+ "base64",
  "futures",
  "lnb-core",
  "lnb-daily-private",
@@ -1638,6 +1639,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "sha2",
  "sqlx",
  "thiserror 2.0.12",
  "time",

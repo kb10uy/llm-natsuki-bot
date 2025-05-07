@@ -3,7 +3,7 @@ use crate::function::ConfigurableFunction;
 use async_openai::types::{Image, ImagesResponse};
 use base64::prelude::*;
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
-use lnb_common::config::tools::ConfigToolsImageGenerator;
+use lnb_common::{config::tools::ConfigToolsImageGenerator, extension::ContextExt};
 use lnb_core::{
     APP_USER_AGENT,
     error::FunctionError,
@@ -209,7 +209,7 @@ impl ImageGenerator {
             "model": self.model,
             "prompt": prompt,
             "moderation": moderation,
-            "user": context.identity().unwrap_or("system"),
+            "user": context.hashed_identity(),
         });
 
         let raw_response = self
