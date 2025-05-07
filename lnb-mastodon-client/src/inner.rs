@@ -6,11 +6,7 @@ use crate::{
 use std::{iter::once, sync::Arc, time::Duration};
 
 use futures::prelude::*;
-use lnb_common::{
-    config::client::ConfigClientMastodon,
-    debug::{DebugOptionValue, get_debug_option},
-    user_roles::UserRolesGroup,
-};
+use lnb_common::{config::client::ConfigClientMastodon, debug::debug_option_value, user_roles::UserRolesGroup};
 use lnb_core::{
     APP_USER_AGENT,
     error::ClientError,
@@ -512,7 +508,7 @@ pub enum MastodonClientError {
 fn get_default_headers() -> HeaderMap {
     let mut headers = HeaderMap::new();
 
-    if let Some(DebugOptionValue::Specified(secs)) = get_debug_option("mastodon_disconnect") {
+    if let Some(secs) = debug_option_value("mastodon_disconnect") {
         warn!("force disconnection enabled; duration is {secs}");
         headers.append("X-Disconnect-After", secs.parse().expect("must parse"));
     }

@@ -159,7 +159,7 @@ impl DailyPrivate {
         let masturbation_ranges = self.masturbation.calculate_daily_playing_ranges(
             &mut daily_rng,
             menstruation_status.bleeding_days,
-            logical_date,
+            logical_julian_day,
         );
         let (masturbation_status, current_play) = self
             .masturbation

@@ -31,13 +31,14 @@ impl MasturbationConfiguration {
         &self,
         rng: &mut R,
         bleeding_days: Option<i64>,
-        logical_date: Date,
+        julian_day: i32,
     ) -> Vec<Range<f64>> {
+        let weekday = Date::from_julian_day(julian_day).expect("invalid range").weekday();
         let total_lambda = {
             let bleeding_debuff = bleeding_days
                 .map(|days| 1.0 - (1.0 / days.max(1) as f64))
                 .unwrap_or(1.0);
-            let holiday_boost = match logical_date.weekday() {
+            let holiday_boost = match weekday {
                 Weekday::Saturday | Weekday::Sunday => self.holiday_boost_scale,
                 _ => 1.0,
             };
