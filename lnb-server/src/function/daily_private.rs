@@ -137,18 +137,8 @@ impl DailyPrivate {
         let long_term_cycles = logical_julian_day.div_euclid(self.long_term_days as i32) as i64;
         info!("julian day: {logical_julian_day}, long term: cycle {long_term_cycles} / day {logical_in_long_term}");
 
-        let mut daily_rng = {
-            let mut hasher = Sha256::new();
-            hasher.update(&self.rng_salt);
-            hasher.update(logical_julian_day.to_le_bytes());
-            StdRng::from_seed(hasher.finalize().into())
-        };
-        let mut long_term_rng = {
-            let mut hasher = Sha256::new();
-            hasher.update(&self.rng_salt);
-            hasher.update(long_term_cycles.to_le_bytes());
-            StdRng::from_seed(hasher.finalize().into())
-        };
+        let mut daily_rng = self.make_salted_rng(logical_julian_day.to_le_bytes());
+        let mut long_term_rng = self.make_salted_rng(long_term_cycles.to_le_bytes());
 
         // 生理周期
         let menstruation_cycles = self
@@ -209,5 +199,12 @@ impl DailyPrivate {
             result: serde_json::to_value(&info).map_err(FunctionError::by_serialization)?,
             attachments: vec![],
         })
+    }
+
+    fn make_salted_rng(&self, seed_bytes: impl AsRef<[u8]>) -> StdRng {
+        let mut hasher = Sha256::new();
+        hasher.update(&self.rng_salt);
+        hasher.update(seed_bytes);
+        StdRng::from_seed(hasher.finalize().into())
     }
 }
