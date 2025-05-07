@@ -1,7 +1,7 @@
 use crate::function::ConfigurableFunction;
 
 use futures::{FutureExt, future::BoxFuture};
-use lnb_common::config::tools::ConfigToolsDailyPrivate;
+use lnb_common::{config::tools::ConfigToolsDailyPrivate, debug::debug_option_parsed};
 use lnb_core::{
     error::FunctionError,
     interface::{
@@ -26,7 +26,7 @@ use time::{
     format_description::{BorrowedFormatItem, well_known::Rfc3339},
     macros::format_description,
 };
-use tracing::info;
+use tracing::{info, warn};
 
 const TIME_FORMAT: &[BorrowedFormatItem<'static>] = format_description!("[hour]:[minute]:[second]");
 
@@ -43,11 +43,14 @@ struct DailyPrivateInfo {
 #[derive(Debug)]
 pub struct DailyPrivate {
     rng_salt: String,
+    long_term_days: u64,
     day_routine: DayRoutineConfiguration,
     menstruation: MenstruationConfiguration,
     temperature: TemperatureConfiguration,
     masturbation: MasturbationConfiguration,
     underwear: UnderwearConfiguration,
+
+    debug_offset: Duration,
 }
 
 impl ConfigurableFunction for DailyPrivate {
@@ -64,13 +67,25 @@ impl ConfigurableFunction for DailyPrivate {
             morning_preparation: Duration::minutes(config.day_routine.morning_preparation_minutes as i64),
             bathtime_duration: Duration::minutes(config.day_routine.bathtime_minutes as i64),
         };
+        let debug_offset = {
+            let offset_days = debug_option_parsed("daily_private_offset")
+                .map_err(FunctionError::by_serialization)?
+                .unwrap_or(0);
+            if offset_days != 0 {
+                warn!("day offset: {offset_days}");
+            }
+            Duration::days(offset_days)
+        };
         Ok(DailyPrivate {
             rng_salt: config.daily_rng_salt.clone(),
+            long_term_days: config.long_term_days,
             day_routine,
             underwear: config.underwear.clone(),
             masturbation: config.masturbation.clone(),
             menstruation: config.menstruation.clone(),
             temperature: config.temperature.clone(),
+
+            debug_offset,
         })
     }
 }
@@ -106,7 +121,7 @@ impl Function for DailyPrivate {
 
 impl DailyPrivate {
     async fn get_daily_info(&self) -> Result<FunctionResponse, FunctionError> {
-        let now = OffsetDateTime::now_local().map_err(FunctionError::by_external)?;
+        let now = OffsetDateTime::now_local().map_err(FunctionError::by_external)? + self.debug_offset;
         let local_now = PrimitiveDateTime::new(now.date(), now.time());
         let logical_date = self.day_routine.logical_date(local_now);
         let logical_day_start = self.day_routine.day_part_start(logical_date);
@@ -117,25 +132,33 @@ impl DailyPrivate {
             day_progress * 100.0
         );
 
+        let logical_julian_day = logical_date.to_julian_day();
+        let logical_in_long_term = logical_julian_day.rem_euclid(self.long_term_days as i32) as i64;
+        let long_term_cycles = logical_julian_day.div_euclid(self.long_term_days as i32) as i64;
+        info!("julian day: {logical_julian_day}, long term: cycle {long_term_cycles} / day {logical_in_long_term}");
+
         let mut daily_rng = {
             let mut hasher = Sha256::new();
             hasher.update(&self.rng_salt);
-            hasher.update(logical_date.to_julian_day().to_le_bytes());
+            hasher.update(logical_julian_day.to_le_bytes());
             StdRng::from_seed(hasher.finalize().into())
         };
-        let mut annual_rng = {
+        let mut long_term_rng = {
             let mut hasher = Sha256::new();
             hasher.update(&self.rng_salt);
-            hasher.update(logical_date.year().to_le_bytes());
+            hasher.update(long_term_cycles.to_le_bytes());
             StdRng::from_seed(hasher.finalize().into())
         };
 
         // 生理周期
-        let menstruation_cycles = self.menstruation.calculate_cycles(&mut annual_rng);
+        let menstruation_cycles = self
+            .menstruation
+            .calculate_cycles(&mut long_term_rng, self.long_term_days)
+            .map_err(FunctionError::by_external)?;
         let menstruation_status = self.menstruation.construct_status(
             &mut daily_rng,
             &menstruation_cycles,
-            logical_date.ordinal(),
+            logical_in_long_term,
             day_progress,
         );
         info!("menstruation: {menstruation_status:?}");
@@ -143,13 +166,13 @@ impl DailyPrivate {
 
         // 基礎体温
         let basal_body_temperature = self.temperature.calculate(&mut daily_rng, menstruation_status.phase);
-        info!("basal body temperature: {basal_body_temperature}℃");
+        info!("basal body temperature: {basal_body_temperature:.02}℃");
 
         // オナニー
         let masturbation_ranges = self.masturbation.calculate_daily_playing_ranges(
             &mut daily_rng,
             menstruation_status.bleeding_days,
-            logical_date,
+            logical_julian_day,
         );
         let (masturbation_status, current_play) = self
             .masturbation

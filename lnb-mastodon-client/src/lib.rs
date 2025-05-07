@@ -3,12 +3,11 @@ mod text;
 
 use crate::inner::MastodonLnbClientInner;
 
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use futures::{future::BoxFuture, prelude::*};
 use lnb_common::{config::client::ConfigClientMastodon, user_roles::UserRolesGroup};
 use lnb_core::{
-    DebugOptionValue,
     error::{ClientError, ReminderError},
     interface::{client::LnbClient, reminder::Remindable, server::LnbServer},
     model::conversation::ConversationUpdate,
@@ -23,10 +22,9 @@ impl<S: LnbServer> MastodonLnbClient<S> {
     pub async fn new(
         config: &ConfigClientMastodon,
         roles_group: UserRolesGroup,
-        debug_options: &HashMap<String, DebugOptionValue>,
         assistant: S,
     ) -> Result<MastodonLnbClient<S>, ClientError> {
-        let inner = MastodonLnbClientInner::new(config, roles_group, debug_options, assistant).await?;
+        let inner = MastodonLnbClientInner::new(config, roles_group, assistant).await?;
         Ok(MastodonLnbClient(Arc::new(inner)))
     }
 }

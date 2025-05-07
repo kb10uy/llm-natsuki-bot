@@ -21,6 +21,7 @@ use clap::Parser;
 use futures::future::{join, join_all};
 use lnb_common::{
     config::{Config, load_config, tools::ConfigTools},
+    debug::set_debug_options,
     rate_limits::{RateLimits, RateLimitsCategory, load_rate_limits},
     user_roles::load_user_roles,
 };
@@ -34,10 +35,12 @@ use tracing::info;
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let args = cli::Arguments::parse();
-    let debug_options: HashMap<_, _> = args.debug_options.into_iter().collect();
     let config = load_config(args.config)?;
     let rate_limits = load_rate_limits(args.rate_limits)?;
     let user_roles = load_user_roles(args.user_roles)?;
+
+    let debug_options: HashMap<_, _> = args.debug_options.into_iter().collect();
+    set_debug_options(debug_options);
 
     let (natsuki, shiyu) = initialize_natsuki(&config, &rate_limits).await?;
 
@@ -46,8 +49,7 @@ async fn main() -> Result<()> {
     // Mastodon
     if let Some(mastodon_config) = &config.client.mastodon {
         info!("starting Mastodon client");
-        let mastodon_client =
-            MastodonLnbClient::new(mastodon_config, user_roles.mastodon, &debug_options, natsuki.clone()).await?;
+        let mastodon_client = MastodonLnbClient::new(mastodon_config, user_roles.mastodon, natsuki.clone()).await?;
         shiyu.register_remindable(mastodon_client.clone()).await;
 
         let mastodon_task = spawn(mastodon_client.execute());

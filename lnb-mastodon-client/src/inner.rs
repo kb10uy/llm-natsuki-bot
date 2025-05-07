@@ -3,12 +3,12 @@ use crate::{
     text::{sanitize_markdown_for_mastodon, sanitize_mention_html_from_mastodon},
 };
 
-use std::{collections::HashMap, iter::once, sync::Arc, time::Duration};
+use std::{iter::once, sync::Arc, time::Duration};
 
 use futures::prelude::*;
-use lnb_common::{config::client::ConfigClientMastodon, user_roles::UserRolesGroup};
+use lnb_common::{config::client::ConfigClientMastodon, debug::debug_option_value, user_roles::UserRolesGroup};
 use lnb_core::{
-    APP_USER_AGENT, DebugOptionValue,
+    APP_USER_AGENT,
     error::ClientError,
     interface::{Context, reminder::RemindableContext, server::LnbServer},
     model::{
@@ -47,13 +47,12 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
     pub async fn new(
         config: &ConfigClientMastodon,
         roles_group: UserRolesGroup,
-        debug_options: &HashMap<String, DebugOptionValue>,
         assistant: S,
     ) -> Result<MastodonLnbClientInner<S>, ClientError> {
         // Mastodon クライアントと自己アカウント情報
         let http_client = reqwest::ClientBuilder::new()
             .user_agent(APP_USER_AGENT)
-            .default_headers(default_headers(debug_options))
+            .default_headers(get_default_headers())
             .build()
             .map_err(ClientError::by_communication)?;
         let mastodon_data = mastodon_async::Data {
@@ -506,10 +505,10 @@ pub enum MastodonClientError {
     UnsupportedImageType(String),
 }
 
-fn default_headers(debug_options: &HashMap<String, DebugOptionValue>) -> HeaderMap {
+fn get_default_headers() -> HeaderMap {
     let mut headers = HeaderMap::new();
 
-    if let Some(DebugOptionValue::Specified(secs)) = debug_options.get("mastodon_disconnect") {
+    if let Some(secs) = debug_option_value("mastodon_disconnect") {
         warn!("force disconnection enabled; duration is {secs}");
         headers.append("X-Disconnect-After", secs.parse().expect("must parse"));
     }
