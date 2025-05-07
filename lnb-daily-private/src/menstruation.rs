@@ -45,7 +45,6 @@ pub enum MensePhase {
 pub enum MenstruationAbsorbent {
     Pad(PadVariation),
     Tampon,
-    Cup,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -134,7 +133,6 @@ impl MenstruationConfiguration {
         let absorbent = match (variant, pad_variation) {
             (0, pad) => MenstruationAbsorbent::Pad(pad.clone()),
             (1, _) => MenstruationAbsorbent::Tampon,
-            (2, _) => MenstruationAbsorbent::Cup,
             _ => unreachable!("invalid range"),
         };
         Some(absorbent)
