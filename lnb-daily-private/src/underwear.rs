@@ -1,5 +1,7 @@
 use crate::{day_routine::DayStep, menstruation::MenstruationAbsorbent};
 
+use std::collections::HashSet;
+
 use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -10,9 +12,23 @@ pub struct UnderwearConfiguration {
     pub no_bra_ratio: f64,
     pub no_panty_ratio: f64,
     pub unified_ratio: f64,
-    pub no_wear_reasons: Vec<String>,
-    pub masturbating_reason: String,
-    pub bathtime_reason: String,
+    pub unworn_reasons: Vec<UnwornReason>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct UnwornReason {
+    pub text: String,
+    pub usage: HashSet<UnwornReasonUsage>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UnwornReasonUsage {
+    NoBra,
+    NoPanty,
+    Naked,
+    Bathtime,
+    Masturbating,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -71,17 +87,22 @@ impl UnderwearConfiguration {
         let unified = rng.random::<f64>() < self.unified_ratio;
         let no_bra = rng.random::<f64>() < self.no_bra_ratio;
         let no_panty = rng.random::<f64>() < self.no_panty_ratio;
-        let no_bp_reason = self.no_wear_reasons.choose(rng).map(|s| &s[..]).unwrap_or_default();
+
+        let masturbating_reason = self.choose_unworn_reason(rng, UnwornReasonUsage::Masturbating);
+        let bathtime_reason = self.choose_unworn_reason(rng, UnwornReasonUsage::Bathtime);
+        let no_bra_reason = self.choose_unworn_reason(rng, UnwornReasonUsage::NoBra);
+        let no_panty_reason = self.choose_unworn_reason(rng, UnwornReasonUsage::NoPanty);
+        let naked_reason = self.choose_unworn_reason(rng, UnwornReasonUsage::Naked);
 
         if matches!(masturbation_progress, Some(p) if p >= 0.5) {
             // オナニーの進行度が半分以上なら常に全脱ぎ
             return UnderwearStatus::NoBraNoPanty {
-                reason: self.masturbating_reason.clone(),
+                reason: masturbating_reason.to_string(),
             };
         } else if day_step == DayStep::Bathtime {
             // 風呂なのでもちろん脱ぐ
             return UnderwearStatus::NoBraNoPanty {
-                reason: self.bathtime_reason.clone(),
+                reason: bathtime_reason.to_string(),
             };
         }
 
@@ -101,19 +122,28 @@ impl UnderwearConfiguration {
             // ノーブラ
             (_, false, true) => UnderwearStatus::BraOnly {
                 bra_design,
-                no_panty_reason: no_bp_reason.to_string(),
+                no_panty_reason: no_panty_reason.to_string(),
             },
             // ノーパン
             (_, true, false) => UnderwearStatus::PantyOnly {
-                no_bra_reason: no_bp_reason.to_string(),
+                no_bra_reason: no_bra_reason.to_string(),
                 panty_design,
                 is_sanitary,
             },
             // ノーブラノーパン
             (_, true, true) => UnderwearStatus::NoBraNoPanty {
-                reason: no_bp_reason.to_string(),
+                reason: naked_reason.to_string(),
             },
         }
+    }
+
+    fn choose_unworn_reason<R: RngCore + ?Sized>(&self, rng: &mut R, usage: UnwornReasonUsage) -> &str {
+        let chosen_reason = self
+            .unworn_reasons
+            .iter()
+            .filter(|r| r.usage.contains(&usage))
+            .choose(rng);
+        chosen_reason.map(|r| r.text.as_str()).unwrap_or_default()
     }
 
     fn generate_part<R: RngCore + ?Sized>(&self, rng: &mut R) -> Option<UnderwearDesign> {
