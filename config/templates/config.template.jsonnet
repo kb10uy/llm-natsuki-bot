@@ -115,12 +115,12 @@ local tool_config = {
       no_bra_ratio: 0.1,
       no_panty_ratio: 0.1,
       unified_ratio: 0.4,
-      no_wear_reasons: [
-        '単に着忘れた',
-        '出先で汚してしまった',
+      unworn_reasons: [
+        { text: '単に着忘れた', usage: ['no_bra', 'no_panty', 'naked'] },
+        { text: '出先で汚してしまった', usage: ['no_bra', 'no_panty', 'naked'] },
+        { text: '秘密', usage: ['masturbating'] },
+        { text: 'お風呂中', usage: ['bathtime'] },
       ],
-      masturbating_reason: '秘密',
-      bathtime_reason: 'お風呂中',
     },
   },
 };
