@@ -1,0 +1,34 @@
+syntax = "proto3";
+package lnb_service;
+
+service LnbService {
+  rpc NewConversation() returns (ConversationId);
+
+  rpc RestoreConversation(RestoreConversationRequest)
+      returns (RestoreConversationResponse);
+
+  rpc SaveConversation(SaveConversationRequest) returns (ConversationId);
+
+  rpc ProcessConversation(ProcessConversationRequest)
+      returns (ProcessConversationResponse);
+}
+
+message RestoreConversationRequest { string context_key = 1; }
+message RestoreConversationResponse { ConversationId id = 1; }
+
+message SaveConversationRequest {
+  ConversationId id = 1;
+  ConversationUpdate update = 2;
+}
+
+message ProcessConversationRequest {
+  ConversationId id = 1;
+  UserMessage user_message = 2;
+}
+message ProcessConversationResponse { ConversationUpdate update = 1; }
+
+message ConversationId { string id = 1; }
+
+message ConversationUpdate {}
+
+message UserMessage {}
