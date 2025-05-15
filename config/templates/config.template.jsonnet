@@ -122,6 +122,9 @@ local tool_config = {
         { text: 'お風呂中', usage: ['bathtime'] },
       ],
     },
+    schedule: {
+      holiday_events: [],
+    },
   },
 };
 
