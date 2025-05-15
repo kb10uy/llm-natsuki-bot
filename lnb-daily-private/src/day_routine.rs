@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use time::{Date, Duration, PrimitiveDateTime, Time};
 
+use crate::logical_date::LogicalDateTime;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DayRoutineConfiguration {
     /// 昼パートの開始時刻。
@@ -48,25 +50,6 @@ impl DayRoutineConfiguration {
         self.night_start_at < self.daytime_start_at
     }
 
-    /// 論理今日を取得する。
-    pub fn logical_date(&self, datetime: PrimitiveDateTime) -> Date {
-        let date = datetime.date();
-        if datetime.time() < self.daytime_start_at {
-            date.previous_day().expect("minimum date")
-        } else {
-            date
-        }
-    }
-
-    /// 論理今日が進んだ割合を計算する。
-    pub fn logical_day_progress(&self, datetime: PrimitiveDateTime) -> f64 {
-        let logical_day_start = datetime
-            .replace_date(self.logical_date(datetime))
-            .replace_time(self.daytime_start_at);
-        let progress_duration = datetime - logical_day_start;
-        progress_duration.as_seconds_f64() / Duration::DAY.as_seconds_f64()
-    }
-
     /// 論理日付の昼パートの開始日時を計算する。
     pub fn day_part_start(&self, logical_date: Date) -> PrimitiveDateTime {
         PrimitiveDateTime::new(logical_date, self.daytime_start_at)
@@ -82,19 +65,19 @@ impl DayRoutineConfiguration {
     }
 
     /// `DayStep` を論理日時ベースで計算する。
-    pub fn determine_day_step(&self, datetime: PrimitiveDateTime) -> DayStep {
-        let logical_date = self.logical_date(datetime);
+    pub fn determine_day_step(&self, logical_date_time: &LogicalDateTime) -> DayStep {
+        let logical_date = logical_date_time.logical_date();
         let is_daytime = if self.daytime_over_midnight() {
             let night_range = self.night_start_at..self.daytime_start_at;
-            !night_range.contains(&datetime.time())
+            !night_range.contains(&logical_date_time.time())
         } else {
             let daytime_range = self.daytime_start_at..self.night_start_at;
-            daytime_range.contains(&datetime.time())
+            daytime_range.contains(&logical_date_time.time())
         };
         let part_elapsed = if is_daytime {
-            datetime - self.day_part_start(logical_date)
+            logical_date_time.local_now() - self.day_part_start(logical_date)
         } else {
-            datetime - self.night_part_start(logical_date)
+            logical_date_time.local_now() - self.night_part_start(logical_date)
         };
 
         match is_daytime {

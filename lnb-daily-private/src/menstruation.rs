@@ -1,4 +1,4 @@
-use crate::{DailyPrivateError, schedule::HolidayEvent};
+use crate::{DailyPrivateError, logical_date::LogicalDateTime, schedule::HolidayEvent};
 
 use std::ops::Range;
 
@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MenstruationConfiguration {
     pub cycle_mu_sigma: (u64, f64),
-    pub bleeding_days: i64,
-    pub ovulation_day: i64,
+    pub bleeding_days: usize,
+    pub ovulation_day: usize,
     pub pad_variations: Vec<PadVariation>,
 }
 
@@ -54,7 +54,7 @@ pub struct MenstruationStatus {
     #[serde(skip_serializing)]
     pub phase: MensePhase,
 
-    pub bleeding_days: Option<i64>,
+    pub bleeding_days: Option<usize>,
     pub absorbent: Option<MenstruationAbsorbent>,
 }
 
@@ -62,13 +62,13 @@ impl MenstruationConfiguration {
     pub fn calculate_cycles<R: RngCore + ?Sized>(
         &self,
         long_term_rng: &mut R,
-        long_term_days: u64,
-    ) -> Result<Vec<Range<i64>>, DailyPrivateError> {
+        long_term_duration: u64,
+    ) -> Result<Vec<Range<usize>>, DailyPrivateError> {
         // 長期収束のために割り切れれて正の商になる必要がある
-        if long_term_days % self.cycle_mu_sigma.0 != 0 || long_term_days < self.cycle_mu_sigma.0 {
+        if long_term_duration % self.cycle_mu_sigma.0 != 0 || long_term_duration < self.cycle_mu_sigma.0 {
             return Err(DailyPrivateError::LongTermMismatch);
         }
-        let long_term_cycles = (long_term_days / self.cycle_mu_sigma.0) as usize;
+        let long_term_cycles = (long_term_duration / self.cycle_mu_sigma.0) as usize;
 
         // ジッターの各周期後の総和が 2σ を超えないように生成
         let jitter_distr = Normal::new(0.0, self.cycle_mu_sigma.1).expect("invalid distribution");
@@ -86,8 +86,8 @@ impl MenstruationConfiguration {
 
         let cycles = jitters
             .iter()
-            .map(|j| j + self.cycle_mu_sigma.0 as i64)
-            .scan(0i64, |prev_end, length| {
+            .map(|j| (j + self.cycle_mu_sigma.0 as i64) as usize)
+            .scan(0, |prev_end, length| {
                 let range = *prev_end..(*prev_end + length);
                 *prev_end += length;
                 Some(range)
@@ -99,24 +99,24 @@ impl MenstruationConfiguration {
     pub fn construct_status<R: RngCore + ?Sized>(
         &self,
         rng: &mut R,
-        cycles: &[Range<i64>],
-        logical_in_long_term: i64,
-        day_progress: f64,
+        cycles: &[Range<usize>],
+        logical_datetime: &LogicalDateTime,
         event: Option<&HolidayEvent>,
     ) -> MenstruationStatus {
         let cycle_range = cycles
             .iter()
-            .find(|r| r.contains(&logical_in_long_term))
+            .find(|r| r.contains(&logical_datetime.long_term_days()))
             .expect("invalid cycles");
         let cycle_length = cycle_range.end - cycle_range.start;
-        let cycle_days = logical_in_long_term - cycle_range.start;
+        let cycle_days = logical_datetime.long_term_days() - cycle_range.start;
 
         let phase = if cycle_days < self.ovulation_day {
-            let phase_progress = (cycle_days as f64 + day_progress) / self.ovulation_day as f64;
+            let phase_progress = (cycle_days as f64 + logical_datetime.day_progress()) / self.ovulation_day as f64;
             MensePhase::Follicular(phase_progress)
         } else {
             let phase_length = (cycle_length - self.ovulation_day).max(1) as f64;
-            let phase_progress = (cycle_days as f64 + day_progress - self.ovulation_day as f64) / phase_length;
+            let phase_progress =
+                (cycle_days as f64 + logical_datetime.day_progress() - self.ovulation_day as f64) / phase_length;
             MensePhase::Luteal(phase_progress)
         };
         let bleeding_days = (cycle_days < self.bleeding_days).then_some(cycle_days + 1);

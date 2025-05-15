@@ -3,7 +3,9 @@ use std::ops::{Not, Range};
 use rand::prelude::*;
 use rand_distr::{Normal, Poisson, StandardUniform};
 use serde::{Deserialize, Serialize};
-use time::{Date, Weekday};
+use time::Weekday;
+
+use crate::logical_date::LogicalDateTime;
 
 // 理論上無限回出るので上限を決める
 const TECHNO_BREAK_LIMIT: f64 = 12.0;
@@ -30,15 +32,14 @@ impl MasturbationConfiguration {
     pub fn calculate_daily_playing_ranges<R: RngCore + ?Sized>(
         &self,
         rng: &mut R,
-        bleeding_days: Option<i64>,
-        julian_day: i32,
+        bleeding_days: Option<usize>,
+        logical_datetime: &LogicalDateTime,
     ) -> Vec<Range<f64>> {
-        let weekday = Date::from_julian_day(julian_day).expect("invalid range").weekday();
         let total_lambda = {
             let bleeding_debuff = bleeding_days
                 .map(|days| 1.0 - (1.0 / days.max(1) as f64))
                 .unwrap_or(1.0);
-            let holiday_boost = match weekday {
+            let holiday_boost = match logical_datetime.weekday() {
                 Weekday::Saturday | Weekday::Sunday => self.holiday_boost_scale,
                 _ => 1.0,
             };
