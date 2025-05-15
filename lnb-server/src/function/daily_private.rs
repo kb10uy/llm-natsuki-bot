@@ -14,6 +14,7 @@ use lnb_daily_private::{
     day_routine::{DayRoutineConfiguration, DayStep},
     masturbation::{MasturbationConfiguration, MasturbationStatus},
     menstruation::{MenstruationConfiguration, MenstruationStatus},
+    schedule::ScheduleConfiguration,
     temperature::TemperatureConfiguration,
     underwear::{UnderwearConfiguration, UnderwearStatus},
 };
@@ -45,6 +46,7 @@ pub struct DailyPrivate {
     rng_salt: String,
     long_term_days: u64,
     day_routine: DayRoutineConfiguration,
+    schedule: ScheduleConfiguration,
     menstruation: MenstruationConfiguration,
     temperature: TemperatureConfiguration,
     masturbation: MasturbationConfiguration,
@@ -80,6 +82,7 @@ impl ConfigurableFunction for DailyPrivate {
             rng_salt: config.daily_rng_salt.clone(),
             long_term_days: config.long_term_days,
             day_routine,
+            schedule: config.schedule.clone(),
             underwear: config.underwear.clone(),
             masturbation: config.masturbation.clone(),
             menstruation: config.menstruation.clone(),
@@ -140,6 +143,9 @@ impl DailyPrivate {
         let mut daily_rng = self.make_salted_rng(logical_julian_day.to_le_bytes());
         let mut long_term_rng = self.make_salted_rng(long_term_cycles.to_le_bytes());
 
+        // スケジュール
+        let event = self.schedule.choose_event(&mut daily_rng, logical_date);
+
         // 生理周期
         let menstruation_cycles = self
             .menstruation
@@ -150,6 +156,7 @@ impl DailyPrivate {
             &menstruation_cycles,
             logical_in_long_term,
             day_progress,
+            event.map(|e| e.tampon_required).unwrap_or(false),
         );
         info!("menstruation: {menstruation_status:?}");
         info!("menstruation cycles: {menstruation_cycles:?}");

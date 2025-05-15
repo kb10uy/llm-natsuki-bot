@@ -3,6 +3,7 @@ use std::{
     ops::RangeInclusive,
 };
 
+use rand::{RngCore, seq::IteratorRandom};
 use serde::{
     Deserialize, Serialize,
     de::{Error as _, SeqAccess, Visitor},
@@ -12,8 +13,29 @@ use time::Date;
 
 const WEEK_NUMBER_RANGE: RangeInclusive<u8> = 1..=53;
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ScheduleConfiguration {
+    pub holiday_events: Vec<HolidayEvent>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct HolidayEvent {
+    pub title: String,
+    pub week_ranges: Vec<WeekRange>,
+    pub tampon_required: bool,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct WeekRange(u8, u8);
+
+impl ScheduleConfiguration {
+    pub fn choose_event<R: RngCore + ?Sized>(&self, rng: &mut R, logical_date: Date) -> Option<&HolidayEvent> {
+        self.holiday_events
+            .iter()
+            .filter(|he| he.week_ranges.iter().any(|wr| wr.contains(logical_date)))
+            .choose(rng)
+    }
+}
 
 impl WeekRange {
     pub fn contains(&self, date: Date) -> bool {

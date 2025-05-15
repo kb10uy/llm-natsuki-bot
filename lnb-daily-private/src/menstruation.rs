@@ -102,6 +102,7 @@ impl MenstruationConfiguration {
         cycles: &[Range<i64>],
         logical_in_long_term: i64,
         day_progress: f64,
+        should_use_tampon: bool,
     ) -> MenstruationStatus {
         let cycle_range = cycles
             .iter()
@@ -120,7 +121,7 @@ impl MenstruationConfiguration {
         };
         let bleeding_days = (cycle_days < self.bleeding_days).then_some(cycle_days + 1);
 
-        let absorbent = self.choose_absorbent(rng);
+        let absorbent = self.choose_absorbent(rng, should_use_tampon);
 
         MenstruationStatus {
             phase,
@@ -129,17 +130,15 @@ impl MenstruationConfiguration {
         }
     }
 
-    fn choose_absorbent<R: RngCore + ?Sized>(&self, rng: &mut R) -> Option<MenstruationAbsorbent> {
+    fn choose_absorbent<R: RngCore + ?Sized>(
+        &self,
+        rng: &mut R,
+        should_use_tampon: bool,
+    ) -> Option<MenstruationAbsorbent> {
         let pad_variation = self.pad_variations.choose(rng);
-        let should_use_tampon = self.should_use_tampon(rng);
         if should_use_tampon {
             return Some(MenstruationAbsorbent::Tampon);
         }
         pad_variation.cloned().map(MenstruationAbsorbent::Pad)
-    }
-
-    fn should_use_tampon<R: RngCore + ?Sized>(&self, _rng: &mut R) -> bool {
-        // TODO: なんか作る
-        false
     }
 }
