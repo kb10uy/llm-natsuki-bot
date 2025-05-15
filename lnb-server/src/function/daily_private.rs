@@ -145,6 +145,7 @@ impl DailyPrivate {
 
         // スケジュール
         let event = self.schedule.choose_event(&mut daily_rng, logical_date);
+        info!("event: {event:?}");
 
         // 生理周期
         let menstruation_cycles = self
