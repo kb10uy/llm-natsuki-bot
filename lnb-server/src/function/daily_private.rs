@@ -156,7 +156,7 @@ impl DailyPrivate {
             &menstruation_cycles,
             logical_in_long_term,
             day_progress,
-            event.map(|e| e.tampon_required).unwrap_or(false),
+            event,
         );
         info!("menstruation: {menstruation_status:?}");
         info!("menstruation cycles: {menstruation_cycles:?}");

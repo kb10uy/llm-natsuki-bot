@@ -1,4 +1,4 @@
-use crate::DailyPrivateError;
+use crate::{DailyPrivateError, schedule::HolidayEvent};
 
 use std::ops::Range;
 
@@ -46,7 +46,7 @@ pub enum MensePhase {
 #[serde(rename_all = "snake_case", tag = "type", content = "details")]
 pub enum MenstruationAbsorbent {
     Pad(PadVariation),
-    Tampon,
+    Tampon { due_to_event: String },
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -102,7 +102,7 @@ impl MenstruationConfiguration {
         cycles: &[Range<i64>],
         logical_in_long_term: i64,
         day_progress: f64,
-        should_use_tampon: bool,
+        event: Option<&HolidayEvent>,
     ) -> MenstruationStatus {
         let cycle_range = cycles
             .iter()
@@ -121,7 +121,7 @@ impl MenstruationConfiguration {
         };
         let bleeding_days = (cycle_days < self.bleeding_days).then_some(cycle_days + 1);
 
-        let absorbent = self.choose_absorbent(rng, should_use_tampon);
+        let absorbent = self.choose_absorbent(rng, event);
 
         MenstruationStatus {
             phase,
@@ -133,12 +133,19 @@ impl MenstruationConfiguration {
     fn choose_absorbent<R: RngCore + ?Sized>(
         &self,
         rng: &mut R,
-        should_use_tampon: bool,
+        event: Option<&HolidayEvent>,
     ) -> Option<MenstruationAbsorbent> {
         let pad_variation = self.pad_variations.choose(rng);
-        if should_use_tampon {
-            return Some(MenstruationAbsorbent::Tampon);
+
+        let Some(event) = event else {
+            return pad_variation.cloned().map(MenstruationAbsorbent::Pad);
+        };
+        if event.tampon_required {
+            Some(MenstruationAbsorbent::Tampon {
+                due_to_event: event.title.to_string(),
+            })
+        } else {
+            pad_variation.cloned().map(MenstruationAbsorbent::Pad)
         }
-        pad_variation.cloned().map(MenstruationAbsorbent::Pad)
     }
 }
