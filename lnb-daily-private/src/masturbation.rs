@@ -39,7 +39,7 @@ impl MasturbationConfiguration {
             let bleeding_debuff = bleeding_days
                 .map(|days| 1.0 - (1.0 / days.max(1) as f64))
                 .unwrap_or(1.0);
-            let holiday_boost = match logical_datetime.weekday() {
+            let holiday_boost = match logical_datetime.logical_date.weekday() {
                 Weekday::Saturday | Weekday::Sunday => self.holiday_boost_scale,
                 _ => 1.0,
             };

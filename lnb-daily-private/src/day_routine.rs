@@ -66,18 +66,18 @@ impl DayRoutineConfiguration {
 
     /// `DayStep` を論理日時ベースで計算する。
     pub fn determine_day_step(&self, logical_date_time: &LogicalDateTime) -> DayStep {
-        let logical_date = logical_date_time.logical_date();
+        let logical_date = logical_date_time.logical_date;
         let is_daytime = if self.daytime_over_midnight() {
             let night_range = self.night_start_at..self.daytime_start_at;
-            !night_range.contains(&logical_date_time.time())
+            !night_range.contains(&logical_date_time.time)
         } else {
             let daytime_range = self.daytime_start_at..self.night_start_at;
-            daytime_range.contains(&logical_date_time.time())
+            daytime_range.contains(&logical_date_time.time)
         };
         let part_elapsed = if is_daytime {
-            logical_date_time.local_now() - self.day_part_start(logical_date)
+            logical_date_time.local_now - self.day_part_start(logical_date)
         } else {
-            logical_date_time.local_now() - self.night_part_start(logical_date)
+            logical_date_time.local_now - self.night_part_start(logical_date)
         };
 
         match is_daytime {

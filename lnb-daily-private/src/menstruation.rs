@@ -105,18 +105,18 @@ impl MenstruationConfiguration {
     ) -> MenstruationStatus {
         let cycle_range = cycles
             .iter()
-            .find(|r| r.contains(&logical_datetime.long_term_days()))
+            .find(|r| r.contains(&logical_datetime.long_term_days))
             .expect("invalid cycles");
         let cycle_length = cycle_range.end - cycle_range.start;
-        let cycle_days = logical_datetime.long_term_days() - cycle_range.start;
+        let cycle_days = logical_datetime.long_term_days - cycle_range.start;
 
         let phase = if cycle_days < self.ovulation_day {
-            let phase_progress = (cycle_days as f64 + logical_datetime.day_progress()) / self.ovulation_day as f64;
+            let phase_progress = (cycle_days as f64 + logical_datetime.day_progress) / self.ovulation_day as f64;
             MensePhase::Follicular(phase_progress)
         } else {
             let phase_length = (cycle_length - self.ovulation_day).max(1) as f64;
             let phase_progress =
-                (cycle_days as f64 + logical_datetime.day_progress() - self.ovulation_day as f64) / phase_length;
+                (cycle_days as f64 + logical_datetime.day_progress - self.ovulation_day as f64) / phase_length;
             MensePhase::Luteal(phase_progress)
         };
         let bleeding_days = (cycle_days < self.bleeding_days).then_some(cycle_days + 1);

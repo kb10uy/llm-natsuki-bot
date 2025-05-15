@@ -134,13 +134,13 @@ impl DailyPrivate {
         let day_step = self.day_routine.determine_day_step(&logical_datetime);
         info!("logical: {logical_datetime:?}, step: {day_step:?}");
 
-        let mut daily_rng = self.make_salted_rng(logical_datetime.logical_julian_day().to_le_bytes());
-        let mut long_term_rng = self.make_salted_rng(logical_datetime.long_term_cycles().to_le_bytes());
+        let mut daily_rng = self.make_salted_rng(logical_datetime.logical_julian_day.to_le_bytes());
+        let mut long_term_rng = self.make_salted_rng(logical_datetime.long_term_cycles.to_le_bytes());
 
         // スケジュール
         let event = self
             .schedule
-            .choose_event(&mut daily_rng, logical_datetime.logical_date());
+            .choose_event(&mut daily_rng, logical_datetime.logical_date);
         info!("event: {event:?}");
 
         // 生理周期
@@ -166,7 +166,7 @@ impl DailyPrivate {
         );
         let (masturbation_status, current_play) = self
             .masturbation
-            .construct_status_progress(&masturbation_ranges, logical_datetime.day_progress());
+            .construct_status_progress(&masturbation_ranges, logical_datetime.day_progress);
         info!(
             "masturbation: {} completed (current play: {current_play:?})",
             masturbation_status.completed_count
