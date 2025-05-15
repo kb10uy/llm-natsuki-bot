@@ -73,8 +73,8 @@ local tool_config = {
   },
   daily_private: {
     daily_rng_salt: 'ロングもみあげガール推進部',
-    long_term_days: 720,
     day_routine: {
+      long_term_days: 720,
       morning_start: '07:00:00',
       morning_preparation_minutes: 30,
       night_start: '21:30:00',
