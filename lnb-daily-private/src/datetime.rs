@@ -1,6 +1,7 @@
 use time::{Date, Duration, PrimitiveDateTime, Time};
 
 /// スケジュール決定のベースになる論理日付情報。
+// TODO: 冗長なのでなんとかする
 #[derive(Debug, Clone)]
 pub struct LogicalDateTime {
     /// ローカル日時。

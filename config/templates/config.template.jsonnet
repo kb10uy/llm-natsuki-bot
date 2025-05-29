@@ -77,7 +77,7 @@ local tool_config = {
       long_term_days: 720,
       morning_start: '07:00:00',
       morning_preparation_minutes: 30,
-      night_start: '21:30:00',
+      daytime_minutes: 18 * 60 + 30,
       bathtime_minutes: 30,
     },
     menstruation: {
