@@ -11,8 +11,8 @@ use lnb_core::{
     model::{conversation::IncompleteConversation, message::MessageToolCalling, schema::DescribedSchema},
 };
 use lnb_daily_private::{
-    day_routine::{DayRoutineConfiguration, DayStep},
-    logical_date::LogicalDateTime,
+    datetime::LogicalDateTime,
+    day_routine::{DayRoutine, DayStep},
     masturbation::{MasturbationConfiguration, MasturbationStatus},
     menstruation::{MenstruationConfiguration, MenstruationStatus},
     schedule::ScheduleConfiguration,
@@ -46,7 +46,8 @@ struct DailyPrivateInfo {
 pub struct DailyPrivate {
     rng_salt: String,
     long_term_days: usize,
-    day_routine: DayRoutineConfiguration,
+    daytime_start: Time,
+    day_routine: DayRoutine,
     schedule: ScheduleConfiguration,
     menstruation: MenstruationConfiguration,
     temperature: TemperatureConfiguration,
@@ -62,14 +63,13 @@ impl ConfigurableFunction for DailyPrivate {
     type Configuration = ConfigToolsDailyPrivate;
 
     async fn configure(config: &ConfigToolsDailyPrivate, _: Option<RateLimiter>) -> Result<Self, FunctionError> {
-        let day_routine = DayRoutineConfiguration {
-            daytime_start_at: Time::parse(&config.day_routine.morning_start, TIME_FORMAT)
-                .map_err(FunctionError::by_serialization)?,
-            night_start_at: Time::parse(&config.day_routine.night_start, TIME_FORMAT)
-                .map_err(FunctionError::by_serialization)?,
-            morning_preparation: Duration::minutes(config.day_routine.morning_preparation_minutes as i64),
-            bathtime_duration: Duration::minutes(config.day_routine.bathtime_minutes as i64),
-        };
+        let daytime_start =
+            Time::parse(&config.day_routine.morning_start, TIME_FORMAT).map_err(FunctionError::by_serialization)?;
+        let day_routine = DayRoutine::new(
+            Duration::minutes(config.day_routine.daytime_minutes as i64),
+            Duration::minutes(config.day_routine.morning_preparation_minutes as i64),
+            Duration::minutes(config.day_routine.bathtime_minutes as i64),
+        );
         let debug_offset = {
             let offset_days = debug_option_parsed("daily_private_offset")
                 .map_err(FunctionError::by_serialization)?
@@ -82,6 +82,7 @@ impl ConfigurableFunction for DailyPrivate {
         Ok(DailyPrivate {
             rng_salt: config.daily_rng_salt.clone(),
             long_term_days: config.day_routine.long_term_days as usize,
+            daytime_start,
             day_routine,
             schedule: config.schedule.clone(),
             underwear: config.underwear.clone(),
@@ -128,10 +129,10 @@ impl DailyPrivate {
         let now = OffsetDateTime::now_local().map_err(FunctionError::by_external)? + self.debug_offset;
         let logical_datetime = LogicalDateTime::calculate(
             PrimitiveDateTime::new(now.date(), now.time()),
-            self.day_routine.daytime_start_at,
+            self.daytime_start,
             self.long_term_days,
         );
-        let day_step = self.day_routine.determine_day_step(&logical_datetime);
+        let day_step = self.day_routine.calculate_day_step(&logical_datetime);
         info!("logical: {logical_datetime:?}, step: {day_step:?}");
 
         let mut daily_rng = self.make_salted_rng(logical_datetime.logical_julian_day.to_le_bytes());

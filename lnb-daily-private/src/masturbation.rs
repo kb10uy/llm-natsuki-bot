@@ -5,7 +5,7 @@ use rand_distr::{Normal, Poisson, StandardUniform};
 use serde::{Deserialize, Serialize};
 use time::Weekday;
 
-use crate::logical_date::LogicalDateTime;
+use crate::datetime::LogicalDateTime;
 
 // 理論上無限回出るので上限を決める
 const TECHNO_BREAK_LIMIT: f64 = 12.0;

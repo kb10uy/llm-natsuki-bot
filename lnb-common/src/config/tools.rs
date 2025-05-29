@@ -47,6 +47,6 @@ pub struct ConfigToolsDailyPrivateDayRoutine {
     pub long_term_days: u64,
     pub morning_start: String,
     pub morning_preparation_minutes: usize,
-    pub night_start: String,
+    pub daytime_minutes: usize,
     pub bathtime_minutes: usize,
 }

@@ -1,4 +1,4 @@
-use crate::{DailyPrivateError, logical_date::LogicalDateTime, schedule::HolidayEvent};
+use crate::{DailyPrivateError, datetime::LogicalDateTime, schedule::HolidayEvent};
 
 use std::ops::Range;
 
