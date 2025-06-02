@@ -162,7 +162,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         let assistant_message = recovered_update.assistant_response();
         let attachments = recovered_update.attachments();
         let replied_status = self
-            .send_reply(ReplyType::Status(status), assistant_message, attachments)
+            .send_reply(ReplyType::Status(Box::new(status)), assistant_message, attachments)
             .await?;
         info!(
             "夏稀[{}]: {:?} ({} attachment(s))",
@@ -456,7 +456,7 @@ struct RemindRequester {
 #[derive(Debug)]
 enum ReplyType {
     /// 投稿に対するリプライ。
-    Status(Status),
+    Status(Box<Status>),
 
     /// リマインド(親投稿なし)。
     Remind(RemindRequester),
