@@ -34,7 +34,6 @@ pub struct ConfigToolsExchangeRate {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ConfigToolsDailyPrivate {
     pub daily_rng_salt: String,
-    pub long_term_days: u64,
     pub day_routine: ConfigToolsDailyPrivateDayRoutine,
     pub schedule: ScheduleConfiguration,
     pub underwear: UnderwearConfiguration,
@@ -45,8 +44,9 @@ pub struct ConfigToolsDailyPrivate {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ConfigToolsDailyPrivateDayRoutine {
+    pub long_term_days: u64,
     pub morning_start: String,
     pub morning_preparation_minutes: usize,
-    pub night_start: String,
+    pub daytime_minutes: usize,
     pub bathtime_minutes: usize,
 }

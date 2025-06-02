@@ -11,7 +11,8 @@ use lnb_core::{
     model::{conversation::IncompleteConversation, message::MessageToolCalling, schema::DescribedSchema},
 };
 use lnb_daily_private::{
-    day_routine::{DayRoutineConfiguration, DayStep},
+    datetime::LogicalDateTime,
+    day_routine::{DayRoutine, DayStep},
     masturbation::{MasturbationConfiguration, MasturbationStatus},
     menstruation::{MenstruationConfiguration, MenstruationStatus},
     schedule::ScheduleConfiguration,
@@ -44,8 +45,9 @@ struct DailyPrivateInfo {
 #[derive(Debug)]
 pub struct DailyPrivate {
     rng_salt: String,
-    long_term_days: u64,
-    day_routine: DayRoutineConfiguration,
+    long_term_days: usize,
+    daytime_start: Time,
+    day_routine: DayRoutine,
     schedule: ScheduleConfiguration,
     menstruation: MenstruationConfiguration,
     temperature: TemperatureConfiguration,
@@ -61,14 +63,13 @@ impl ConfigurableFunction for DailyPrivate {
     type Configuration = ConfigToolsDailyPrivate;
 
     async fn configure(config: &ConfigToolsDailyPrivate, _: Option<RateLimiter>) -> Result<Self, FunctionError> {
-        let day_routine = DayRoutineConfiguration {
-            daytime_start_at: Time::parse(&config.day_routine.morning_start, TIME_FORMAT)
-                .map_err(FunctionError::by_serialization)?,
-            night_start_at: Time::parse(&config.day_routine.night_start, TIME_FORMAT)
-                .map_err(FunctionError::by_serialization)?,
-            morning_preparation: Duration::minutes(config.day_routine.morning_preparation_minutes as i64),
-            bathtime_duration: Duration::minutes(config.day_routine.bathtime_minutes as i64),
-        };
+        let daytime_start =
+            Time::parse(&config.day_routine.morning_start, TIME_FORMAT).map_err(FunctionError::by_serialization)?;
+        let day_routine = DayRoutine::new(
+            Duration::minutes(config.day_routine.daytime_minutes as i64),
+            Duration::minutes(config.day_routine.morning_preparation_minutes as i64),
+            Duration::minutes(config.day_routine.bathtime_minutes as i64),
+        );
         let debug_offset = {
             let offset_days = debug_option_parsed("daily_private_offset")
                 .map_err(FunctionError::by_serialization)?
@@ -80,7 +81,8 @@ impl ConfigurableFunction for DailyPrivate {
         };
         Ok(DailyPrivate {
             rng_salt: config.daily_rng_salt.clone(),
-            long_term_days: config.long_term_days,
+            long_term_days: config.day_routine.long_term_days as usize,
+            daytime_start,
             day_routine,
             schedule: config.schedule.clone(),
             underwear: config.underwear.clone(),
@@ -125,40 +127,31 @@ impl Function for DailyPrivate {
 impl DailyPrivate {
     async fn get_daily_info(&self) -> Result<FunctionResponse, FunctionError> {
         let now = OffsetDateTime::now_local().map_err(FunctionError::by_external)? + self.debug_offset;
-        let local_now = PrimitiveDateTime::new(now.date(), now.time());
-        let logical_date = self.day_routine.logical_date(local_now);
-        let logical_day_start = self.day_routine.day_part_start(logical_date);
-        let day_progress = self.day_routine.logical_day_progress(local_now);
-        let day_step = self.day_routine.determine_day_step(local_now);
-        info!(
-            "logical date: {logical_date}, day progress: {:.2}%, step: {day_step:?}",
-            day_progress * 100.0
+        let logical_datetime = LogicalDateTime::calculate(
+            PrimitiveDateTime::new(now.date(), now.time()),
+            self.daytime_start,
+            self.long_term_days,
         );
+        let day_step = self.day_routine.calculate_day_step(&logical_datetime);
+        info!("logical: {logical_datetime:?}, step: {day_step:?}");
 
-        let logical_julian_day = logical_date.to_julian_day();
-        let logical_in_long_term = logical_julian_day.rem_euclid(self.long_term_days as i32) as i64;
-        let long_term_cycles = logical_julian_day.div_euclid(self.long_term_days as i32) as i64;
-        info!("julian day: {logical_julian_day}, long term: cycle {long_term_cycles} / day {logical_in_long_term}");
-
-        let mut daily_rng = self.make_salted_rng(logical_julian_day.to_le_bytes());
-        let mut long_term_rng = self.make_salted_rng(long_term_cycles.to_le_bytes());
+        let mut daily_rng = self.make_salted_rng(logical_datetime.logical_julian_day.to_le_bytes());
+        let mut long_term_rng = self.make_salted_rng(logical_datetime.long_term_cycles.to_le_bytes());
 
         // スケジュール
-        let event = self.schedule.choose_event(&mut daily_rng, logical_date);
+        let event = self
+            .schedule
+            .choose_event(&mut daily_rng, logical_datetime.logical_date);
         info!("event: {event:?}");
 
         // 生理周期
         let menstruation_cycles = self
             .menstruation
-            .calculate_cycles(&mut long_term_rng, self.long_term_days)
+            .calculate_cycles(&mut long_term_rng, self.long_term_days as u64)
             .map_err(FunctionError::by_external)?;
-        let menstruation_status = self.menstruation.construct_status(
-            &mut daily_rng,
-            &menstruation_cycles,
-            logical_in_long_term,
-            day_progress,
-            event,
-        );
+        let menstruation_status =
+            self.menstruation
+                .construct_status(&mut daily_rng, &menstruation_cycles, &logical_datetime, event);
         info!("menstruation: {menstruation_status:?}");
         info!("menstruation cycles: {menstruation_cycles:?}");
 
@@ -170,24 +163,16 @@ impl DailyPrivate {
         let masturbation_ranges = self.masturbation.calculate_daily_playing_ranges(
             &mut daily_rng,
             menstruation_status.bleeding_days,
-            logical_julian_day,
+            &logical_datetime,
         );
         let (masturbation_status, current_play) = self
             .masturbation
-            .construct_status_progress(&masturbation_ranges, day_progress);
-        let masturbation_times: Vec<_> = masturbation_ranges
-            .iter()
-            .map(|mr| {
-                let start = logical_day_start + (mr.start * Duration::DAY);
-                let end = logical_day_start + (mr.end * Duration::DAY);
-                format!("({start} ~ {end})")
-            })
-            .collect();
+            .construct_status_progress(&masturbation_ranges, logical_datetime.day_progress);
         info!(
             "masturbation: {} completed (current play: {current_play:?})",
             masturbation_status.completed_count
         );
-        info!("masturbation planned: {masturbation_times:?}");
+        info!("masturbation planned: {masturbation_ranges:?}");
 
         // 下着
         let underwear_status =
