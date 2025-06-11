@@ -6,7 +6,11 @@ use crate::{
 use std::{iter::once, sync::Arc, time::Duration};
 
 use futures::prelude::*;
-use lnb_common::{config::client::ConfigClientMastodon, debug::debug_option_value, user_roles::UserRolesGroup};
+use lnb_common::{
+    config::client::ConfigClientMastodon,
+    debug::{debug_option_enabled, debug_option_value},
+    user_roles::UserRolesGroup,
+};
 use lnb_core::{
     APP_USER_AGENT,
     error::ClientError,
@@ -25,9 +29,11 @@ use mastodon_async::{
 };
 use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
+use serde_json::Value as JsonValue;
 use tempfile::NamedTempFile;
 use thiserror::Error as ThisError;
 use tokio::{fs::File, io::AsyncWriteExt, spawn, time::sleep};
+use tokio_tungstenite::tungstenite::{Bytes, Message as WsMessage};
 use tracing::{debug, error, info, warn};
 
 const RECONNECT_SLEEP: Duration = Duration::from_secs(120);
@@ -41,6 +47,7 @@ pub struct MastodonLnbClientInner<S> {
     sensitive_spoiler: String,
     max_length: usize,
     remote_fetch_delay: Duration,
+    websocket_endpoint: String,
 }
 
 impl<S: LnbServer> MastodonLnbClientInner<S> {
@@ -60,6 +67,13 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
             token: config.token.clone().into(),
             ..Default::default()
         };
+        let websocket_endpoint = {
+            let wss_base = config.server_url.replace("https://", "wss://");
+            format!(
+                "{wss_base}/api/v1/streaming?access_token={}&stream=user:notification",
+                config.token
+            )
+        };
         let mastodon = Mastodon::new(http_client.clone(), mastodon_data);
         let self_account = mastodon.verify_credentials().map_err(ClientError::by_external).await?;
 
@@ -71,26 +85,21 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
             sensitive_spoiler: config.sensitive_spoiler.clone(),
             max_length: config.max_length,
             remote_fetch_delay: Duration::from_secs(config.remote_fetch_delay_seconds as u64),
+            websocket_endpoint,
         })
     }
 
     pub async fn execute(self: Arc<Self>) -> Result<(), ClientError> {
+        let use_sse = debug_option_enabled("mastodon_sse").unwrap_or(false);
         loop {
-            let notification_stream = self
-                .mastodon
-                .stream_notifications()
-                .map_err(ClientError::by_communication)
-                .await?;
+            let this = self.clone();
+            let closed_status = if use_sse {
+                this.execute_sse().await
+            } else {
+                this.execute_websocket().await
+            };
 
-            let disconnected_status = notification_stream
-                .try_for_each(async |(e, _)| {
-                    spawn(self.clone().process_event(e));
-                    Ok(())
-                })
-                .map_err(ClientError::by_communication)
-                .await;
-
-            match disconnected_status {
+            match closed_status {
                 Ok(()) => {
                     warn!("user stream disconnected unexpectedly successfully");
                 }
@@ -98,9 +107,58 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
                     error!("user stream disconnected: {e}");
                 }
             }
+
             warn!("trying to reconnect user stream, waiting...");
             sleep(RECONNECT_SLEEP).await;
         }
+    }
+
+    async fn execute_sse(self: Arc<Self>) -> Result<(), ClientError> {
+        let notification_stream = self
+            .mastodon
+            .stream_notifications()
+            .map_err(ClientError::by_communication)
+            .await?;
+
+        notification_stream
+            .try_for_each(async |(e, _)| {
+                spawn(self.clone().process_event(e));
+                Ok(())
+            })
+            .map_err(ClientError::by_communication)
+            .await
+    }
+
+    async fn execute_websocket(self: Arc<Self>) -> Result<(), ClientError> {
+        let (mut ws_stream, _) = tokio_tungstenite::connect_async(&self.websocket_endpoint)
+            .map_err(ClientError::by_communication)
+            .await?;
+
+        while let Some(msg) = ws_stream.next().await {
+            let message = msg.map_err(ClientError::by_communication)?;
+            match message {
+                WsMessage::Text(utf8_bytes) => {
+                    let packet_json: JsonValue =
+                        serde_json::from_str(&utf8_bytes).map_err(ClientError::by_communication)?;
+                    if packet_json["event"].as_str() == Some("notification") {
+                        let Some(payload_str) = packet_json["payload"].as_str() else {
+                            continue;
+                        };
+                        let n = serde_json::from_str(payload_str).map_err(ClientError::by_communication)?;
+                        spawn(self.clone().process_event(Event::Notification(n)));
+                    }
+                }
+                WsMessage::Ping(_) => {
+                    debug!("received ping, returning pong");
+                    ws_stream
+                        .send(WsMessage::Pong(Bytes::new()))
+                        .map_err(ClientError::by_communication)
+                        .await?;
+                }
+                _ => (),
+            }
+        }
+        Ok(())
     }
 
     async fn process_event(self: Arc<Self>, event: Event) {
