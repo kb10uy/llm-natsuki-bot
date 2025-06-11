@@ -11,6 +11,7 @@ use lnb_core::{
     error::ClientError,
     interface::{client::LnbClient, server::LnbServer},
 };
+use tracing::error;
 
 pub struct DiscordLnbClient<S>(Arc<inner::DiscordLnbClientInner<S>>);
 
@@ -29,10 +30,9 @@ impl<S: LnbServer> LnbClient for DiscordLnbClient<S> {
     fn execute(&self) -> BoxFuture<'static, Result<(), ClientError>> {
         let cloned = self.0.clone();
         async move {
-            cloned
-                .execute()
-                .map_err(|e| ClientError::Communication(e.into()))
-                .await?;
+            if let Err(e) = cloned.execute().map_err(|e| ClientError::Communication(e.into())).await {
+                error!("connection totally lost: {e}");
+            }
             Ok(())
         }
         .boxed()

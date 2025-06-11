@@ -12,6 +12,7 @@ use lnb_core::{
     interface::{client::LnbClient, reminder::Remindable, server::LnbServer},
     model::conversation::ConversationUpdate,
 };
+use tracing::error;
 
 const CONTEXT_KEY_PREFIX: &str = "mastodon";
 
@@ -33,7 +34,9 @@ impl<S: LnbServer> LnbClient for MastodonLnbClient<S> {
     fn execute(&self) -> BoxFuture<'static, Result<(), ClientError>> {
         let cloned_inner = self.0.clone();
         async move {
-            cloned_inner.execute().await?;
+            if let Err(e) = cloned_inner.execute().await {
+                error!("connection totally lost: {e}");
+            }
             Ok(())
         }
         .boxed()
