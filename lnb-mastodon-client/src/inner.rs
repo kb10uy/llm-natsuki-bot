@@ -29,13 +29,11 @@ use mastodon_async::{
 };
 use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
+use serde_json::Value as JsonValue;
 use tempfile::NamedTempFile;
 use thiserror::Error as ThisError;
-use tokio::{fs::File, io::AsyncWriteExt, net::TcpStream, spawn, time::sleep};
-use tokio_tungstenite::{
-    MaybeTlsStream, WebSocketStream,
-    tungstenite::{Bytes, Message as WsMessage},
-};
+use tokio::{fs::File, io::AsyncWriteExt, spawn, time::sleep};
+use tokio_tungstenite::tungstenite::{Bytes, Message as WsMessage};
 use tracing::{debug, error, info, warn};
 
 const RECONNECT_SLEEP: Duration = Duration::from_secs(120);
@@ -92,49 +90,15 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
     }
 
     pub async fn execute(self: Arc<Self>) -> Result<(), ClientError> {
-        if debug_option_enabled("mastodon_websocket").unwrap_or(false) {
-            self.execute_websocket().await
-        } else {
-            self.execute_sse().await
-        }
-    }
-
-    async fn execute_sse(self: Arc<Self>) -> Result<(), ClientError> {
+        let use_websocket = debug_option_enabled("mastodon_websocket").unwrap_or(false);
         loop {
-            let notification_stream = self
-                .mastodon
-                .stream_notifications()
-                .map_err(ClientError::by_communication)
-                .await?;
+            let this = self.clone();
+            let closed_status = if use_websocket {
+                this.execute_websocket().await
+            } else {
+                this.execute_sse().await
+            };
 
-            let disconnected_status = notification_stream
-                .try_for_each(async |(e, _)| {
-                    spawn(self.clone().process_event(e));
-                    Ok(())
-                })
-                .map_err(ClientError::by_communication)
-                .await;
-
-            match disconnected_status {
-                Ok(()) => {
-                    warn!("user stream disconnected unexpectedly successfully");
-                }
-                Err(e) => {
-                    error!("user stream disconnected: {e}");
-                }
-            }
-            warn!("trying to reconnect user stream, waiting...");
-            sleep(RECONNECT_SLEEP).await;
-        }
-    }
-
-    async fn execute_websocket(self: Arc<Self>) -> Result<(), ClientError> {
-        loop {
-            let (ws_stream, _) = tokio_tungstenite::connect_async(&self.websocket_endpoint)
-                .map_err(ClientError::by_communication)
-                .await?;
-
-            let closed_status = self.process_websocket(ws_stream).await;
             match closed_status {
                 Ok(()) => {
                     warn!("user stream disconnected unexpectedly successfully");
@@ -143,33 +107,53 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
                     error!("user stream disconnected: {e}");
                 }
             }
+
             warn!("trying to reconnect user stream, waiting...");
             sleep(RECONNECT_SLEEP).await;
         }
     }
 
-    async fn process_websocket(
-        &self,
-        mut ws_stream: WebSocketStream<MaybeTlsStream<TcpStream>>,
-    ) -> Result<(), ClientError> {
+    async fn execute_sse(self: Arc<Self>) -> Result<(), ClientError> {
+        let notification_stream = self
+            .mastodon
+            .stream_notifications()
+            .map_err(ClientError::by_communication)
+            .await?;
+
+        notification_stream
+            .try_for_each(async |(e, _)| {
+                spawn(self.clone().process_event(e));
+                Ok(())
+            })
+            .map_err(ClientError::by_communication)
+            .await
+    }
+
+    async fn execute_websocket(self: Arc<Self>) -> Result<(), ClientError> {
+        let (mut ws_stream, _) = tokio_tungstenite::connect_async(&self.websocket_endpoint)
+            .map_err(ClientError::by_communication)
+            .await?;
+
         while let Some(msg) = ws_stream.next().await {
             let message = msg.map_err(ClientError::by_communication)?;
             match message {
                 WsMessage::Text(utf8_bytes) => {
-                    info!("received utf8 bytes: {}", utf8_bytes.as_str());
-                }
-                WsMessage::Binary(bytes) => {
-                    info!("received binary {} bytes", bytes.len());
+                    let packet_json: JsonValue =
+                        serde_json::from_str(&utf8_bytes).map_err(ClientError::by_communication)?;
+                    if packet_json["event"].as_str() == Some("notification") {
+                        let Some(payload_str) = packet_json["payload"].as_str() else {
+                            continue;
+                        };
+                        let n = serde_json::from_str(payload_str).map_err(ClientError::by_communication)?;
+                        spawn(self.clone().process_event(Event::Notification(n)));
+                    }
                 }
                 WsMessage::Ping(_) => {
-                    info!("received ping, returning pong");
+                    debug!("received ping, returning pong");
                     ws_stream
                         .send(WsMessage::Pong(Bytes::new()))
                         .map_err(ClientError::by_communication)
                         .await?;
-                }
-                WsMessage::Close(_) => {
-                    info!("closed");
                 }
                 _ => (),
             }
