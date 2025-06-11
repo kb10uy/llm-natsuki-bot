@@ -63,6 +63,7 @@ time = { version = "0.3.41", features = [
 ] }
 tokio = { version = "1.44.1", features = ["full"] }
 tokio-stream = "0.1.17"
+tokio-tungstenite = "0.26.2"
 toml = "0.8.20"
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
