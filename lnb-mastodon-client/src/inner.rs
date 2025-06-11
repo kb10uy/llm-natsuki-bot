@@ -90,13 +90,13 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
     }
 
     pub async fn execute(self: Arc<Self>) -> Result<(), ClientError> {
-        let use_websocket = debug_option_enabled("mastodon_websocket").unwrap_or(false);
+        let use_sse = debug_option_enabled("mastodon_sse").unwrap_or(false);
         loop {
             let this = self.clone();
-            let closed_status = if use_websocket {
-                this.execute_websocket().await
-            } else {
+            let closed_status = if use_sse {
                 this.execute_sse().await
+            } else {
+                this.execute_websocket().await
             };
 
             match closed_status {
