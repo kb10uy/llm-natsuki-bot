@@ -4,7 +4,6 @@ members = [
   "lnb-core",
   "lnb-common",
   "lnb-rate-limiter",
-  "lnb-daily-private",
   "lnb-server",
   "lnb-admin-api",
   "lnb-mastodon-client",
@@ -22,7 +21,6 @@ edition = "2024"
 lnb-core = { path = "./lnb-core" }
 lnb-common = { path = "./lnb-common" }
 lnb-rate-limiter = { path = "./lnb-rate-limiter" }
-lnb-daily-private = { path = "./lnb-daily-private" }
 lnb-mastodon-client = { path = "./lnb-mastodon-client" }
 lnb-discord-client = { path = "./lnb-discord-client" }
 

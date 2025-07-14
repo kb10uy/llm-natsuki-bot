@@ -9,7 +9,6 @@ edition.workspace = true
 lnb-core = { workspace = true }
 lnb-common = { workspace = true }
 lnb-rate-limiter = { workspace = true }
-lnb-daily-private = { workspace = true }
 lnb-mastodon-client = { workspace = true }
 lnb-discord-client = { workspace = true }
 

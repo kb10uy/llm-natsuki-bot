@@ -1,11 +1,9 @@
-mod daily_private;
 mod exchange_rate;
 mod get_illust_url;
 mod image_generator;
 mod local_info;
 mod self_info;
 
-pub use daily_private::DailyPrivate;
 pub use exchange_rate::ExchangeRate;
 pub use get_illust_url::GetIllustUrl;
 pub use image_generator::ImageGenerator;

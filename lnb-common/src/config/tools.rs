@@ -1,7 +1,3 @@
-use lnb_daily_private::{
-    masturbation::MasturbationConfiguration, menstruation::MenstruationConfiguration, schedule::ScheduleConfiguration,
-    temperature::TemperatureConfiguration, underwear::UnderwearConfiguration,
-};
 use serde::Deserialize;
 
 /// [tool]
@@ -10,7 +6,6 @@ pub struct ConfigTools {
     pub image_generator: Option<ConfigToolsImageGenerator>,
     pub get_illust_url: Option<ConfigToolsGetIllustUrl>,
     pub exchange_rate: Option<ConfigToolsExchangeRate>,
-    pub daily_private: Option<ConfigToolsDailyPrivate>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -29,17 +24,6 @@ pub struct ConfigToolsGetIllustUrl {
 pub struct ConfigToolsExchangeRate {
     pub endpoint: String,
     pub token: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ConfigToolsDailyPrivate {
-    pub daily_rng_salt: String,
-    pub day_routine: ConfigToolsDailyPrivateDayRoutine,
-    pub schedule: ScheduleConfiguration,
-    pub underwear: UnderwearConfiguration,
-    pub masturbation: MasturbationConfiguration,
-    pub menstruation: MenstruationConfiguration,
-    pub temperature: TemperatureConfiguration,
 }
 
 #[derive(Debug, Clone, Deserialize)]
