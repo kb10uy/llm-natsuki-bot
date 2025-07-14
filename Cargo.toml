@@ -12,7 +12,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.15.1"
+version = "0.16.0"
 description = "LLM-based chatbot with various functions"
 authors = ["kb10uy <kb10uy@kb10uy.org>"]
 edition = "2024"
