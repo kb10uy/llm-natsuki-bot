@@ -11,6 +11,9 @@ use url::Url;
 static RE_HEAD_MENTION: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"^\s*(\[@.+?\]\(.+?\)\s*)+"#).expect("invalid regex"));
 
+static RE_ESCAPING_MENTION: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"(?:^|\s)@([A-Za-z0-9_]+)"#).expect("invalid regex"));
+
 pub fn sanitize_mention_html_from_mastodon(mention_html: &str) -> String {
     let content_markdown = parse_html(mention_html);
     RE_HEAD_MENTION.replace_all(&content_markdown, "").to_string()
@@ -85,7 +88,7 @@ fn walk_mastodon(writer: &mut impl Write, children: Vec<Node>) -> FmtResult {
 }
 
 fn write_text_element(writer: &mut impl Write, original: &str) -> FmtResult {
-    let escaped = original.replace("@", "(at)");
+    let escaped = RE_ESCAPING_MENTION.replace_all(original, "(at)$1");
     write!(writer, "{escaped}")?;
     Ok(())
 }
