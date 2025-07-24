@@ -109,13 +109,12 @@ impl Function for DailyPrivate {
         _incomplete: &'a IncompleteConversation,
         _tool_calling: MessageToolCalling,
     ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
-        async move { self.get_daily_info().await }.boxed()
+        async move { self.get_daily_info(ctx.datetime_provider.now()).await }.boxed()
     }
 }
 
 impl DailyPrivate {
-    async fn get_daily_info(&self) -> Result<FunctionResponse, FunctionError> {
-        let now = OffsetDateTime::now_local().map_err(FunctionError::by_external)?;
+    async fn get_daily_info(&self, now: OffsetDateTime) -> Result<FunctionResponse, FunctionError> {
         let logical_datetime = LogicalDateTime::calculate(
             PrimitiveDateTime::new(now.date(), now.time()),
             self.daytime_start,

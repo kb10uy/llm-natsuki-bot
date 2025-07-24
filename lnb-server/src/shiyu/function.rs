@@ -61,7 +61,7 @@ impl Function for ShiyuProvider {
 
     fn call<'a>(
         &'a self,
-        _ctx: &'a Context,
+        ctx: &'a Context,
         message_ctx: &'a MessageContext,
         _incomplete: &'a IncompleteConversation,
         tool_calling: MessageToolCalling,
@@ -70,7 +70,7 @@ impl Function for ShiyuProvider {
             Ok(p) => p,
             Err(err) => return async { Err(FunctionError::Serialization(err.into())) }.boxed(),
         };
-        async move { self.execute(message_ctx, parameters).await }.boxed()
+        async move { self.execute(ctx.datetime_provider.now(), message_ctx, parameters).await }.boxed()
     }
 }
 
@@ -84,6 +84,7 @@ impl ShiyuProvider {
 
     async fn execute(
         &self,
+        now: OffsetDateTime,
         message_ctx: &MessageContext,
         parameters: ReminderParameters,
     ) -> Result<FunctionResponse, FunctionError> {
@@ -98,7 +99,6 @@ impl ShiyuProvider {
             return self.cancel(cancel_id).await;
         }
 
-        let now = OffsetDateTime::now_local().map_err(FunctionError::by_external)?;
         let complete_remind_at = if let Some(remind_at) = parameters.remind_at {
             if let Ok(full_datetime) = OffsetDateTime::parse(&remind_at, &Rfc3339) {
                 full_datetime
