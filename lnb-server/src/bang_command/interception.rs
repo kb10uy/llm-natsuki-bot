@@ -45,7 +45,7 @@ impl BangCommandInterception {
 
     async fn execute(
         &self,
-        context: &MessageContext,
+        message_ctx: &MessageContext,
         incomplete: &mut IncompleteConversation,
     ) -> Result<InterceptionStatus, LlmError> {
         let Some(last_user_message) = incomplete.last_user_mut() else {
@@ -79,7 +79,7 @@ impl BangCommandInterception {
             return Ok(self.complete_with(format!("unknown command: {command_name}")));
         };
 
-        let result_status = command.call(context, rest).await?;
+        let result_status = command.call(message_ctx, rest).await?;
         if let Some(model_override) = result_status.model_override {
             incomplete.set_model_override(model_override);
         }

@@ -231,7 +231,7 @@ impl ImageGenerator {
 
     async fn edit_image(
         &self,
-        context: &MessageContext,
+        message_ctx: &MessageContext,
         prompt: String,
         input_image_urls: Vec<String>,
     ) -> Result<ImagesResponse, IntermediateError> {
@@ -247,7 +247,7 @@ impl ImageGenerator {
             let mut f = Form::new()
                 .text("model", self.model.clone())
                 .text("prompt", prompt)
-                .text("user", context.identity().unwrap_or("system").to_string());
+                .text("user", message_ctx.identity().unwrap_or("system").to_string());
             for image in &downloaded_images {
                 f = f
                     .file("image[]", image.path())

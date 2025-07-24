@@ -196,11 +196,11 @@ impl NatsukiInner {
         }
     }
 
-    async fn ensure_in_rate(&self, context: &MessageContext) -> bool {
+    async fn ensure_in_rate(&self, message_ctx: &MessageContext) -> bool {
         let Some(rate_limiter) = &self.rate_limiter else {
             return true;
         };
-        let Some(identity) = context.identity() else {
+        let Some(identity) = message_ctx.identity() else {
             return true;
         };
 

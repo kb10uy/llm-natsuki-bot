@@ -84,10 +84,10 @@ impl ShiyuProvider {
 
     async fn execute(
         &self,
-        context: &MessageContext,
+        message_ctx: &MessageContext,
         parameters: ReminderParameters,
     ) -> Result<FunctionResponse, FunctionError> {
-        let Some(remindable) = context
+        let Some(remindable) = message_ctx
             .get::<RemindableContext>()
             .map_err(FunctionError::by_serialization)?
         else {
