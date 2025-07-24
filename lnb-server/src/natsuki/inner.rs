@@ -1,9 +1,10 @@
-use crate::natsuki::{context::NatsukiContext, function_store::FunctionStore, llm_cache::LlmCache};
+use crate::natsuki::{function_store::FunctionStore, llm_cache::LlmCache};
 
 use std::{iter::once, sync::Arc};
 
 use lnb_common::{config::assistant::ConfigAssistant, debug::debug_option_parsed, time_provider::BotDateTimeProvider};
 use lnb_core::{
+    context::NatsukiContext,
     error::{FunctionError, ServerError},
     interface::{
         Context,
