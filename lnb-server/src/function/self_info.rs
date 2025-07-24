@@ -2,7 +2,7 @@ use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
     error::FunctionError,
     interface::{
-        Context,
+        MessageContext,
         function::{Function, FunctionDescriptor, FunctionResponse},
     },
     model::{conversation::IncompleteConversation, message::MessageToolCalling, schema::DescribedSchema},
@@ -29,7 +29,7 @@ impl Function for SelfInfo {
 
     fn call<'a>(
         &'a self,
-        _context: &'a Context,
+        _context: &'a MessageContext,
         _incomplete: &'a IncompleteConversation,
         _tool_calling: MessageToolCalling,
     ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {

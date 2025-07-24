@@ -7,7 +7,7 @@ use lnb_core::{
     context::NatsukiContext,
     error::{FunctionError, ServerError},
     interface::{
-        Context,
+        MessageContext,
         interception::{BoxInterception, InterceptionStatus},
         llm::LlmUpdate,
         storage::BoxConversationStorage,
@@ -72,7 +72,7 @@ impl NatsukiInner {
 
     pub async fn process_conversation(
         &self,
-        context: Context,
+        context: MessageContext,
         conversation_id: ConversationId,
         new_messages: Vec<Message>,
     ) -> Result<ConversationUpdate, ServerError> {
@@ -194,7 +194,7 @@ impl NatsukiInner {
         }
     }
 
-    async fn ensure_in_rate(&self, context: &Context) -> bool {
+    async fn ensure_in_rate(&self, context: &MessageContext) -> bool {
         let Some(rate_limiter) = &self.rate_limiter else {
             return true;
         };
@@ -208,7 +208,7 @@ impl NatsukiInner {
 
     async fn process_tool_callings(
         &self,
-        context: &Context,
+        context: &MessageContext,
         incomplete_conversation: &IncompleteConversation,
         tool_callings: Vec<MessageToolCalling>,
     ) -> Result<(Vec<FunctionResponseMessage>, Vec<ConversationAttachment>), ServerError> {

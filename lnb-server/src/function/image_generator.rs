@@ -8,7 +8,7 @@ use lnb_core::{
     APP_USER_AGENT,
     error::FunctionError,
     interface::{
-        Context,
+        MessageContext,
         function::{Function, FunctionDescriptor, FunctionResponse},
     },
     model::{
@@ -109,7 +109,7 @@ impl Function for ImageGenerator {
 
     fn call<'a>(
         &'a self,
-        context: &'a Context,
+        context: &'a MessageContext,
         _incomplete: &'a IncompleteConversation,
         tool_calling: MessageToolCalling,
     ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
@@ -137,7 +137,7 @@ impl Function for ImageGenerator {
 impl ImageGenerator {
     async fn execute(
         &self,
-        context: &Context,
+        context: &MessageContext,
         parameters: GenerationParameters,
     ) -> Result<FunctionResponse, IntermediateError> {
         if !self.ensure_in_rate(context.identity()).await {
@@ -197,7 +197,7 @@ impl ImageGenerator {
         })
     }
 
-    async fn generate_image(&self, context: &Context, prompt: String) -> Result<ImagesResponse, IntermediateError> {
+    async fn generate_image(&self, context: &MessageContext, prompt: String) -> Result<ImagesResponse, IntermediateError> {
         info!("generating image with {prompt:?}");
 
         let moderation = if context.role().accepts(LOW_MODERATION_SCOPE) {
@@ -225,7 +225,7 @@ impl ImageGenerator {
 
     async fn edit_image(
         &self,
-        context: &Context,
+        context: &MessageContext,
         prompt: String,
         input_image_urls: Vec<String>,
     ) -> Result<ImagesResponse, IntermediateError> {

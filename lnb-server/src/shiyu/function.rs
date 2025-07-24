@@ -3,7 +3,7 @@ use lnb_common::config::reminder::ConfigReminder;
 use lnb_core::{
     error::FunctionError,
     interface::{
-        Context,
+        MessageContext,
         function::{Function, FunctionDescriptor, FunctionResponse},
         reminder::{Remind, RemindableContext, Reminder},
     },
@@ -60,7 +60,7 @@ impl Function for ShiyuProvider {
 
     fn call<'a>(
         &'a self,
-        context: &'a Context,
+        context: &'a MessageContext,
         _incomplete: &'a IncompleteConversation,
         tool_calling: MessageToolCalling,
     ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
@@ -82,7 +82,7 @@ impl ShiyuProvider {
 
     async fn execute(
         &self,
-        context: &Context,
+        context: &MessageContext,
         parameters: ReminderParameters,
     ) -> Result<FunctionResponse, FunctionError> {
         let Some(remindable) = context

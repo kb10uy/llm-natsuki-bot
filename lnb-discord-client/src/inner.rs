@@ -5,7 +5,7 @@ use crate::text::{sanitize_discord_message, sanitize_markdown_for_discord};
 use lnb_common::{config::client::ConfigClientDiscord, user_roles::UserRolesGroup};
 use lnb_core::{
     error::ClientError,
-    interface::{Context as LnbContext, server::LnbServer},
+    interface::{MessageContext as LnbContext, server::LnbServer},
     model::{
         conversation::ConversationUpdate,
         message::{AssistantMessage, UserMessage, UserMessageContent},

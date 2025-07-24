@@ -1,6 +1,6 @@
 use crate::{
     error::FunctionError,
-    interface::Context,
+    interface::MessageContext,
     model::{
         conversation::{ConversationAttachment, IncompleteConversation},
         message::MessageToolCalling,
@@ -36,7 +36,7 @@ pub trait Function: Send + Sync {
     /// Function を実行する。
     fn call<'a>(
         &'a self,
-        context: &'a Context,
+        context: &'a MessageContext,
         incomplete: &'a IncompleteConversation,
         tool_calling: MessageToolCalling,
     ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>>;
