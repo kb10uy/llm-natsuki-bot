@@ -5,9 +5,14 @@ use std::collections::HashMap;
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use lnb_common::config::tools::ConfigToolsExchangeRate;
 use lnb_core::{
-    context::Context, error::FunctionError, interface::{
-        function::{Function, FunctionDescriptor, FunctionResponse}, MessageContext
-    }, model::{conversation::IncompleteConversation, message::MessageToolCalling, schema::DescribedSchema}, APP_USER_AGENT, RFC3339_NUMOFFSET
+    APP_USER_AGENT, RFC3339_NUMOFFSET,
+    context::Context,
+    error::FunctionError,
+    interface::{
+        MessageContext,
+        function::{Function, FunctionDescriptor, FunctionResponse},
+    },
+    model::{conversation::IncompleteConversation, message::MessageToolCalling, schema::DescribedSchema},
 };
 use lnb_rate_limiter::RateLimiter;
 use reqwest::{Client, ClientBuilder};

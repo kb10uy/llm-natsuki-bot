@@ -116,8 +116,9 @@ impl<T: BangCommand + 'static> From<T> for BoxBangCommand {
     }
 }
 
-type BoxedAsyncClosure =
-    Box<dyn Send + Sync + for<'a> Fn(&'a MessageContext, &'a str) -> BoxFuture<'a, Result<BangCommandResponse, LlmError>>>;
+type BoxedAsyncClosure = Box<
+    dyn Send + Sync + for<'a> Fn(&'a MessageContext, &'a str) -> BoxFuture<'a, Result<BangCommandResponse, LlmError>>,
+>;
 type BoxedSyncClosure =
     Box<dyn Send + Sync + for<'a> Fn(&'a MessageContext, &'a str) -> Result<BangCommandResponse, LlmError>>;
 
@@ -147,7 +148,10 @@ impl BangCommand for SyncClosure {
 #[allow(dead_code)]
 pub fn async_fn_command<F>(f: F) -> AsyncClosure
 where
-    F: Send + Sync + for<'a> Fn(&'a MessageContext, &'a str) -> BoxFuture<'a, Result<BangCommandResponse, LlmError>> + 'static,
+    F: Send
+        + Sync
+        + for<'a> Fn(&'a MessageContext, &'a str) -> BoxFuture<'a, Result<BangCommandResponse, LlmError>>
+        + 'static,
 {
     AsyncClosure(Box::new(f))
 }
