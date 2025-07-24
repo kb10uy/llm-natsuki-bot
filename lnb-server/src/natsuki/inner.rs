@@ -1,10 +1,10 @@
-use crate::natsuki::{function_store::FunctionStore, llm_cache::LlmCache};
+use crate::natsuki::{context::NatsukiContext, function_store::FunctionStore, llm_cache::LlmCache};
 
-use std::iter::once;
+use std::{iter::once, sync::Arc};
 
-use lnb_common::config::assistant::ConfigAssistant;
+use lnb_common::{config::assistant::ConfigAssistant, debug::debug_option_parsed, time_provider::BotDateTimeProvider};
 use lnb_core::{
-    error::ServerError,
+    error::{FunctionError, ServerError},
     interface::{
         Context,
         interception::{BoxInterception, InterceptionStatus},
@@ -19,7 +19,7 @@ use lnb_core::{
     },
 };
 use lnb_rate_limiter::{RateLimiter, Rated};
-use time::UtcDateTime;
+use time::{Duration, UtcDateTime};
 use tracing::{debug, info, warn};
 
 const MAX_CONVERSATION_LOOP: usize = 8;
@@ -30,8 +30,7 @@ pub struct NatsukiInner {
     llm_cache: LlmCache,
     function_store: FunctionStore,
     interceptions: Vec<BoxInterception>,
-    system_role: String,
-    sensitive_marker: String,
+    context: NatsukiContext,
 }
 
 impl NatsukiInner {
@@ -43,14 +42,30 @@ impl NatsukiInner {
         interceptions: Vec<BoxInterception>,
         assistant_identity: &ConfigAssistant,
     ) -> Result<NatsukiInner, ServerError> {
+        let context = {
+            let mut dtp = BotDateTimeProvider::new();
+            let offset_days = debug_option_parsed("datetime_offset")
+                .map_err(FunctionError::by_serialization)?
+                .unwrap_or(0);
+            if offset_days != 0 {
+                warn!("day offset: {offset_days}");
+                dtp.set_offset(Duration::days(offset_days as i64));
+            }
+
+            NatsukiContext {
+                datetime_provider: Arc::new(dtp),
+                system_role: assistant_identity.system_role.clone().into(),
+                sensitive_marker: assistant_identity.sensitive_marker.clone().into(),
+            }
+        };
+
         Ok(NatsukiInner {
             storage,
             rate_limiter,
             llm_cache,
             function_store,
             interceptions,
-            system_role: assistant_identity.system_role.clone(),
-            sensitive_marker: assistant_identity.sensitive_marker.clone(),
+            context,
         })
     }
 
@@ -170,8 +185,8 @@ impl NatsukiInner {
     fn strip_sensitive_text(&self, original: String, explicit_sensitive: Option<bool>) -> (String, bool) {
         match explicit_sensitive {
             Some(v) => (original, v),
-            None if self.sensitive_marker.is_empty() => (original, false),
-            _ => match original.strip_prefix(&self.sensitive_marker) {
+            None if self.context.sensitive_marker.is_empty() => (original, false),
+            _ => match original.strip_prefix(&*self.context.sensitive_marker) {
                 Some(stripped) => (stripped.to_string(), true),
                 None => (original, false),
             },
@@ -224,7 +239,7 @@ impl NatsukiInner {
     }
 
     pub async fn new_conversation(&self) -> Result<ConversationId, ServerError> {
-        let system_message = Message::new_system(self.system_role.clone());
+        let system_message = Message::new_system(self.context.system_role.to_string());
         let conversation = Conversation::new_now(Some(system_message));
         self.storage.upsert(&conversation, None).await?;
         Ok(conversation.id())

@@ -1,3 +1,4 @@
+mod context;
 mod function_store;
 mod inner;
 mod llm_cache;
