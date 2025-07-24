@@ -4,7 +4,7 @@ use std::{iter::once, sync::Arc};
 
 use lnb_common::{config::assistant::ConfigAssistant, debug::debug_option_parsed, time_provider::BotDateTimeProvider};
 use lnb_core::{
-    context::NatsukiContext,
+    context::Context,
     error::{FunctionError, ServerError},
     interface::{
         MessageContext,
@@ -31,7 +31,7 @@ pub struct NatsukiInner {
     llm_cache: LlmCache,
     function_store: FunctionStore,
     interceptions: Vec<BoxInterception>,
-    context: NatsukiContext,
+    context: Context,
 }
 
 impl NatsukiInner {
@@ -53,7 +53,7 @@ impl NatsukiInner {
                 dtp.set_offset(Duration::days(offset_days as i64));
             }
 
-            NatsukiContext {
+            Context {
                 datetime_provider: Arc::new(dtp),
                 system_role: assistant_identity.system_role.clone().into(),
                 sensitive_marker: assistant_identity.sensitive_marker.clone().into(),
