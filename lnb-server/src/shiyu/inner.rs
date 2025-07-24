@@ -7,7 +7,7 @@ use lnb_common::config::reminder::ConfigReminder;
 use lnb_core::{
     error::ReminderError,
     interface::{
-        Context,
+        MessageContext,
         reminder::{Remind, Remindable},
         server::LnbServer,
     },
@@ -137,7 +137,7 @@ impl ShiyuDispatcher {
             ..Default::default()
         };
         let update = server
-            .process_conversation(Context::new_system(), conversation_id, vec![user_message.into()])
+            .process_conversation(MessageContext::new_system(), conversation_id, vec![user_message.into()])
             .map_err(ReminderError::by_internal)
             .await?;
         remindable

@@ -14,7 +14,7 @@ use std::sync::Arc;
 use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
     error::ServerError,
-    interface::{Context, interception::BoxInterception, server::LnbServer, storage::BoxConversationStorage},
+    interface::{MessageContext, interception::BoxInterception, server::LnbServer, storage::BoxConversationStorage},
     model::{
         conversation::{ConversationId, ConversationUpdate},
         message::Message,
@@ -67,13 +67,13 @@ impl LnbServer for Natsuki {
 
     fn process_conversation(
         &self,
-        context: Context,
+        message_ctx: MessageContext,
         conversation_id: ConversationId,
         user_message: Vec<Message>,
     ) -> BoxFuture<'_, Result<ConversationUpdate, ServerError>> {
         async move {
             self.0
-                .process_conversation(context, conversation_id, user_message)
+                .process_conversation(message_ctx, conversation_id, user_message)
                 .await
         }
         .boxed()

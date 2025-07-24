@@ -1,11 +1,12 @@
 use crate::function::ConfigurableFunction;
 
 use futures::{FutureExt, future::BoxFuture};
-use lnb_common::{config::tools::ConfigToolsDailyPrivate, debug::debug_option_parsed};
+use lnb_common::config::tools::ConfigToolsDailyPrivate;
 use lnb_core::{
+    context::Context,
     error::FunctionError,
     interface::{
-        Context,
+        MessageContext,
         function::{Function, FunctionDescriptor, FunctionResponse},
     },
     model::{conversation::IncompleteConversation, message::MessageToolCalling, schema::DescribedSchema},
@@ -28,7 +29,7 @@ use time::{
     format_description::{BorrowedFormatItem, well_known::Rfc3339},
     macros::format_description,
 };
-use tracing::{info, warn};
+use tracing::info;
 
 const TIME_FORMAT: &[BorrowedFormatItem<'static>] = format_description!("[hour]:[minute]:[second]");
 
@@ -53,8 +54,6 @@ pub struct DailyPrivate {
     temperature: TemperatureConfiguration,
     masturbation: MasturbationConfiguration,
     underwear: UnderwearConfiguration,
-
-    debug_offset: Duration,
 }
 
 impl ConfigurableFunction for DailyPrivate {
@@ -70,15 +69,6 @@ impl ConfigurableFunction for DailyPrivate {
             Duration::minutes(config.day_routine.morning_preparation_minutes as i64),
             Duration::minutes(config.day_routine.bathtime_minutes as i64),
         );
-        let debug_offset = {
-            let offset_days = debug_option_parsed("daily_private_offset")
-                .map_err(FunctionError::by_serialization)?
-                .unwrap_or(0);
-            if offset_days != 0 {
-                warn!("day offset: {offset_days}");
-            }
-            Duration::days(offset_days)
-        };
         Ok(DailyPrivate {
             rng_salt: config.daily_rng_salt.clone(),
             long_term_days: config.day_routine.long_term_days as usize,
@@ -89,8 +79,6 @@ impl ConfigurableFunction for DailyPrivate {
             masturbation: config.masturbation.clone(),
             menstruation: config.menstruation.clone(),
             temperature: config.temperature.clone(),
-
-            debug_offset,
         })
     }
 }
@@ -116,17 +104,17 @@ impl Function for DailyPrivate {
 
     fn call<'a>(
         &'a self,
-        _context: &'a Context,
+        ctx: &'a Context,
+        _message_ctx: &'a MessageContext,
         _incomplete: &'a IncompleteConversation,
         _tool_calling: MessageToolCalling,
     ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
-        async move { self.get_daily_info().await }.boxed()
+        async move { self.get_daily_info(ctx.datetime_provider.now()).await }.boxed()
     }
 }
 
 impl DailyPrivate {
-    async fn get_daily_info(&self) -> Result<FunctionResponse, FunctionError> {
-        let now = OffsetDateTime::now_local().map_err(FunctionError::by_external)? + self.debug_offset;
+    async fn get_daily_info(&self, now: OffsetDateTime) -> Result<FunctionResponse, FunctionError> {
         let logical_datetime = LogicalDateTime::calculate(
             PrimitiveDateTime::new(now.date(), now.time()),
             self.daytime_start,

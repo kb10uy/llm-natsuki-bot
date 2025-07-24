@@ -6,9 +6,10 @@ use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use lnb_common::config::tools::ConfigToolsExchangeRate;
 use lnb_core::{
     APP_USER_AGENT, RFC3339_NUMOFFSET,
+    context::Context,
     error::FunctionError,
     interface::{
-        Context,
+        MessageContext,
         function::{Function, FunctionDescriptor, FunctionResponse},
     },
     model::{conversation::IncompleteConversation, message::MessageToolCalling, schema::DescribedSchema},
@@ -71,7 +72,8 @@ impl Function for ExchangeRate {
 
     fn call<'a>(
         &'a self,
-        _context: &'a Context,
+        _ctx: &'a Context,
+        _message_ctx: &'a MessageContext,
         _incomplete: &'a IncompleteConversation,
         tool_calling: MessageToolCalling,
     ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {

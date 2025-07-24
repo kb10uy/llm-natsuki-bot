@@ -14,7 +14,7 @@ use lnb_common::{
 use lnb_core::{
     APP_USER_AGENT,
     error::ClientError,
-    interface::{Context, reminder::RemindableContext, server::LnbServer},
+    interface::{MessageContext, reminder::RemindableContext, server::LnbServer},
     model::{
         conversation::{ConversationAttachment, ConversationId, ConversationUpdate},
         message::{AssistantMessage, Message, UserMessage, UserMessageContent},
@@ -486,7 +486,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         Ok(())
     }
 
-    async fn create_context(&self, status: &Status) -> Result<Context, ClientError> {
+    async fn create_context(&self, status: &Status) -> Result<MessageContext, ClientError> {
         let identity = format!("{CONTEXT_KEY_PREFIX}:{}", status.account.acct);
         let remindable = RemindableContext {
             context: CONTEXT_KEY_PREFIX.to_string(),
@@ -497,7 +497,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
             .map_err(ClientError::by_external)?,
         };
 
-        let mut context = Context::new_user(identity, self.roles_group.get(&status.account.acct).clone());
+        let mut context = MessageContext::new_user(identity, self.roles_group.get(&status.account.acct).clone());
         context.set(remindable).map_err(ClientError::by_external)?;
         Ok(context)
     }

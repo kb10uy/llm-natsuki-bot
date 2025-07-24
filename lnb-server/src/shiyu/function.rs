@@ -1,9 +1,10 @@
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use lnb_common::config::reminder::ConfigReminder;
 use lnb_core::{
+    context::Context,
     error::FunctionError,
     interface::{
-        Context,
+        MessageContext,
         function::{Function, FunctionDescriptor, FunctionResponse},
         reminder::{Remind, RemindableContext, Reminder},
     },
@@ -60,7 +61,8 @@ impl Function for ShiyuProvider {
 
     fn call<'a>(
         &'a self,
-        context: &'a Context,
+        ctx: &'a Context,
+        message_ctx: &'a MessageContext,
         _incomplete: &'a IncompleteConversation,
         tool_calling: MessageToolCalling,
     ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
@@ -68,7 +70,7 @@ impl Function for ShiyuProvider {
             Ok(p) => p,
             Err(err) => return async { Err(FunctionError::Serialization(err.into())) }.boxed(),
         };
-        async move { self.execute(context, parameters).await }.boxed()
+        async move { self.execute(ctx.datetime_provider.now(), message_ctx, parameters).await }.boxed()
     }
 }
 
@@ -82,10 +84,11 @@ impl ShiyuProvider {
 
     async fn execute(
         &self,
-        context: &Context,
+        now: OffsetDateTime,
+        message_ctx: &MessageContext,
         parameters: ReminderParameters,
     ) -> Result<FunctionResponse, FunctionError> {
-        let Some(remindable) = context
+        let Some(remindable) = message_ctx
             .get::<RemindableContext>()
             .map_err(FunctionError::by_serialization)?
         else {
@@ -96,7 +99,6 @@ impl ShiyuProvider {
             return self.cancel(cancel_id).await;
         }
 
-        let now = OffsetDateTime::now_local().map_err(FunctionError::by_external)?;
         let complete_remind_at = if let Some(remind_at) = parameters.remind_at {
             if let Ok(full_datetime) = OffsetDateTime::parse(&remind_at, &Rfc3339) {
                 full_datetime

@@ -4,7 +4,7 @@ use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
     error::LlmError,
     interface::{
-        Context,
+        MessageContext,
         interception::{Interception, InterceptionStatus},
     },
     model::{
@@ -24,7 +24,7 @@ pub struct BangCommandInterception {
 impl Interception for BangCommandInterception {
     fn before_llm<'a>(
         &'a self,
-        context: &'a Context,
+        context: &'a MessageContext,
         incomplete: &'a mut IncompleteConversation,
     ) -> BoxFuture<'a, Result<InterceptionStatus, LlmError>> {
         async move { self.execute(context, incomplete).await }.boxed()
@@ -45,7 +45,7 @@ impl BangCommandInterception {
 
     async fn execute(
         &self,
-        context: &Context,
+        message_ctx: &MessageContext,
         incomplete: &mut IncompleteConversation,
     ) -> Result<InterceptionStatus, LlmError> {
         let Some(last_user_message) = incomplete.last_user_mut() else {
@@ -79,7 +79,7 @@ impl BangCommandInterception {
             return Ok(self.complete_with(format!("unknown command: {command_name}")));
         };
 
-        let result_status = command.call(context, rest).await?;
+        let result_status = command.call(message_ctx, rest).await?;
         if let Some(model_override) = result_status.model_override {
             incomplete.set_model_override(model_override);
         }
@@ -105,7 +105,7 @@ pub struct BangCommandResponse {
 pub trait BangCommand: Send + Sync {
     fn call<'a>(
         &'a self,
-        context: &'a Context,
+        context: &'a MessageContext,
         rest_text: &'a str,
     ) -> BoxFuture<'a, Result<BangCommandResponse, LlmError>>;
 }
@@ -116,10 +116,11 @@ impl<T: BangCommand + 'static> From<T> for BoxBangCommand {
     }
 }
 
-type BoxedAsyncClosure =
-    Box<dyn Send + Sync + for<'a> Fn(&'a Context, &'a str) -> BoxFuture<'a, Result<BangCommandResponse, LlmError>>>;
+type BoxedAsyncClosure = Box<
+    dyn Send + Sync + for<'a> Fn(&'a MessageContext, &'a str) -> BoxFuture<'a, Result<BangCommandResponse, LlmError>>,
+>;
 type BoxedSyncClosure =
-    Box<dyn Send + Sync + for<'a> Fn(&'a Context, &'a str) -> Result<BangCommandResponse, LlmError>>;
+    Box<dyn Send + Sync + for<'a> Fn(&'a MessageContext, &'a str) -> Result<BangCommandResponse, LlmError>>;
 
 pub struct AsyncClosure(BoxedAsyncClosure);
 pub struct SyncClosure(BoxedSyncClosure);
@@ -127,7 +128,7 @@ pub struct SyncClosure(BoxedSyncClosure);
 impl BangCommand for AsyncClosure {
     fn call<'a>(
         &'a self,
-        context: &'a Context,
+        context: &'a MessageContext,
         rest_text: &'a str,
     ) -> BoxFuture<'a, Result<BangCommandResponse, LlmError>> {
         (self.0)(context, rest_text)
@@ -137,7 +138,7 @@ impl BangCommand for AsyncClosure {
 impl BangCommand for SyncClosure {
     fn call<'a>(
         &'a self,
-        context: &'a Context,
+        context: &'a MessageContext,
         rest_text: &'a str,
     ) -> BoxFuture<'a, Result<BangCommandResponse, LlmError>> {
         async { (self.0)(context, rest_text) }.boxed()
@@ -147,7 +148,10 @@ impl BangCommand for SyncClosure {
 #[allow(dead_code)]
 pub fn async_fn_command<F>(f: F) -> AsyncClosure
 where
-    F: Send + Sync + for<'a> Fn(&'a Context, &'a str) -> BoxFuture<'a, Result<BangCommandResponse, LlmError>> + 'static,
+    F: Send
+        + Sync
+        + for<'a> Fn(&'a MessageContext, &'a str) -> BoxFuture<'a, Result<BangCommandResponse, LlmError>>
+        + 'static,
 {
     AsyncClosure(Box::new(f))
 }
@@ -155,7 +159,7 @@ where
 #[allow(dead_code)]
 pub fn fn_command<F>(f: F) -> SyncClosure
 where
-    F: Send + Sync + for<'a> Fn(&'a Context, &'a str) -> Result<BangCommandResponse, LlmError> + 'static,
+    F: Send + Sync + for<'a> Fn(&'a MessageContext, &'a str) -> Result<BangCommandResponse, LlmError> + 'static,
 {
     SyncClosure(Box::new(f))
 }

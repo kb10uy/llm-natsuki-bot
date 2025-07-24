@@ -1,6 +1,6 @@
 use crate::{
     error::LlmError,
-    interface::Context,
+    interface::MessageContext,
     model::{conversation::IncompleteConversation, message::AssistantMessage},
 };
 
@@ -12,7 +12,7 @@ pub type BoxInterception = Box<dyn Interception + 'static>;
 pub trait Interception: Send + Sync {
     fn before_llm<'a>(
         &'a self,
-        context: &'a Context,
+        context: &'a MessageContext,
         incomplete: &'a mut IncompleteConversation,
     ) -> BoxFuture<'a, Result<InterceptionStatus, LlmError>>;
 }

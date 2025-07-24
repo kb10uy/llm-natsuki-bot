@@ -1,9 +1,10 @@
 use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
     RFC3339_NUMOFFSET,
+    context::Context,
     error::FunctionError,
     interface::{
-        Context,
+        MessageContext,
         function::{Function, FunctionDescriptor, FunctionResponse},
     },
     model::{conversation::IncompleteConversation, message::MessageToolCalling, schema::DescribedSchema},
@@ -32,11 +33,12 @@ impl Function for LocalInfo {
 
     fn call<'a>(
         &'a self,
-        _context: &'a Context,
+        ctx: &'a Context,
+        _message_ctx: &'a MessageContext,
         _incomplete: &'a IncompleteConversation,
         _tool_calling: MessageToolCalling,
     ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
-        async { self.get_info() }.boxed()
+        async { self.get_info(ctx.datetime_provider.now()) }.boxed()
     }
 }
 
@@ -47,8 +49,7 @@ impl LocalInfo {
         })
     }
 
-    fn get_info(&self) -> Result<FunctionResponse, FunctionError> {
-        let now = OffsetDateTime::now_local().map_err(FunctionError::by_external)?;
+    fn get_info(&self, now: OffsetDateTime) -> Result<FunctionResponse, FunctionError> {
         Ok(FunctionResponse {
             result: json!({
                 "time_now": now.format(RFC3339_NUMOFFSET).map_err(FunctionError::by_serialization)?,

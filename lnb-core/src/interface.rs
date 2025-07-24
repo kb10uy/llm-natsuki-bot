@@ -5,6 +5,7 @@ pub mod llm;
 pub mod reminder;
 pub mod server;
 pub mod storage;
+pub mod time;
 
 use std::collections::HashMap;
 
@@ -18,23 +19,23 @@ pub trait Extension: Serialize + DeserializeOwned {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Context {
+pub struct MessageContext {
     unique_identity: Option<String>,
     role: UserRole,
     values: HashMap<String, Value>,
 }
 
-impl Context {
-    pub fn new_user(unique_identity: impl Into<String>, role: UserRole) -> Context {
-        Context {
+impl MessageContext {
+    pub fn new_user(unique_identity: impl Into<String>, role: UserRole) -> MessageContext {
+        MessageContext {
             unique_identity: Some(unique_identity.into()),
             role,
             values: HashMap::new(),
         }
     }
 
-    pub fn new_system() -> Context {
-        Context {
+    pub fn new_system() -> MessageContext {
+        MessageContext {
             unique_identity: None,
             role: UserRole::Privileged,
             values: HashMap::new(),

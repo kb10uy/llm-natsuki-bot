@@ -1,12 +1,13 @@
 use crate::natsuki::{function_store::FunctionStore, llm_cache::LlmCache};
 
-use std::iter::once;
+use std::{iter::once, sync::Arc};
 
-use lnb_common::config::assistant::ConfigAssistant;
+use lnb_common::{config::assistant::ConfigAssistant, debug::debug_option_parsed, time_provider::BotDateTimeProvider};
 use lnb_core::{
-    error::ServerError,
+    context::Context,
+    error::{FunctionError, ServerError},
     interface::{
-        Context,
+        MessageContext,
         interception::{BoxInterception, InterceptionStatus},
         llm::LlmUpdate,
         storage::BoxConversationStorage,
@@ -19,7 +20,7 @@ use lnb_core::{
     },
 };
 use lnb_rate_limiter::{RateLimiter, Rated};
-use time::UtcDateTime;
+use time::{Duration, UtcDateTime};
 use tracing::{debug, info, warn};
 
 const MAX_CONVERSATION_LOOP: usize = 8;
@@ -30,8 +31,7 @@ pub struct NatsukiInner {
     llm_cache: LlmCache,
     function_store: FunctionStore,
     interceptions: Vec<BoxInterception>,
-    system_role: String,
-    sensitive_marker: String,
+    context: Context,
 }
 
 impl NatsukiInner {
@@ -43,25 +43,41 @@ impl NatsukiInner {
         interceptions: Vec<BoxInterception>,
         assistant_identity: &ConfigAssistant,
     ) -> Result<NatsukiInner, ServerError> {
+        let context = {
+            let mut dtp = BotDateTimeProvider::new();
+            let offset_days = debug_option_parsed("datetime_offset")
+                .map_err(FunctionError::by_serialization)?
+                .unwrap_or(0);
+            if offset_days != 0 {
+                warn!("day offset: {offset_days}");
+                dtp.set_offset(Duration::days(offset_days as i64));
+            }
+
+            Context {
+                datetime_provider: Arc::new(dtp),
+                system_role: assistant_identity.system_role.clone().into(),
+                sensitive_marker: assistant_identity.sensitive_marker.clone().into(),
+            }
+        };
+
         Ok(NatsukiInner {
             storage,
             rate_limiter,
             llm_cache,
             function_store,
             interceptions,
-            system_role: assistant_identity.system_role.clone(),
-            sensitive_marker: assistant_identity.sensitive_marker.clone(),
+            context,
         })
     }
 
     pub async fn process_conversation(
         &self,
-        context: Context,
+        message_ctx: MessageContext,
         conversation_id: ConversationId,
         new_messages: Vec<Message>,
     ) -> Result<ConversationUpdate, ServerError> {
         // TODO: Context に UserRole を統合する
-        if !self.ensure_in_rate(&context).await {
+        if !self.ensure_in_rate(&message_ctx).await {
             return Err(ServerError::RateLimitExceeded);
         }
 
@@ -80,7 +96,9 @@ impl NatsukiInner {
         // interception updates
         // 後から追加した方が前のものを "wrap" する (axum などと同じ)ので逆順
         for interception in self.interceptions.iter().rev() {
-            let status = interception.before_llm(&context, &mut incomplete_conversation).await?;
+            let status = interception
+                .before_llm(&message_ctx, &mut incomplete_conversation)
+                .await?;
             match status {
                 InterceptionStatus::Continue => continue,
                 InterceptionStatus::Bypass => break,
@@ -145,7 +163,7 @@ impl NatsukiInner {
                     debug!("conversation requested tool calling");
                     let call_message = Message::new_function_calls(tool_callings.clone());
                     let (response_messages, called_attachments) = self
-                        .process_tool_callings(&context, &incomplete_conversation, tool_callings)
+                        .process_tool_callings(&message_ctx, &incomplete_conversation, tool_callings)
                         .await?;
 
                     let extending_messages = once(call_message).chain(response_messages.into_iter().map(|m| m.into()));
@@ -170,19 +188,19 @@ impl NatsukiInner {
     fn strip_sensitive_text(&self, original: String, explicit_sensitive: Option<bool>) -> (String, bool) {
         match explicit_sensitive {
             Some(v) => (original, v),
-            None if self.sensitive_marker.is_empty() => (original, false),
-            _ => match original.strip_prefix(&self.sensitive_marker) {
+            None if self.context.sensitive_marker.is_empty() => (original, false),
+            _ => match original.strip_prefix(&*self.context.sensitive_marker) {
                 Some(stripped) => (stripped.to_string(), true),
                 None => (original, false),
             },
         }
     }
 
-    async fn ensure_in_rate(&self, context: &Context) -> bool {
+    async fn ensure_in_rate(&self, message_ctx: &MessageContext) -> bool {
         let Some(rate_limiter) = &self.rate_limiter else {
             return true;
         };
-        let Some(identity) = context.identity() else {
+        let Some(identity) = message_ctx.identity() else {
             return true;
         };
 
@@ -192,7 +210,7 @@ impl NatsukiInner {
 
     async fn process_tool_callings(
         &self,
-        context: &Context,
+        message_ctx: &MessageContext,
         incomplete_conversation: &IncompleteConversation,
         tool_callings: Vec<MessageToolCalling>,
     ) -> Result<(Vec<FunctionResponseMessage>, Vec<ConversationAttachment>), ServerError> {
@@ -204,7 +222,7 @@ impl NatsukiInner {
 
             let Some(response) = self
                 .function_store
-                .find_call(tool_calling, context, incomplete_conversation)
+                .find_call(tool_calling, &self.context, message_ctx, incomplete_conversation)
                 .await
             else {
                 warn!("tool {name} not found, skipping");
@@ -224,7 +242,7 @@ impl NatsukiInner {
     }
 
     pub async fn new_conversation(&self) -> Result<ConversationId, ServerError> {
-        let system_message = Message::new_system(self.system_role.clone());
+        let system_message = Message::new_system(self.context.system_role.to_string());
         let conversation = Conversation::new_now(Some(system_message));
         self.storage.upsert(&conversation, None).await?;
         Ok(conversation.id())
