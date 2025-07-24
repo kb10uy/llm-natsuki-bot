@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use lnb_core::{
+    context::Context,
     error::FunctionError,
     interface::{
         MessageContext,
@@ -35,11 +36,12 @@ impl FunctionStore {
     pub async fn find_call(
         &self,
         tool_calling: MessageToolCalling,
-        context: &MessageContext,
+        ctx: &Context,
+        message_ctx: &MessageContext,
         incomplete: &IncompleteConversation,
     ) -> Option<Result<FunctionResponse, FunctionError>> {
         if let Some((function, _)) = self.functions.get(&tool_calling.name) {
-            let result = function.call(context, incomplete, tool_calling).await;
+            let result = function.call(ctx, message_ctx, incomplete, tool_calling).await;
             Some(result)
         } else {
             None

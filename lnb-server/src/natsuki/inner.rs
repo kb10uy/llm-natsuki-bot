@@ -72,12 +72,12 @@ impl NatsukiInner {
 
     pub async fn process_conversation(
         &self,
-        context: MessageContext,
+        message_ctx: MessageContext,
         conversation_id: ConversationId,
         new_messages: Vec<Message>,
     ) -> Result<ConversationUpdate, ServerError> {
         // TODO: Context に UserRole を統合する
-        if !self.ensure_in_rate(&context).await {
+        if !self.ensure_in_rate(&message_ctx).await {
             return Err(ServerError::RateLimitExceeded);
         }
 
@@ -96,7 +96,9 @@ impl NatsukiInner {
         // interception updates
         // 後から追加した方が前のものを "wrap" する (axum などと同じ)ので逆順
         for interception in self.interceptions.iter().rev() {
-            let status = interception.before_llm(&context, &mut incomplete_conversation).await?;
+            let status = interception
+                .before_llm(&message_ctx, &mut incomplete_conversation)
+                .await?;
             match status {
                 InterceptionStatus::Continue => continue,
                 InterceptionStatus::Bypass => break,
@@ -161,7 +163,7 @@ impl NatsukiInner {
                     debug!("conversation requested tool calling");
                     let call_message = Message::new_function_calls(tool_callings.clone());
                     let (response_messages, called_attachments) = self
-                        .process_tool_callings(&context, &incomplete_conversation, tool_callings)
+                        .process_tool_callings(&message_ctx, &incomplete_conversation, tool_callings)
                         .await?;
 
                     let extending_messages = once(call_message).chain(response_messages.into_iter().map(|m| m.into()));
@@ -208,7 +210,7 @@ impl NatsukiInner {
 
     async fn process_tool_callings(
         &self,
-        context: &MessageContext,
+        message_ctx: &MessageContext,
         incomplete_conversation: &IncompleteConversation,
         tool_callings: Vec<MessageToolCalling>,
     ) -> Result<(Vec<FunctionResponseMessage>, Vec<ConversationAttachment>), ServerError> {
@@ -220,7 +222,7 @@ impl NatsukiInner {
 
             let Some(response) = self
                 .function_store
-                .find_call(tool_calling, context, incomplete_conversation)
+                .find_call(tool_calling, &self.context, message_ctx, incomplete_conversation)
                 .await
             else {
                 warn!("tool {name} not found, skipping");

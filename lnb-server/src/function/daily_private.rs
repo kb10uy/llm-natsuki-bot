@@ -3,6 +3,7 @@ use crate::function::ConfigurableFunction;
 use futures::{FutureExt, future::BoxFuture};
 use lnb_common::config::tools::ConfigToolsDailyPrivate;
 use lnb_core::{
+    context::Context,
     error::FunctionError,
     interface::{
         MessageContext,
@@ -103,7 +104,8 @@ impl Function for DailyPrivate {
 
     fn call<'a>(
         &'a self,
-        _context: &'a MessageContext,
+        ctx: &'a Context,
+        _message_ctx: &'a MessageContext,
         _incomplete: &'a IncompleteConversation,
         _tool_calling: MessageToolCalling,
     ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {

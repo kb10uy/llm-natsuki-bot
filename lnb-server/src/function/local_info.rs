@@ -1,6 +1,7 @@
 use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
     RFC3339_NUMOFFSET,
+    context::Context,
     error::FunctionError,
     interface::{
         MessageContext,
@@ -32,7 +33,8 @@ impl Function for LocalInfo {
 
     fn call<'a>(
         &'a self,
-        _context: &'a MessageContext,
+        _ctx: &'a Context,
+        _message_ctx: &'a MessageContext,
         _incomplete: &'a IncompleteConversation,
         _tool_calling: MessageToolCalling,
     ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {

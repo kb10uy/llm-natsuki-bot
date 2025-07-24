@@ -5,13 +5,9 @@ use std::collections::HashMap;
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use lnb_common::config::tools::ConfigToolsExchangeRate;
 use lnb_core::{
-    APP_USER_AGENT, RFC3339_NUMOFFSET,
-    error::FunctionError,
-    interface::{
-        MessageContext,
-        function::{Function, FunctionDescriptor, FunctionResponse},
-    },
-    model::{conversation::IncompleteConversation, message::MessageToolCalling, schema::DescribedSchema},
+    context::Context, error::FunctionError, interface::{
+        function::{Function, FunctionDescriptor, FunctionResponse}, MessageContext
+    }, model::{conversation::IncompleteConversation, message::MessageToolCalling, schema::DescribedSchema}, APP_USER_AGENT, RFC3339_NUMOFFSET
 };
 use lnb_rate_limiter::RateLimiter;
 use reqwest::{Client, ClientBuilder};
@@ -71,7 +67,8 @@ impl Function for ExchangeRate {
 
     fn call<'a>(
         &'a self,
-        _context: &'a MessageContext,
+        _ctx: &'a Context,
+        _message_ctx: &'a MessageContext,
         _incomplete: &'a IncompleteConversation,
         tool_calling: MessageToolCalling,
     ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {

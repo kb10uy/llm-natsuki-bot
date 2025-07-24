@@ -6,6 +6,7 @@ use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use lnb_common::{config::tools::ConfigToolsImageGenerator, extension::ContextExt};
 use lnb_core::{
     APP_USER_AGENT,
+    context::Context,
     error::FunctionError,
     interface::{
         MessageContext,
@@ -109,7 +110,8 @@ impl Function for ImageGenerator {
 
     fn call<'a>(
         &'a self,
-        context: &'a MessageContext,
+        _ctx: &'a Context,
+        message_ctx: &'a MessageContext,
         _incomplete: &'a IncompleteConversation,
         tool_calling: MessageToolCalling,
     ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
@@ -118,7 +120,7 @@ impl Function for ImageGenerator {
             Err(err) => return async { Err(FunctionError::Serialization(err.into())) }.boxed(),
         };
         async move {
-            match self.execute(context, parameters).await {
+            match self.execute(message_ctx, parameters).await {
                 Ok(response) => Ok(response),
                 Err(IntermediateError::AsResponse(message)) => Ok(FunctionResponse {
                     result: serde_json::to_value(GenerationError {
@@ -137,10 +139,10 @@ impl Function for ImageGenerator {
 impl ImageGenerator {
     async fn execute(
         &self,
-        context: &MessageContext,
+        message_ctx: &MessageContext,
         parameters: GenerationParameters,
     ) -> Result<FunctionResponse, IntermediateError> {
-        if !self.ensure_in_rate(context.identity()).await {
+        if !self.ensure_in_rate(message_ctx.identity()).await {
             return Err(IntermediateError::response("rate limit exceeded"));
         }
 
@@ -149,9 +151,9 @@ impl ImageGenerator {
         }
 
         let images_response = match parameters.mode {
-            GenerationMode::Generate => self.generate_image(context, parameters.prompt.clone()).await?,
+            GenerationMode::Generate => self.generate_image(message_ctx, parameters.prompt.clone()).await?,
             GenerationMode::Edit => {
-                self.edit_image(context, parameters.prompt.clone(), parameters.input_image_urls)
+                self.edit_image(message_ctx, parameters.prompt.clone(), parameters.input_image_urls)
                     .await?
             }
         };
@@ -197,10 +199,14 @@ impl ImageGenerator {
         })
     }
 
-    async fn generate_image(&self, context: &MessageContext, prompt: String) -> Result<ImagesResponse, IntermediateError> {
+    async fn generate_image(
+        &self,
+        message_ctx: &MessageContext,
+        prompt: String,
+    ) -> Result<ImagesResponse, IntermediateError> {
         info!("generating image with {prompt:?}");
 
-        let moderation = if context.role().accepts(LOW_MODERATION_SCOPE) {
+        let moderation = if message_ctx.role().accepts(LOW_MODERATION_SCOPE) {
             "low"
         } else {
             "auto"
@@ -209,7 +215,7 @@ impl ImageGenerator {
             "model": self.model,
             "prompt": prompt,
             "moderation": moderation,
-            "user": context.hashed_identity(),
+            "user": message_ctx.hashed_identity(),
         });
 
         let raw_response = self

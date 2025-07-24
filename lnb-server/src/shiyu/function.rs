@@ -1,6 +1,7 @@
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use lnb_common::config::reminder::ConfigReminder;
 use lnb_core::{
+    context::Context,
     error::FunctionError,
     interface::{
         MessageContext,
@@ -60,7 +61,8 @@ impl Function for ShiyuProvider {
 
     fn call<'a>(
         &'a self,
-        context: &'a MessageContext,
+        _ctx: &'a Context,
+        message_ctx: &'a MessageContext,
         _incomplete: &'a IncompleteConversation,
         tool_calling: MessageToolCalling,
     ) -> BoxFuture<'a, Result<FunctionResponse, FunctionError>> {
@@ -68,7 +70,7 @@ impl Function for ShiyuProvider {
             Ok(p) => p,
             Err(err) => return async { Err(FunctionError::Serialization(err.into())) }.boxed(),
         };
-        async move { self.execute(context, parameters).await }.boxed()
+        async move { self.execute(message_ctx, parameters).await }.boxed()
     }
 }
 
