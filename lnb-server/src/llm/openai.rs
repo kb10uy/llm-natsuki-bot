@@ -9,7 +9,11 @@ use crate::llm::{ASSISTANT_RESPONSE_SCHEMA, convert_json_schema};
 
 use std::sync::{Arc, LazyLock};
 
-use async_openai::{Client, config::OpenAIConfig, types::ResponseFormatJsonSchema};
+use async_openai::{
+    Client,
+    config::OpenAIConfig,
+    types::{ReasoningEffort, ResponseFormatJsonSchema},
+};
 use lnb_core::{APP_USER_AGENT, error::LlmError, interface::llm::ArcLlm};
 use serde::Deserialize;
 
@@ -29,6 +33,7 @@ pub struct OpenaiModelConfig {
     pub tool: bool,
     pub structured: bool,
     pub max_token: usize,
+    pub reasoning: Option<ReasoningEffort>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]

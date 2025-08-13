@@ -2,6 +2,7 @@ use crate::llm::{convert_json_schema, openai::OpenaiModelConfig};
 
 use std::sync::Arc;
 
+use async_openai::types::ReasoningEffort;
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use lnb_core::{
     APP_USER_AGENT,
@@ -44,6 +45,7 @@ impl ResponsesBackend {
             api_root: config.endpoint.clone(),
             model: config.model.clone(),
             max_token: config.max_token,
+            reasoning: config.reasoning,
         })))
     }
 }
@@ -66,6 +68,7 @@ struct ResponsesBackendInner {
     api_root: String,
     model: String,
     max_token: usize,
+    reasoning: Option<ReasoningEffort>,
 }
 
 impl ResponsesBackendInner {
@@ -83,11 +86,18 @@ impl ResponsesBackendInner {
         let mut tools = transform_tools(function_descriptors);
         tools.push(json!({"type": "web_search_preview"}));
 
+        let reasoning = self.reasoning.clone().map(|r| {
+            json!({
+                "effort": r,
+            })
+        });
+
         let request = json!({
             "model": self.model,
             "input": input,
             "tools": tools,
             "store": false,
+            "reasoning": reasoning,
         });
         let response_value = self.call_api("/responses", &request).await?;
         let output_objects = response_value["output"].as_array().ok_or(LlmError::NoChoice)?;
