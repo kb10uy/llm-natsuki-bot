@@ -3,5 +3,6 @@ pub mod debug;
 pub mod extension;
 pub mod persistence;
 pub mod rate_limits;
+pub mod text_provider;
 pub mod time_provider;
 pub mod user_roles;
