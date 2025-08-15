@@ -11,3 +11,7 @@ pub const APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARG
 /// RFC3339 拡張形式のタイムゾーンをつねに数値表記にしたもの。
 pub const RFC3339_NUMOFFSET: &[BorrowedFormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second][offset_hour sign:mandatory]:[offset_minute]");
+
+pub const YMDHM_JAPANESE: &[BorrowedFormatItem<'static>] = format_description!(
+    "[year]年[month padding:none]月[day padding:none]日 [hour padding:none]時[minute padding:none]分"
+);

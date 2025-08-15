@@ -1,5 +1,7 @@
+use std::collections::HashMap;
+
 use lnb_core::interface::text::TextProvider;
-use upon::{Engine, Result as UponResult, Template, Value as UponValue};
+use upon::{Engine, Result as UponResult, Template};
 
 #[derive(Debug, Clone)]
 pub struct FixedTextProvider {
@@ -41,7 +43,7 @@ impl InterpolatableTextProvider {
 }
 
 impl TextProvider for InterpolatableTextProvider {
-    type Data = UponValue;
+    type Data = HashMap<String, String>;
 
     fn generate(&self, data: Self::Data) -> String {
         self.template.render(&self.engine, data).to_string().unwrap_or_default()
