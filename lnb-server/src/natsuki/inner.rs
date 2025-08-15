@@ -1,9 +1,13 @@
 use crate::natsuki::{function_store::FunctionStore, llm_cache::LlmCache};
 
-use std::{iter::once, sync::Arc};
+use std::{collections::HashMap, iter::once, sync::Arc};
 
-use lnb_common::{config::assistant::ConfigAssistant, debug::debug_option_parsed, time_provider::BotDateTimeProvider};
+use lnb_common::{
+    config::assistant::ConfigAssistant, debug::debug_option_parsed, text_provider::InterpolatableTextProvider,
+    time_provider::BotDateTimeProvider,
+};
 use lnb_core::{
+    YMDHM_JAPANESE,
     context::Context,
     error::{FunctionError, ServerError},
     interface::{
@@ -44,6 +48,9 @@ impl NatsukiInner {
         assistant_identity: &ConfigAssistant,
     ) -> Result<NatsukiInner, ServerError> {
         let context = {
+            let system_role = InterpolatableTextProvider::new(assistant_identity.system_role.clone())
+                .map_err(ServerError::by_internal)?;
+
             let mut dtp = BotDateTimeProvider::new();
             let offset_days = debug_option_parsed("datetime_offset")
                 .map_err(FunctionError::by_serialization)?
@@ -54,9 +61,9 @@ impl NatsukiInner {
             }
 
             Context {
-                datetime_provider: Arc::new(dtp),
-                system_role: assistant_identity.system_role.clone().into(),
+                system_role: Arc::new(system_role),
                 sensitive_marker: assistant_identity.sensitive_marker.clone().into(),
+                datetime_provider: Arc::new(dtp),
             }
         };
 
@@ -242,7 +249,20 @@ impl NatsukiInner {
     }
 
     pub async fn new_conversation(&self) -> Result<ConversationId, ServerError> {
-        let system_message = Message::new_system(self.context.system_role.to_string());
+        let system_role = {
+            let mut data = HashMap::new();
+            data.insert(
+                "datetime".into(),
+                self.context
+                    .datetime_provider
+                    .now()
+                    .format(YMDHM_JAPANESE)
+                    .expect("failed to format datetime"),
+            );
+            self.context.system_role.generate(data)
+        };
+
+        let system_message = Message::new_system(system_role);
         let conversation = Conversation::new_now(Some(system_message));
         self.storage.upsert(&conversation, None).await?;
         Ok(conversation.id())
