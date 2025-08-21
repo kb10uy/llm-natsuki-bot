@@ -27,7 +27,7 @@ lnb-mastodon-client = { path = "./lnb-mastodon-client" }
 lnb-discord-client = { path = "./lnb-discord-client" }
 
 anyhow = "1.0.97"
-async-openai = "0.28.0"
+async-openai = "0.29.1"
 base64 = "0.22.1"
 bimap = "0.6.3"
 clap = { version = "4.5.32", features = ["derive"] }
