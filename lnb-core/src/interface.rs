@@ -5,6 +5,7 @@ pub mod llm;
 pub mod reminder;
 pub mod server;
 pub mod storage;
+pub mod text;
 pub mod time;
 
 use std::collections::HashMap;
