@@ -14,7 +14,7 @@ use async_openai::{
         ChatCompletionRequestToolMessage, ChatCompletionRequestToolMessageContent, ChatCompletionRequestUserMessage,
         ChatCompletionRequestUserMessageContent, ChatCompletionRequestUserMessageContentPart, ChatCompletionTool,
         ChatCompletionToolType, CreateChatCompletionRequest, FinishReason, FunctionCall, FunctionObject, ImageUrl,
-        ResponseFormat,
+        ReasoningEffort, ResponseFormat,
     },
 };
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
@@ -44,6 +44,7 @@ impl ChatCompletionBackend {
             enable_tool: config.tool,
             structured: config.structured,
             max_token: config.max_token,
+            reasoning: config.reasoning,
         })))
     }
 }
@@ -66,6 +67,7 @@ struct ChatCompletionBackendInner {
     enable_tool: bool,
     structured: bool,
     max_token: usize,
+    reasoning: Option<ReasoningEffort>,
 }
 
 impl ChatCompletionBackendInner {
@@ -92,6 +94,7 @@ impl ChatCompletionBackendInner {
             messages,
             tools: self.enable_tool.then(|| transform_tools(function_descriptors)),
             max_completion_tokens: Some(self.max_token as u32),
+            reasoning_effort: self.reasoning.clone(),
             ..Default::default()
         };
 
@@ -116,6 +119,7 @@ impl ChatCompletionBackendInner {
                 json_schema: RESPONSE_JSON_SCHEMA.clone(),
             }),
             max_completion_tokens: Some(self.max_token as u32),
+            reasoning_effort: self.reasoning.clone(),
             ..Default::default()
         };
 
