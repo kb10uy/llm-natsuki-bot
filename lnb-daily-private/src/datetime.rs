@@ -57,3 +57,26 @@ impl LogicalDateTime {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use time::macros::{date, datetime, time};
+
+    use super::*;
+
+    #[test]
+    fn logical_datetime_works_date_midnight() {
+        let ldt = LogicalDateTime::calculate(datetime!(2025-07-28 20:00:00), time!(00:00), 120);
+        assert_eq!(ldt.logical_date, date!(2025 - 07 - 28));
+        assert_eq!(ldt.time, time!(20:00));
+        assert_eq!(ldt.day_elapsed, Duration::hours(20));
+    }
+
+    #[test]
+    fn logical_datetime_works_date_morning() {
+        let ldt = LogicalDateTime::calculate(datetime!(2025-07-29 06:00:00), time!(08:00), 120);
+        assert_eq!(ldt.logical_date, date!(2025 - 07 - 28));
+        assert_eq!(ldt.time, time!(06:00));
+        assert_eq!(ldt.day_elapsed, Duration::hours(22));
+    }
+}
