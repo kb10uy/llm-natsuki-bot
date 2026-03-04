@@ -65,7 +65,7 @@ function addPadding(svg: string, padding: number): string {
     );
 
     return svg
-        .replace(/width="[^\d\.]+/, `viewBox="${newView.height}`)
+        .replace(/height="[^\d\.]+/, `viewBox="${newView.height}`)
         .replace(/width="[^\d\.]+/, `viewBox="${newView.width}`)
         .replace(/viewBox="[^"]+"/, `viewBox="${newView.viewBox.join(" ")}"`);
 }

@@ -26,7 +26,7 @@ export async function renderMath(
 
     try {
         const png = await renderToPng(request.latex.trim(), request.display, {
-            scale: 2.0,
+            scale: request.scale ?? 1.0,
             padding: 200,
         });
         return new Response(png, {

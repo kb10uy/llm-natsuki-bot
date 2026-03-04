@@ -1,6 +1,7 @@
 export interface RenderRequestBody {
     latex: string;
     display: boolean;
+    scale: number;
 }
 
 export interface ErrorResponse {
