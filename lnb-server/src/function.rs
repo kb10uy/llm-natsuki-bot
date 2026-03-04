@@ -3,6 +3,7 @@ mod exchange_rate;
 mod get_illust_url;
 mod image_generator;
 mod local_info;
+mod math_renderer;
 mod self_info;
 
 pub use daily_private::DailyPrivate;
@@ -11,6 +12,7 @@ pub use get_illust_url::GetIllustUrl;
 pub use image_generator::ImageGenerator;
 use lnb_rate_limiter::RateLimiter;
 pub use local_info::LocalInfo;
+pub use math_renderer::MathRenderer;
 pub use self_info::SelfInfo;
 
 use std::fmt::Debug;
