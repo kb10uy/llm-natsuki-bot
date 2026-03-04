@@ -65,7 +65,7 @@ impl MenstruationConfiguration {
         long_term_duration: u64,
     ) -> Result<Vec<Range<usize>>, DailyPrivateError> {
         // 長期収束のために割り切れれて正の商になる必要がある
-        if long_term_duration % self.cycle_mu_sigma.0 != 0 || long_term_duration < self.cycle_mu_sigma.0 {
+        if !long_term_duration.is_multiple_of(self.cycle_mu_sigma.0) || long_term_duration < self.cycle_mu_sigma.0 {
             return Err(DailyPrivateError::LongTermMismatch);
         }
         let long_term_cycles = (long_term_duration / self.cycle_mu_sigma.0) as usize;
