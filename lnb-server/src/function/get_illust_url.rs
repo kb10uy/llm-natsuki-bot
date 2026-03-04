@@ -75,7 +75,7 @@ impl GetIllustUrl {
             .await?;
 
         let limited_count = count.min(4).min(all_illusts.len());
-        let selected_illusts: Vec<_> = all_illusts.choose_multiple(&mut rng(), limited_count).collect();
+        let selected_illusts: Vec<_> = all_illusts.sample(&mut rng(), limited_count).collect();
 
         Ok(FunctionResponse {
             result: json!({

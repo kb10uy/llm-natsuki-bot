@@ -68,7 +68,7 @@ pub struct UnderwearDesign {
 }
 
 impl UnderwearConfiguration {
-    pub fn generate_status<R: RngCore + ?Sized>(
+    pub fn generate_status<R: Rng + ?Sized>(
         &self,
         rng: &mut R,
         day_step: DayStep,
@@ -137,7 +137,7 @@ impl UnderwearConfiguration {
         }
     }
 
-    fn choose_unworn_reason<R: RngCore + ?Sized>(&self, rng: &mut R, usage: UnwornReasonUsage) -> &str {
+    fn choose_unworn_reason<R: Rng + ?Sized>(&self, rng: &mut R, usage: UnwornReasonUsage) -> &str {
         let chosen_reason = self
             .unworn_reasons
             .iter()
@@ -146,7 +146,7 @@ impl UnderwearConfiguration {
         chosen_reason.map(|r| r.text.as_str()).unwrap_or_default()
     }
 
-    fn generate_part<R: RngCore + ?Sized>(&self, rng: &mut R) -> Option<UnderwearDesign> {
+    fn generate_part<R: Rng + ?Sized>(&self, rng: &mut R) -> Option<UnderwearDesign> {
         let color = self.separate_colors.choose(rng)?;
         let design = self.separate_designs.choose(rng)?;
         Some(UnderwearDesign {

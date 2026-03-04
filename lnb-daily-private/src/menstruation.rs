@@ -59,7 +59,7 @@ pub struct MenstruationStatus {
 }
 
 impl MenstruationConfiguration {
-    pub fn calculate_cycles<R: RngCore + ?Sized>(
+    pub fn calculate_cycles<R: Rng + ?Sized>(
         &self,
         long_term_rng: &mut R,
         long_term_duration: u64,
@@ -96,7 +96,7 @@ impl MenstruationConfiguration {
         Ok(cycles)
     }
 
-    pub fn construct_status<R: RngCore + ?Sized>(
+    pub fn construct_status<R: Rng + ?Sized>(
         &self,
         rng: &mut R,
         cycles: &[Range<usize>],
@@ -130,7 +130,7 @@ impl MenstruationConfiguration {
         }
     }
 
-    fn choose_absorbent<R: RngCore + ?Sized>(
+    fn choose_absorbent<R: Rng + ?Sized>(
         &self,
         rng: &mut R,
         event: Option<&HolidayEvent>,

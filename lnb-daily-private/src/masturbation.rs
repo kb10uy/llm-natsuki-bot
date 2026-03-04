@@ -29,7 +29,7 @@ pub struct MasturbationStatus {
 }
 
 impl MasturbationConfiguration {
-    pub fn calculate_daily_playing_ranges<R: RngCore + ?Sized>(
+    pub fn calculate_daily_playing_ranges<R: Rng + ?Sized>(
         &self,
         rng: &mut R,
         bleeding_days: Option<usize>,

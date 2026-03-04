@@ -2,7 +2,7 @@ use crate::llm::{convert_json_schema, openai::OpenaiModelConfig};
 
 use std::sync::Arc;
 
-use async_openai::types::ReasoningEffort;
+use async_openai::types::responses::ReasoningEffort;
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use lnb_core::{
     APP_USER_AGENT,

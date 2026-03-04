@@ -1,6 +1,6 @@
 use crate::function::ConfigurableFunction;
 
-use async_openai::types::{Image, ImagesResponse};
+use async_openai::types::images::{Image, ImagesResponse};
 use base64::prelude::*;
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use lnb_common::{config::tools::ConfigToolsImageGenerator, extension::ContextExt};

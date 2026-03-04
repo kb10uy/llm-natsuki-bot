@@ -16,7 +16,7 @@ pub struct TemperatureConfiguration {
 }
 
 impl TemperatureConfiguration {
-    pub fn calculate<R: RngCore + ?Sized>(&self, rng: &mut R, phase: MensePhase) -> f64 {
+    pub fn calculate<R: Rng + ?Sized>(&self, rng: &mut R, phase: MensePhase) -> f64 {
         // baseline は時刻で変動するけど jitter は日替わり
         let jitter_distr = {
             let (mu, sigma) = self.jitter_mu_sigma;

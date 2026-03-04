@@ -3,7 +3,7 @@ use std::{
     ops::RangeInclusive,
 };
 
-use rand::{RngCore, seq::IteratorRandom};
+use rand::{Rng, seq::IteratorRandom};
 use serde::{
     Deserialize, Serialize,
     de::{Error as _, SeqAccess, Visitor},
@@ -29,7 +29,7 @@ pub struct HolidayEvent {
 pub struct WeekRange(u8, u8);
 
 impl ScheduleConfiguration {
-    pub fn choose_event<R: RngCore + ?Sized>(&self, rng: &mut R, logical_date: Date) -> Option<&HolidayEvent> {
+    pub fn choose_event<R: Rng + ?Sized>(&self, rng: &mut R, logical_date: Date) -> Option<&HolidayEvent> {
         self.holiday_events
             .iter()
             .filter(|he| he.week_ranges.iter().any(|wr| wr.contains(logical_date)))

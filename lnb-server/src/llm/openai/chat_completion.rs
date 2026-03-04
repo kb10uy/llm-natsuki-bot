@@ -8,12 +8,13 @@ use std::sync::Arc;
 use async_openai::{
     Client,
     config::OpenAIConfig,
-    types::{
-        ChatChoice, ChatCompletionMessageToolCall, ChatCompletionRequestAssistantMessage, ChatCompletionRequestMessage,
+    types::chat::{
+        ChatChoice, ChatCompletionMessageToolCall, ChatCompletionMessageToolCalls,
+        ChatCompletionRequestAssistantMessage, ChatCompletionRequestMessage,
         ChatCompletionRequestMessageContentPartImage, ChatCompletionRequestMessageContentPartText,
         ChatCompletionRequestToolMessage, ChatCompletionRequestToolMessageContent, ChatCompletionRequestUserMessage,
         ChatCompletionRequestUserMessageContent, ChatCompletionRequestUserMessageContentPart, ChatCompletionTool,
-        ChatCompletionToolType, CreateChatCompletionRequest, FinishReason, FunctionCall, FunctionObject, ImageUrl,
+        ChatCompletionTools, CreateChatCompletionRequest, FinishReason, FunctionCall, FunctionObject, ImageUrl,
         ReasoningEffort, ResponseFormat,
     },
 };
@@ -132,17 +133,18 @@ impl ChatCompletionBackendInner {
     }
 }
 
-fn transform_tools(descriptors: &[&FunctionDescriptor]) -> Vec<ChatCompletionTool> {
+fn transform_tools(descriptors: &[&FunctionDescriptor]) -> Vec<ChatCompletionTools> {
     descriptors
         .iter()
-        .map(|d| ChatCompletionTool {
-            function: FunctionObject {
-                name: d.name.clone(),
-                description: Some(d.description.clone()),
-                parameters: Some(convert_json_schema(&d.parameters)),
-                strict: Some(true),
-            },
-            ..Default::default()
+        .map(|d| {
+            ChatCompletionTools::Function(ChatCompletionTool {
+                function: FunctionObject {
+                    name: d.name.clone(),
+                    description: Some(d.description.clone()),
+                    parameters: Some(convert_json_schema(&d.parameters)),
+                    strict: Some(true),
+                },
+            })
         })
         .collect()
 }
@@ -191,10 +193,13 @@ fn transform_choice(choice: ChatChoice) -> Result<LlmUpdate, LlmError> {
             let converted_calls: Result<_, _> = tool_calls
                 .into_iter()
                 .map(|c| {
-                    let arguments = serde_json::from_str(&c.function.arguments).map_err(LlmError::by_format)?;
+                    let ChatCompletionMessageToolCalls::Function(fc) = c else {
+                        return Err(LlmError::ExpectationMismatch("tool call not met".to_string()));
+                    };
+                    let arguments = serde_json::from_str(&fc.function.arguments).map_err(LlmError::by_format)?;
                     Ok(MessageToolCalling {
-                        id: c.id,
-                        name: c.function.name,
+                        id: fc.id,
+                        name: fc.function.name,
                         arguments,
                     })
                 })
@@ -248,13 +253,14 @@ fn transform_message(message: &Message) -> Result<ChatCompletionRequestMessage, 
                 .0
                 .iter()
                 .map(|c| {
-                    serde_json::to_string(&c.arguments).map(|args| ChatCompletionMessageToolCall {
-                        id: c.id.clone(),
-                        function: FunctionCall {
-                            name: c.name.clone(),
-                            arguments: args,
-                        },
-                        r#type: ChatCompletionToolType::Function,
+                    serde_json::to_string(&c.arguments).map(|args| {
+                        ChatCompletionMessageToolCalls::Function(ChatCompletionMessageToolCall {
+                            id: c.id.clone(),
+                            function: FunctionCall {
+                                name: c.name.clone(),
+                                arguments: args,
+                            },
+                        })
                     })
                 })
                 .collect();

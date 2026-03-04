@@ -12,7 +12,7 @@ use std::sync::{Arc, LazyLock};
 use async_openai::{
     Client,
     config::OpenAIConfig,
-    types::{ReasoningEffort, ResponseFormatJsonSchema},
+    types::responses::{ReasoningEffort, ResponseFormatJsonSchema},
 };
 use lnb_core::{APP_USER_AGENT, error::LlmError, interface::llm::ArcLlm};
 use serde::Deserialize;
