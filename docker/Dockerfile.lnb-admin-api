@@ -1,4 +1,4 @@
-FROM mirror.gcr.io/rust:1.86 AS builder
+FROM mirror.gcr.io/rust:1.93 AS builder
 ARG GIT_COMMIT_HASH
 WORKDIR /build
 RUN mkdir .cargo && printf '[target.x86_64-unknown-linux-gnu]\nrustflags = ["-C", "link-arg=-fuse-ld=mold"]\n' > .cargo/config.toml

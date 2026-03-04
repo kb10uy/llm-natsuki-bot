@@ -64,6 +64,10 @@ local tool_config = {
     token: '',
     model: 'dall-e-3',
   },
+  math_renderer: {
+    endpoint: 'http://math-renderer:3000/renderMath',
+    scale: 2.0,
+  },
   get_illust_url: {
     database_filepath: './data/conversations.sqlite3',
   },

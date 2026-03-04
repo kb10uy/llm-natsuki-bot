@@ -1,0 +1,19 @@
+FROM mirror.gcr.io/node:22-slim AS builder
+ENV NODE_ENV=development
+WORKDIR /build
+COPY lnb-math-renderer/package*.json ./
+COPY lnb-math-renderer/tsconfig.json ./
+RUN npm ci
+COPY lnb-math-renderer/src ./src
+RUN npm run build
+
+FROM mirror.gcr.io/node:22-slim AS runtime
+ENV NODE_ENV=production
+WORKDIR /app
+COPY lnb-math-renderer/package*.json ./
+COPY lnb-math-renderer/tsconfig.json ./
+RUN npm ci --omit=dev
+COPY --from=builder /build/dist ./dist
+USER node
+EXPOSE 3000
+CMD ["node", "dist/index.js"]

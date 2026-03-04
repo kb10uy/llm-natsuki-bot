@@ -8,7 +8,10 @@ mod storage;
 
 use crate::{
     bang_command::initialize_bang_command,
-    function::{ConfigurableFunction, DailyPrivate, ExchangeRate, GetIllustUrl, ImageGenerator, LocalInfo, SelfInfo},
+    function::{
+        ConfigurableFunction, DailyPrivate, ExchangeRate, GetIllustUrl, ImageGenerator, LocalInfo, MathRenderer,
+        SelfInfo,
+    },
     natsuki::{FunctionStore, LlmCache, Natsuki},
     shiyu::{Shiyu, ShiyuProvider},
     storage::initialize_storage,
@@ -120,6 +123,7 @@ async fn initialize_functions(tool_config: &ConfigTools, rate_limits: &RateLimit
         configure_function::<ImageGenerator>(tool_config.image_generator.as_ref(), Some(&rate_limits.image_generator))
             .await?,
     );
+    functions.extend(configure_function::<MathRenderer>(tool_config.math_renderer.as_ref(), None).await?);
     functions.extend(configure_function::<ExchangeRate>(tool_config.exchange_rate.as_ref(), None).await?);
     functions.extend(configure_function::<GetIllustUrl>(tool_config.get_illust_url.as_ref(), None).await?);
     functions.extend(configure_function::<DailyPrivate>(tool_config.daily_private.as_ref(), None).await?);

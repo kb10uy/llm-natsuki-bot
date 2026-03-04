@@ -8,6 +8,7 @@ use serde::Deserialize;
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct ConfigTools {
     pub image_generator: Option<ConfigToolsImageGenerator>,
+    pub math_renderer: Option<ConfigToolsMathRenderer>,
     pub get_illust_url: Option<ConfigToolsGetIllustUrl>,
     pub exchange_rate: Option<ConfigToolsExchangeRate>,
     pub daily_private: Option<ConfigToolsDailyPrivate>,
@@ -18,6 +19,12 @@ pub struct ConfigToolsImageGenerator {
     pub endpoint: String,
     pub token: String,
     pub model: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ConfigToolsMathRenderer {
+    pub endpoint: String,
+    pub scale: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
