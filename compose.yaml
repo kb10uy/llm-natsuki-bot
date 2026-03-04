@@ -1,4 +1,12 @@
 services:
+  math-renderer:
+    build:
+      dockerfile: "./docker/Dockerfile.lnb-math-renderer"
+      context: "."
+    stop_grace_period: "2s"
+    expose:
+      - 3000
+
   bot:
     build:
       dockerfile: "./docker/Dockerfile.lnb-server"
@@ -13,6 +21,7 @@ services:
       - "./data:/data"
     depends_on:
       - "valkey"
+      - "math-renderer"
 
   api:
     build:
