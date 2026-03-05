@@ -104,7 +104,7 @@ impl Function for MathRenderer {
 impl MathRenderer {
     async fn execute(&self, parameters: RenderingParameters) -> Result<FunctionResponse, IntermediateError> {
         let payload = json!({
-            "latex": parameters.formula,
+            "formula": parameters.formula,
             "display": parameters.display_mode,
             "scale": self.scale,
         });
