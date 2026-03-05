@@ -5,7 +5,7 @@ const RENDERING_EX_SIZE = 32;
 const RASTERIZE_DENSITY = 96;
 const FORMULA_GAP = 24;
 const LABEL_MARGIN = 16;
-const LABEL_WIDTH = 48;
+const LABEL_WIDTH = 128;
 
 interface MathJaxInstance {
     tex2svgPromise: (
@@ -144,7 +144,11 @@ export async function renderMultipleToPng(
         maxFormulaWidth = Math.max(maxFormulaWidth, formulaWidth);
         totalFormulaHeight += formulaHeight;
 
-        compositeInputs.push({ input: formulaImage, top: y, left: 0 });
+        compositeInputs.push({
+            input: formulaImage,
+            top: y,
+            left: LABEL_MARGIN + LABEL_WIDTH,
+        });
 
         // Label
         const labelPng = await sharp({
@@ -165,7 +169,7 @@ export async function renderMultipleToPng(
         compositeInputs.push({
             input: labelPng,
             top: labelTop,
-            left: formulaWidth + LABEL_MARGIN,
+            left: LABEL_MARGIN,
         });
 
         // Linefeed
