@@ -41,7 +41,7 @@ export async function renderMath(
         });
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        console.error(`[render error] ${message}`);
+        console.error(err);
         return error(c, 500, message);
     }
 }
@@ -68,7 +68,7 @@ export async function renderMathMultiple(
         });
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        console.error(`[render error] ${message}`);
+        console.error(err);
         return error(c, 500, message);
     }
 }

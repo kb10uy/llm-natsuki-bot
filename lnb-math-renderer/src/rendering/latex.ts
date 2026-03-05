@@ -56,7 +56,10 @@ async function renderSvgToPng(
     scale: number,
     background: string,
 ): Promise<Buffer> {
-    return sharp(Buffer.from(svg), { density: RASTERIZE_DENSITY * scale })
+    const filteredSvg = svg.replace(/data-latex="[^"]*"/g, "");
+    return sharp(Buffer.from(filteredSvg), {
+        density: RASTERIZE_DENSITY * scale,
+    })
         .extend({
             top: 5,
             bottom: 5,
@@ -78,37 +81,42 @@ export async function renderMultipleToPng(
     const padding = options?.padding ?? 0;
     const background = options?.backgroundColor ?? "white";
 
-    const formulaPngs = await Promise.all(
-        formulae.map(async (latex) => {
-            const svgNode = await mj.tex2svgPromise(latex.trim(), {
+    let maxFormulaWidth = 0;
+    let totalFormulaHeight = 0;
+    let index = 1;
+    let y = 0;
+    const compositeInputs: sharp.OverlayOptions[] = [];
+    for (const formula of formulae) {
+        // Formula
+        let svg;
+        let formulaImage;
+        try {
+            const svgNode = await mj.tex2svgPromise(formula.trim(), {
                 display: true,
                 em: RENDERING_EX_SIZE * 2,
                 ex: RENDERING_EX_SIZE,
             });
-            const svg = mj.startup.adaptor.innerHTML(svgNode);
-            return renderSvgToPng(svg, scale, background);
-        }),
-    );
-    const dimensions = await Promise.all(
-        formulaPngs.map((png) => sharp(png).metadata()),
-    );
+            svg = mj.startup.adaptor.innerHTML(svgNode);
+            formulaImage = await renderSvgToPng(svg, scale, background);
+        } catch (e) {
+            console.error("rendering error: ", e);
+            console.error("rendering error: ", formula);
+            console.error("rendering error: ", svg);
+            continue;
+        }
 
-    const maxFormulaWidth = Math.max(...dimensions.map((d) => d.width ?? 0));
-    const totalWidth = maxFormulaWidth + LABEL_MARGIN + LABEL_WIDTH;
-    const totalHeight =
-        dimensions.reduce((sum, d) => sum + (d.height ?? 0), 0) +
-        FORMULA_GAP * (formulae.length - 1);
+        const dimensions = await sharp(formulaImage).metadata();
+        const formulaWidth = dimensions.width ?? 0;
+        const formulaHeight = dimensions.height ?? 0;
+        maxFormulaWidth = Math.max(maxFormulaWidth, formulaWidth);
+        totalFormulaHeight += formulaHeight;
 
-    const compositeInputs: sharp.OverlayOptions[] = [];
-    let y = 0;
-    for (let i = 0; i < formulaPngs.length; i++) {
-        const formulaHeight = dimensions[i]!.height ?? 0;
+        compositeInputs.push({ input: formulaImage, top: y, left: 0 });
 
-        compositeInputs.push({ input: formulaPngs[i]!, top: y, left: 0 });
-
+        // Label
         const labelPng = await sharp({
             text: {
-                text: `(${i + 1})`,
+                text: `(${index})`,
                 font: "sans",
                 dpi: Math.round(72 * scale),
             },
@@ -124,16 +132,18 @@ export async function renderMultipleToPng(
         compositeInputs.push({
             input: labelPng,
             top: labelTop,
-            left: maxFormulaWidth + LABEL_MARGIN,
+            left: formulaWidth + LABEL_MARGIN,
         });
 
+        // Linefeed
         y += formulaHeight + FORMULA_GAP;
+        ++index;
     }
 
     let compositeImage = await sharp({
         create: {
-            width: totalWidth,
-            height: totalHeight,
+            width: maxFormulaWidth + LABEL_MARGIN + LABEL_WIDTH,
+            height: totalFormulaHeight + FORMULA_GAP * (formulae.length - 1),
             channels: 3,
             background,
         },
