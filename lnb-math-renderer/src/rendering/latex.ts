@@ -1,7 +1,8 @@
 import MathJax from "mathjax";
-import { Resvg, type ResvgRenderOptions } from "@resvg/resvg-js";
+import sharp from "sharp";
 
 const RENDERING_EX_SIZE = 32;
+const RASTERIZE_DENSITY = 96;
 
 interface MathJaxInstance {
     tex2svgPromise: (
@@ -41,52 +42,6 @@ async function getMathJax(): Promise<MathJaxInstance> {
     return mjx;
 }
 
-interface SvgView {
-    width: number;
-    height: number;
-    viewBox: [number, number, number, number];
-}
-
-function addPadding(svg: string, padding: number): string {
-    const viewBoxText = svg.match(/viewBox="([^"]+)"/)?.[1];
-    const widthText = svg.match(/width="([\d\.]+)/)?.[1];
-    const heightText = svg.match(/height="([\d\.]+)/)?.[1];
-    if (!viewBoxText || !widthText || !heightText) return svg;
-
-    const viewBox = viewBoxText.split(" ").map(Number);
-    const width = Number(widthText);
-    const height = Number(heightText);
-    if (!width || !height || viewBox.length !== 4 || viewBox.some(isNaN))
-        return svg;
-
-    const newView = adjustPadding(
-        { width, height, viewBox: viewBox as [number, number, number, number] },
-        padding,
-    );
-
-    return svg
-        .replace(/height="[^\d\.]+/, `viewBox="${newView.height}`)
-        .replace(/width="[^\d\.]+/, `viewBox="${newView.width}`)
-        .replace(/viewBox="[^"]+"/, `viewBox="${newView.viewBox.join(" ")}"`);
-}
-
-function adjustPadding(svgView: SvgView, padding: number): SvgView {
-    const newViewBox = [
-        svgView.viewBox[0] - padding,
-        svgView.viewBox[1] - padding,
-        svgView.viewBox[2] + padding * 2,
-        svgView.viewBox[3] + padding * 2,
-    ] satisfies [number, number, number, number];
-    // height 側を保持する
-    const newRatio = newViewBox[2] / newViewBox[3];
-    const newWidth = svgView.height * newRatio;
-    return {
-        width: newWidth,
-        height: svgView.height,
-        viewBox: newViewBox,
-    };
-}
-
 export interface RenderOptions {
     readonly scale?: number;
     readonly padding?: number;
@@ -105,18 +60,30 @@ export async function renderToPng(
         em: RENDERING_EX_SIZE * 2,
         ex: RENDERING_EX_SIZE,
     });
-    let svg = mj.startup.adaptor.innerHTML(svgNode);
+    const svg = mj.startup.adaptor.innerHTML(svgNode);
 
-    if (options?.padding ?? 0 > 0) {
-        svg = addPadding(svg, options!.padding!);
-    }
+    const scale = options?.scale ?? 1.0;
+    const padding = options?.padding ?? 0;
+    const background = options?.backgroundColor ?? "white";
 
-    const resvgOptions: ResvgRenderOptions = {
-        fitTo: { mode: "zoom", value: options?.scale ?? 1.0 },
-        background: options?.backgroundColor ?? "white",
-    };
+    const image = sharp(Buffer.from(svg), {
+        density: RASTERIZE_DENSITY * scale,
+    });
 
-    const resvg = new Resvg(svg, resvgOptions);
-    const rendered = resvg.render();
-    return rendered.asPng();
+    const png = await (
+        padding > 0
+            ? image.extend({
+                  top: padding,
+                  bottom: padding,
+                  left: padding,
+                  right: padding,
+                  background,
+              })
+            : image
+    )
+        .flatten({ background })
+        .png()
+        .toBuffer();
+
+    return new Uint8Array(png);
 }
