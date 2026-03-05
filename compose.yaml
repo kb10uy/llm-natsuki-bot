@@ -1,12 +1,4 @@
 services:
-  math-renderer:
-    build:
-      dockerfile: "./docker/Dockerfile.lnb-math-renderer"
-      context: "."
-    stop_grace_period: "2s"
-    expose:
-      - 3000
-
   bot:
     build:
       dockerfile: "./docker/Dockerfile.lnb-server"
@@ -22,6 +14,14 @@ services:
     depends_on:
       - "valkey"
       - "math-renderer"
+
+  math-renderer:
+    build:
+      dockerfile: "./docker/Dockerfile.lnb-math-renderer"
+      context: "."
+    stop_grace_period: "2s"
+    expose:
+      - 3000
 
   api:
     build:
@@ -39,7 +39,7 @@ services:
       - "valkey"
 
   valkey:
-    image: "mirror.gcr.io/valkey/valkey:8.1-alpine"
+    image: "mirror.gcr.io/valkey/valkey:9.0-alpine"
     environment:
       VALKEY_EXTRA_FLAGS: "--save 60 1 --loglevel warning"
     volumes:
