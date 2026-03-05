@@ -15,7 +15,7 @@ static RE_HEAD_MENTION: LazyLock<Regex> =
 static RE_ESCAPING_MENTION: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"(^|[^=/[:word:]])@([[:word:]]+)"#).expect("invalid regex"));
 
-pub fn sanitize_mention_html_from_mastodon(mention_html: &str) -> String {
+pub fn escape_mention_html_from_mastodon(mention_html: &str) -> String {
     let content_markdown = parse_html(mention_html);
     RE_HEAD_MENTION.replace_all(&content_markdown, "").to_string()
 }
@@ -90,13 +90,13 @@ fn walk_mastodon(writer: &mut impl Write, math_formulae: &mut Vec<String>, child
             Node::InlineMath(inline_math) => {
                 let formula = inline_math.value.trim_matches('$').trim();
                 math_formulae.push(formula.to_string());
-                let reference = format!("(see formula {})", math_formulae.len());
+                let reference = format!("(f.{})", math_formulae.len());
                 write_text_element(writer, &reference)?;
             }
             Node::Math(math) => {
                 let formula = math.value.trim_matches('$').trim();
                 math_formulae.push(formula.to_string());
-                let reference = format!("(see formula {})\n", math_formulae.len());
+                let reference = format!("(f.{})\n", math_formulae.len());
                 write_text_element(writer, &reference)?;
             }
 

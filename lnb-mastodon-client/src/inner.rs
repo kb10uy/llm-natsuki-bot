@@ -1,6 +1,6 @@
 use crate::{
     CONTEXT_KEY_PREFIX,
-    text::{process_markdown_for_mastodon, sanitize_mention_html_from_mastodon},
+    text::{escape_mention_html_from_mastodon, process_markdown_for_mastodon},
 };
 
 use std::{iter::once, sync::Arc, time::Duration};
@@ -326,7 +326,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
     /// Mastodon の `Status` を `Message` 形式に変換する。
     /// 会話復元時などに bot 自身のアカウントの投稿だった場合は `AssistantMessage` になる。
     fn transform_status(&self, status: &Status) -> Message {
-        let mut sanitized_mention_text = sanitize_mention_html_from_mastodon(&status.content);
+        let mut sanitized_mention_text = escape_mention_html_from_mastodon(&status.content);
         let language = status.language.and_then(|l| l.to_639_1()).map(|l| l.to_string());
 
         if status.account.id == self.self_account.id {
