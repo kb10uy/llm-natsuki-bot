@@ -1,7 +1,11 @@
 import MathJax from "mathjax";
-import { Resvg, type ResvgRenderOptions } from "@resvg/resvg-js";
+import sharp from "sharp";
 
 const RENDERING_EX_SIZE = 32;
+const RASTERIZE_DENSITY = 96;
+const FORMULA_GAP = 24;
+const LABEL_MARGIN = 16;
+const LABEL_WIDTH = 48;
 
 interface MathJaxInstance {
     tex2svgPromise: (
@@ -41,56 +45,127 @@ async function getMathJax(): Promise<MathJaxInstance> {
     return mjx;
 }
 
-interface SvgView {
-    width: number;
-    height: number;
-    viewBox: [number, number, number, number];
-}
-
-function addPadding(svg: string, padding: number): string {
-    const viewBoxText = svg.match(/viewBox="([^"]+)"/)?.[1];
-    const widthText = svg.match(/width="([\d\.]+)/)?.[1];
-    const heightText = svg.match(/height="([\d\.]+)/)?.[1];
-    if (!viewBoxText || !widthText || !heightText) return svg;
-
-    const viewBox = viewBoxText.split(" ").map(Number);
-    const width = Number(widthText);
-    const height = Number(heightText);
-    if (!width || !height || viewBox.length !== 4 || viewBox.some(isNaN))
-        return svg;
-
-    const newView = adjustPadding(
-        { width, height, viewBox: viewBox as [number, number, number, number] },
-        padding,
-    );
-
-    return svg
-        .replace(/height="[^\d\.]+/, `viewBox="${newView.height}`)
-        .replace(/width="[^\d\.]+/, `viewBox="${newView.width}`)
-        .replace(/viewBox="[^"]+"/, `viewBox="${newView.viewBox.join(" ")}"`);
-}
-
-function adjustPadding(svgView: SvgView, padding: number): SvgView {
-    const newViewBox = [
-        svgView.viewBox[0] - padding,
-        svgView.viewBox[1] - padding,
-        svgView.viewBox[2] + padding * 2,
-        svgView.viewBox[3] + padding * 2,
-    ] satisfies [number, number, number, number];
-    // height 側を保持する
-    const newRatio = newViewBox[2] / newViewBox[3];
-    const newWidth = svgView.height * newRatio;
-    return {
-        width: newWidth,
-        height: svgView.height,
-        viewBox: newViewBox,
-    };
-}
-
 export interface RenderOptions {
     readonly scale?: number;
     readonly padding?: number;
     readonly backgroundColor?: string;
+}
+
+async function renderSvgToPng(
+    svg: string,
+    scale: number,
+    background: string,
+): Promise<Buffer> {
+    const filteredSvg = svg.replace(/data-latex="[^"]*"/g, "");
+    return sharp(Buffer.from(filteredSvg), {
+        density: RASTERIZE_DENSITY * scale,
+    })
+        .extend({
+            top: 5,
+            bottom: 5,
+            left: 5,
+            right: 5,
+            background,
+        })
+        .flatten({ background })
+        .png()
+        .toBuffer();
+}
+
+export async function renderMultipleToPng(
+    formulae: string[],
+    options?: RenderOptions,
+): Promise<Uint8Array> {
+    const mj = await getMathJax();
+    const scale = options?.scale ?? 1.0;
+    const padding = options?.padding ?? 0;
+    const background = options?.backgroundColor ?? "white";
+
+    let maxFormulaWidth = 0;
+    let totalFormulaHeight = 0;
+    let index = 1;
+    let y = 0;
+    const compositeInputs: sharp.OverlayOptions[] = [];
+    for (const formula of formulae) {
+        // Formula
+        let svg;
+        let formulaImage;
+        try {
+            const svgNode = await mj.tex2svgPromise(formula.trim(), {
+                display: true,
+                em: RENDERING_EX_SIZE * 2,
+                ex: RENDERING_EX_SIZE,
+            });
+            svg = mj.startup.adaptor.innerHTML(svgNode);
+            formulaImage = await renderSvgToPng(svg, scale, background);
+        } catch (e) {
+            console.error("rendering error: ", e);
+            console.error("rendering error: ", formula);
+            console.error("rendering error: ", svg);
+            continue;
+        }
+
+        const dimensions = await sharp(formulaImage).metadata();
+        const formulaWidth = dimensions.width ?? 0;
+        const formulaHeight = dimensions.height ?? 0;
+        maxFormulaWidth = Math.max(maxFormulaWidth, formulaWidth);
+        totalFormulaHeight += formulaHeight;
+
+        compositeInputs.push({ input: formulaImage, top: y, left: 0 });
+
+        // Label
+        const labelPng = await sharp({
+            text: {
+                text: `(${index})`,
+                font: "sans",
+                dpi: Math.round(72 * scale),
+            },
+        })
+            .flatten({ background })
+            .png()
+            .toBuffer();
+
+        const labelDimensions = await sharp(labelPng).metadata();
+        const labelHeight = labelDimensions.height ?? 0;
+        const labelTop = y + Math.round((formulaHeight - labelHeight) / 2);
+
+        compositeInputs.push({
+            input: labelPng,
+            top: labelTop,
+            left: formulaWidth + LABEL_MARGIN,
+        });
+
+        // Linefeed
+        y += formulaHeight + FORMULA_GAP;
+        ++index;
+    }
+
+    let compositeImage = await sharp({
+        create: {
+            width: maxFormulaWidth + LABEL_MARGIN + LABEL_WIDTH,
+            height: totalFormulaHeight + FORMULA_GAP * (formulae.length - 1),
+            channels: 3,
+            background,
+        },
+    })
+        .png()
+        .composite(compositeInputs)
+        .toBuffer();
+
+    if (padding > 0) {
+        compositeImage = await sharp(compositeImage)
+            .png()
+            .extend({
+                top: padding,
+                bottom: padding,
+                left: padding,
+                right: padding,
+                background,
+            })
+            .toBuffer();
+    }
+
+    return new Uint8Array(compositeImage);
 }
 
 export async function renderToPng(
@@ -105,18 +180,25 @@ export async function renderToPng(
         em: RENDERING_EX_SIZE * 2,
         ex: RENDERING_EX_SIZE,
     });
-    let svg = mj.startup.adaptor.innerHTML(svgNode);
+    const svg = mj.startup.adaptor.innerHTML(svgNode);
 
-    if (options?.padding ?? 0 > 0) {
-        svg = addPadding(svg, options!.padding!);
+    const scale = options?.scale ?? 1.0;
+    const padding = options?.padding ?? 0;
+    const background = options?.backgroundColor ?? "white";
+
+    let image = await renderSvgToPng(svg, scale, background);
+    if (padding > 0) {
+        image = await sharp(image)
+            .extend({
+                top: padding,
+                bottom: padding,
+                left: padding,
+                right: padding,
+                background,
+            })
+            .png()
+            .toBuffer();
     }
 
-    const resvgOptions: ResvgRenderOptions = {
-        fitTo: { mode: "zoom", value: options?.scale ?? 1.0 },
-        background: options?.backgroundColor ?? "white",
-    };
-
-    const resvg = new Resvg(svg, resvgOptions);
-    const rendered = resvg.render();
-    return rendered.asPng();
+    return new Uint8Array(image);
 }

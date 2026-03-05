@@ -11,9 +11,9 @@
   },
   "dependencies": {
     "@hono/node-server": "1.19.10",
-    "@resvg/resvg-js": "2.6.2",
     "hono": "4.12.4",
-    "mathjax": "4.1.1"
+    "mathjax": "4.1.1",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@types/node": "22.15.21",

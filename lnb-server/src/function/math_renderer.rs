@@ -1,9 +1,8 @@
 use crate::function::ConfigurableFunction;
 
 use futures::{FutureExt, future::BoxFuture};
-use lnb_common::config::tools::ConfigToolsMathRenderer;
+use lnb_common::{config::tools::ConfigToolsMathRenderer, math_renderer::MathRendererClient};
 use lnb_core::{
-    APP_USER_AGENT,
     context::Context,
     error::FunctionError,
     interface::{
@@ -17,17 +16,12 @@ use lnb_core::{
     },
 };
 use lnb_rate_limiter::RateLimiter;
-use reqwest::{Client as ReqwestClient, ClientBuilder};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::json;
-use thiserror::Error as ThisError;
-use url::Url;
 
 #[derive(Debug)]
 pub struct MathRenderer {
-    http_client: ReqwestClient,
-    render_endpoint: Url,
-    scale: f64,
+    renderer: MathRendererClient,
 }
 
 impl ConfigurableFunction for MathRenderer {
@@ -39,17 +33,8 @@ impl ConfigurableFunction for MathRenderer {
         config: &ConfigToolsMathRenderer,
         _rate_limits: Option<RateLimiter>,
     ) -> Result<MathRenderer, FunctionError> {
-        let http_client = ClientBuilder::new()
-            .user_agent(APP_USER_AGENT)
-            .build()
-            .map_err(FunctionError::by_external)?;
-        let render_endpoint = Url::parse(&config.endpoint).map_err(FunctionError::by_serialization)?;
-
-        Ok(MathRenderer {
-            http_client,
-            render_endpoint,
-            scale: config.scale,
-        })
+        let renderer = MathRendererClient::new(&config.endpoint, config.scale).map_err(FunctionError::by_external)?;
+        Ok(MathRenderer { renderer })
     }
 }
 
@@ -84,48 +69,17 @@ impl Function for MathRenderer {
             Ok(p) => p,
             Err(err) => return async { Err(FunctionError::Serialization(err.into())) }.boxed(),
         };
-        async move {
-            match self.execute(parameters).await {
-                Ok(response) => Ok(response),
-                Err(IntermediateError::AsResponse(message)) => Ok(FunctionResponse {
-                    result: serde_json::to_value(RenderingError {
-                        error: message.to_string(),
-                    })
-                    .map_err(FunctionError::by_serialization)?,
-                    ..Default::default()
-                }),
-                Err(IntermediateError::Unrecoverable(err)) => Err(err),
-            }
-        }
-        .boxed()
+        async move { self.execute(parameters).await }.boxed()
     }
 }
 
 impl MathRenderer {
-    async fn execute(&self, parameters: RenderingParameters) -> Result<FunctionResponse, IntermediateError> {
-        let payload = json!({
-            "latex": parameters.formula,
-            "display": parameters.display_mode,
-            "scale": self.scale,
-        });
-        let resp = self
-            .http_client
-            .post(self.render_endpoint.clone())
-            .json(&payload)
-            .send()
+    async fn execute(&self, parameters: RenderingParameters) -> Result<FunctionResponse, FunctionError> {
+        let png_bytes = self
+            .renderer
+            .render(&parameters.formula, parameters.display_mode)
             .await
-            .map_err(|err| IntermediateError::AsResponse(err.to_string()))?;
-        let png_bytes = if resp.status().is_success() {
-            resp.bytes()
-                .await
-                .map_err(|err| IntermediateError::AsResponse(err.to_string()))?
-        } else {
-            let error: RenderingError = resp
-                .json()
-                .await
-                .map_err(|err| IntermediateError::AsResponse(err.to_string()))?;
-            return Err(IntermediateError::AsResponse(error.error));
-        };
+            .map_err(FunctionError::by_external)?;
 
         let image_attachment = ConversationAttachment::Image {
             bytes: png_bytes.to_vec(),
@@ -145,18 +99,4 @@ impl MathRenderer {
 struct RenderingParameters {
     formula: String,
     display_mode: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct RenderingError {
-    error: String,
-}
-
-#[derive(Debug, ThisError)]
-enum IntermediateError {
-    #[error("as response error: {0}")]
-    AsResponse(String),
-
-    #[error("unrecoverable function error: {0}")]
-    Unrecoverable(#[from] FunctionError),
 }
