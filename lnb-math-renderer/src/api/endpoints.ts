@@ -30,6 +30,7 @@ export async function renderMath(
     try {
         const png = await renderToPng(request.formula.trim(), request.display, {
             scale: request.scale ?? 1.0,
+            preserveAlpha: request.preserveAlpha,
             padding: 20,
         });
         return new Response(png, {
@@ -57,6 +58,7 @@ export async function renderMathMultiple(
     try {
         const png = await renderMultipleToPng(request.formulae, {
             scale: request.scale ?? 1.0,
+            preserveAlpha: request.preserveAlpha,
             padding: 20,
         });
         return new Response(png, {

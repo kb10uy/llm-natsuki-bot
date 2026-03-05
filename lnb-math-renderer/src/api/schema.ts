@@ -9,41 +9,65 @@ export interface RenderMultipleRequestBody {
     scale: number;
 }
 
+export interface RenderCommonOption {
+    scale: number;
+    preserveAlpha: boolean;
+}
+
 export interface ErrorResponse {
     error: string;
 }
 
 export function validateRenderMultipleRequest(
-    request: unknown,
-): request is RenderMultipleRequestBody {
-    if (typeof request !== "object" || request === null) {
+    payload: unknown,
+): payload is RenderMultipleRequestBody & RenderCommonOption {
+    if (typeof payload !== "object" || payload === null) {
         return false;
     }
 
     if (
-        !("formulae" in request) ||
-        !Array.isArray(request.formulae) ||
-        request.formulae.length === 0 ||
-        !request.formulae.every((f) => typeof f === "string")
+        !("formulae" in payload) ||
+        !Array.isArray(payload.formulae) ||
+        payload.formulae.length === 0 ||
+        !payload.formulae.every((f) => typeof f === "string")
     ) {
         return false;
     }
 
-    return true;
+    return validateCommonOption(payload);
 }
 
 export function validateRenderRequest(
-    request: unknown,
-): request is RenderRequestBody {
-    if (typeof request !== "object" || request === null) {
+    payload: unknown,
+): payload is RenderRequestBody & RenderCommonOption {
+    if (typeof payload !== "object" || payload === null) {
         return false;
     }
 
-    if (!("formula" in request) || typeof request.formula !== "string") {
+    if (!("formula" in payload) || typeof payload.formula !== "string") {
         return false;
     }
 
-    if (!("display" in request) || typeof request.display !== "boolean") {
+    if (!("display" in payload) || typeof payload.display !== "boolean") {
+        return false;
+    }
+
+    return validateCommonOption(payload);
+}
+
+function validateCommonOption(payload: unknown): payload is RenderCommonOption {
+    if (typeof payload !== "object" || payload === null) {
+        return false;
+    }
+
+    if (!("scale" in payload) || typeof payload.scale !== "number") {
+        return false;
+    }
+
+    if (
+        !("preserveAlpha" in payload) ||
+        typeof payload.preserveAlpha !== "boolean"
+    ) {
         return false;
     }
 

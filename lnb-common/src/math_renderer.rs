@@ -40,6 +40,7 @@ impl MathRendererClient {
             "formula": formula,
             "display": display_mode,
             "scale": self.scale,
+            "preserveAlpha": true,
         });
         let resp = self
             .client
@@ -65,6 +66,7 @@ impl MathRendererClient {
         let payload = json!({
             "formulae": formulae,
             "scale": self.scale,
+            "preserveAlpha": true,
         });
         let resp = self
             .client

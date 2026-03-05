@@ -5,7 +5,7 @@ const RENDERING_EX_SIZE = 32;
 const RASTERIZE_DENSITY = 96;
 const FORMULA_GAP = 24;
 const LABEL_MARGIN = 16;
-const LABEL_WIDTH = 48;
+const LABEL_WIDTH = 128;
 
 interface MathJaxInstance {
     tex2svgPromise: (
@@ -49,6 +49,7 @@ export interface RenderOptions {
     readonly scale?: number;
     readonly padding?: number;
     readonly backgroundColor?: string;
+    readonly preserveAlpha?: boolean;
 }
 
 async function renderSvgToPng(
@@ -70,6 +71,38 @@ async function renderSvgToPng(
         .flatten({ background })
         .png()
         .toBuffer();
+}
+
+async function addPaddings(
+    original: Buffer,
+    padding: number,
+    background: string,
+    reserveAlpha: boolean,
+): Promise<Buffer> {
+    let imageBuffer = original;
+    if (padding > 0) {
+        imageBuffer = await sharp(imageBuffer)
+            .extend({
+                top: padding,
+                bottom: padding,
+                left: padding,
+                right: padding,
+                background,
+            })
+            .toBuffer();
+    }
+    if (reserveAlpha) {
+        imageBuffer = await sharp(imageBuffer)
+            .extend({
+                top: 1,
+                bottom: 1,
+                left: 1,
+                right: 1,
+                background: { r: 0, g: 0, b: 0, alpha: 0 },
+            })
+            .toBuffer();
+    }
+    return imageBuffer;
 }
 
 export async function renderMultipleToPng(
@@ -111,7 +144,11 @@ export async function renderMultipleToPng(
         maxFormulaWidth = Math.max(maxFormulaWidth, formulaWidth);
         totalFormulaHeight += formulaHeight;
 
-        compositeInputs.push({ input: formulaImage, top: y, left: 0 });
+        compositeInputs.push({
+            input: formulaImage,
+            top: y,
+            left: LABEL_MARGIN + LABEL_WIDTH,
+        });
 
         // Label
         const labelPng = await sharp({
@@ -132,7 +169,7 @@ export async function renderMultipleToPng(
         compositeInputs.push({
             input: labelPng,
             top: labelTop,
-            left: formulaWidth + LABEL_MARGIN,
+            left: LABEL_MARGIN,
         });
 
         // Linefeed
@@ -152,18 +189,12 @@ export async function renderMultipleToPng(
         .composite(compositeInputs)
         .toBuffer();
 
-    if (padding > 0) {
-        compositeImage = await sharp(compositeImage)
-            .png()
-            .extend({
-                top: padding,
-                bottom: padding,
-                left: padding,
-                right: padding,
-                background,
-            })
-            .toBuffer();
-    }
+    compositeImage = await addPaddings(
+        compositeImage,
+        padding,
+        background,
+        options?.preserveAlpha ?? false,
+    );
 
     return new Uint8Array(compositeImage);
 }
@@ -187,18 +218,12 @@ export async function renderToPng(
     const background = options?.backgroundColor ?? "white";
 
     let image = await renderSvgToPng(svg, scale, background);
-    if (padding > 0) {
-        image = await sharp(image)
-            .extend({
-                top: padding,
-                bottom: padding,
-                left: padding,
-                right: padding,
-                background,
-            })
-            .png()
-            .toBuffer();
-    }
+    image = await addPaddings(
+        image,
+        padding,
+        background,
+        options?.preserveAlpha ?? false,
+    );
 
     return new Uint8Array(image);
 }
