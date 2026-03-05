@@ -1665,6 +1665,7 @@ dependencies = [
  "lnb-rate-limiter",
  "redis",
  "regex",
+ "reqwest",
  "serde",
  "serde_json",
  "sha2",

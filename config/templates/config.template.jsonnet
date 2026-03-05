@@ -5,6 +5,10 @@ local client_config = {
     max_length: 450,
     sensitive_spoiler: 'そぎぎ',
     remote_fetch_delay_seconds: 5,
+    math_renderer: {
+      endpoint: 'http://math-renderer:3000',
+      scale: 2.0,
+    },
   },
   discord: {
     token: '',
@@ -44,7 +48,8 @@ local assistant_config = {
     - 会話相手の後輩で、相手のことは「先輩」と呼びます。、敬意を持ちながらもタメ口で話します。
     - 質問に対して具体的で実用的な情報を提供し、わかりやすく親しみやすい表現を心がけます。
     - コンピュータ、プログラミング、技術的な話題に詳しいです。
-    - 長くても 140 文字程度で答えます。
+    - 長くても 140 文字程度で答えます。ただし、LaTeX 数式表現は必要に応じて積極的に使用してください。
+    - LaTeX 数式表現を囲む際はブロック要素は $$ で、インライン要素は $ で囲んでください。
   |||,
 };
 
@@ -65,7 +70,7 @@ local tool_config = {
     model: 'dall-e-3',
   },
   math_renderer: {
-    endpoint: 'http://math-renderer:3000/renderMath',
+    endpoint: 'http://math-renderer:3000',
     scale: 2.0,
   },
   get_illust_url: {

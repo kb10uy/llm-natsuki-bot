@@ -4,7 +4,7 @@ use std::{
 };
 
 use html2md::parse_html;
-use markdown::{ParseOptions, mdast::Node};
+use markdown::{Constructs, ParseOptions, mdast::Node};
 use regex::Regex;
 use url::Url;
 
@@ -20,52 +20,62 @@ pub fn sanitize_mention_html_from_mastodon(mention_html: &str) -> String {
     RE_HEAD_MENTION.replace_all(&content_markdown, "").to_string()
 }
 
-pub fn sanitize_markdown_for_mastodon(markdown_text: &str) -> String {
-    let markdown_ast = markdown::to_mdast(markdown_text, &ParseOptions { ..Default::default() })
-        .expect("normal markdown parse never fails");
+pub fn process_markdown_for_mastodon(markdown_text: &str) -> (String, Vec<String>) {
+    let markdown_ast = markdown::to_mdast(
+        markdown_text,
+        &ParseOptions {
+            constructs: Constructs {
+                math_text: true,
+                math_flow: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+    )
+    .expect("normal markdown parse never fails");
     let Node::Root(root) = markdown_ast else {
         unreachable!("root must be Node::Root");
     };
 
-    let mut sanitized = String::new();
-    walk_mastodon(&mut sanitized, root.children).expect("must succeed");
-    sanitized
+    let mut filtered_text = String::new();
+    let mut math_formulae = Vec::new();
+    walk_mastodon(&mut filtered_text, &mut math_formulae, root.children).expect("must succeed");
+    (filtered_text, math_formulae)
 }
 
-fn walk_mastodon(writer: &mut impl Write, children: Vec<Node>) -> FmtResult {
+fn walk_mastodon(writer: &mut impl Write, math_formulae: &mut Vec<String>, children: Vec<Node>) -> FmtResult {
     for child in children {
         match child {
-            Node::Root(root) => walk_mastodon(writer, root.children)?,
+            Node::Root(root) => walk_mastodon(writer, math_formulae, root.children)?,
 
             Node::Text(text) => write_text_element(writer, &text.value)?,
             Node::Break(_) => writeln!(writer)?,
-            Node::Strong(strong) => walk_mastodon(writer, strong.children)?,
-            Node::Emphasis(emphasis) => walk_mastodon(writer, emphasis.children)?,
-            Node::Delete(delete) => walk_mastodon(writer, delete.children)?,
+            Node::Strong(strong) => walk_mastodon(writer, math_formulae, strong.children)?,
+            Node::Emphasis(emphasis) => walk_mastodon(writer, math_formulae, emphasis.children)?,
+            Node::Delete(delete) => walk_mastodon(writer, math_formulae, delete.children)?,
             Node::InlineCode(inline_code) => write_text_element(writer, &inline_code.value)?,
-            Node::InlineMath(inline_math) => write_text_element(writer, &inline_math.value)?,
             Node::Link(link) => write!(writer, "{}", strip_utm_source(&link.url))?,
 
             Node::Paragraph(paragraph) => {
-                walk_mastodon(writer, paragraph.children)?;
+                walk_mastodon(writer, math_formulae, paragraph.children)?;
                 writeln!(writer)?;
             }
             Node::Heading(heading) => {
-                walk_mastodon(writer, heading.children)?;
+                walk_mastodon(writer, math_formulae, heading.children)?;
                 writeln!(writer)?;
             }
             Node::List(list) => {
                 writeln!(writer)?;
-                walk_mastodon(writer, list.children)?;
+                walk_mastodon(writer, math_formulae, list.children)?;
                 writeln!(writer)?;
             }
             Node::ListItem(list_item) => {
                 write!(writer, "・")?;
-                walk_mastodon(writer, list_item.children)?;
+                walk_mastodon(writer, math_formulae, list_item.children)?;
             }
             Node::Blockquote(blockquote) => {
                 let mut quoted = String::new();
-                walk_mastodon(&mut quoted, blockquote.children)?;
+                walk_mastodon(&mut quoted, math_formulae, blockquote.children)?;
                 for line in quoted.lines() {
                     writeln!(writer, "> ")?;
                     write_text_element(writer, line)?;
@@ -76,7 +86,19 @@ fn walk_mastodon(writer: &mut impl Write, children: Vec<Node>) -> FmtResult {
                 write_text_element(writer, &code.value)?;
                 writeln!(writer)?;
             }
-            Node::Math(math) => write_text_element(writer, &math.value)?,
+
+            Node::InlineMath(inline_math) => {
+                let formula = inline_math.value.trim_matches('$').trim();
+                math_formulae.push(formula.to_string());
+                let reference = format!("(see formula {})", math_formulae.len());
+                write_text_element(writer, &reference)?;
+            }
+            Node::Math(math) => {
+                let formula = math.value.trim_matches('$').trim();
+                math_formulae.push(formula.to_string());
+                let reference = format!("(see formula {})\n", math_formulae.len());
+                write_text_element(writer, &reference)?;
+            }
 
             Node::Table(_) => {
                 writeln!(writer, "(table omitted)")?;

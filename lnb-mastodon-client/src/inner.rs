@@ -1,6 +1,6 @@
 use crate::{
     CONTEXT_KEY_PREFIX,
-    text::{sanitize_markdown_for_mastodon, sanitize_mention_html_from_mastodon},
+    text::{process_markdown_for_mastodon, sanitize_mention_html_from_mastodon},
 };
 
 use std::{iter::once, sync::Arc, time::Duration};
@@ -9,6 +9,7 @@ use futures::prelude::*;
 use lnb_common::{
     config::client::ConfigClientMastodon,
     debug::{debug_option_enabled, debug_option_value},
+    math_renderer::MathRendererClient,
     user_roles::UserRolesGroup,
 };
 use lnb_core::{
@@ -48,6 +49,7 @@ pub struct MastodonLnbClientInner<S> {
     max_length: usize,
     remote_fetch_delay: Duration,
     websocket_endpoint: String,
+    math_renderer: MathRendererClient,
 }
 
 impl<S: LnbServer> MastodonLnbClientInner<S> {
@@ -77,6 +79,10 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         let mastodon = Mastodon::new(http_client.clone(), mastodon_data);
         let self_account = mastodon.verify_credentials().map_err(ClientError::by_external).await?;
 
+        // レンダラー
+        let math_renderer = MathRendererClient::new(&config.math_renderer.endpoint, config.math_renderer.scale)
+            .map_err(ClientError::by_external)?;
+
         Ok(MastodonLnbClientInner {
             assistant,
             roles_group,
@@ -86,6 +92,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
             max_length: config.max_length,
             remote_fetch_delay: Duration::from_secs(config.remote_fetch_delay_seconds as u64),
             websocket_endpoint,
+            math_renderer,
         })
     }
 
@@ -378,6 +385,22 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         assistant_message: &AssistantMessage,
         attachments: &[ConversationAttachment],
     ) -> Result<Status, ClientError> {
+        // リプライ構築
+        // 公開範囲は最大 unlisted でリプライ元に合わせる
+        // CW はリプライ元があったらそのまま、ないときは要そぎぎなら付与
+        let (mut filtered_text, math_formulae) = process_markdown_for_mastodon(&assistant_message.text);
+        if filtered_text.chars().count() > self.max_length {
+            filtered_text = filtered_text.chars().take(self.max_length).collect();
+            filtered_text.push_str("...(omitted)");
+        }
+        let reply_text = format!("@{} {filtered_text}", reply_type.acct());
+        let reply_spoiler = reply_type
+            .present_spoiler()
+            .or(assistant_message
+                .is_sensitive
+                .then_some(self.sensitive_spoiler.as_str()))
+            .map(|s| s.to_string());
+
         // 添付メディア
         let mut attachment_ids = vec![];
         for attachment in attachments {
@@ -388,22 +411,16 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
                 }
             }
         }
-
-        // リプライ構築
-        // 公開範囲は最大 unlisted でリプライ元に合わせる
-        // CW はリプライ元があったらそのまま、ないときは要そぎぎなら付与
-        let mut sanitized_text = sanitize_markdown_for_mastodon(&assistant_message.text);
-        if sanitized_text.chars().count() > self.max_length {
-            sanitized_text = sanitized_text.chars().take(self.max_length).collect();
-            sanitized_text.push_str("...(omitted)");
+        if !math_formulae.is_empty() {
+            let formulae_image = self
+                .math_renderer
+                .render_multiple(&math_formulae)
+                .await
+                .map_err(ClientError::by_external)?;
+            let formulae_image_id = self.upload_image(&formulae_image, None).await?;
+            attachment_ids.push(formulae_image_id);
         }
-        let reply_text = format!("@{} {sanitized_text}", reply_type.acct());
-        let reply_spoiler = reply_type
-            .present_spoiler()
-            .or(assistant_message
-                .is_sensitive
-                .then_some(self.sensitive_spoiler.as_str()))
-            .map(|s| s.to_string());
+
         let reply_status = NewStatus {
             status: Some(reply_text),
             visibility: Some(reply_type.visilibity()),
