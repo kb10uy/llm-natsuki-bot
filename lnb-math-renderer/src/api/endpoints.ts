@@ -1,8 +1,11 @@
 import type { Context } from "hono";
 import type { BlankEnv, BlankInput } from "hono/types";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { validateRenderRequest } from "./schema.js";
-import { renderToPng } from "../rendering/latex.js";
+import {
+    validateRenderMultipleRequest,
+    validateRenderRequest,
+} from "./schema.js";
+import { renderMultipleToPng, renderToPng } from "../rendering/latex.js";
 
 function error<P extends string>(
     c: Context<BlankEnv, P, BlankInput>,
@@ -25,7 +28,34 @@ export async function renderMath(
     }
 
     try {
-        const png = await renderToPng(request.latex.trim(), request.display, {
+        const png = await renderToPng(request.formula.trim(), request.display, {
+            scale: request.scale ?? 1.0,
+            padding: 20,
+        });
+        return new Response(png, {
+            status: 200,
+            headers: {
+                "Content-Type": "image/png",
+                "Content-Length": png.length.toString(),
+            },
+        });
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`[render error] ${message}`);
+        return error(c, 500, message);
+    }
+}
+
+export async function renderMathMultiple(
+    c: Context<BlankEnv, "/renderMathMultiple", BlankInput>,
+) {
+    const request: unknown = await c.req.json();
+    if (!validateRenderMultipleRequest(request)) {
+        return error(c, 400, "invalid request");
+    }
+
+    try {
+        const png = await renderMultipleToPng(request.formulae, {
             scale: request.scale ?? 1.0,
             padding: 20,
         });
