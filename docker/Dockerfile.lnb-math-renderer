@@ -11,9 +11,10 @@ RUN mkdir -p /usr/local/share/fonts \
     && wget https://github.com/githubnext/monaspace/releases/download/v1.301/monaspace-static-v1.301.zip \
     && unzip monaspace-static-v1.301.zip \
     && find -name '*.otf' -exec cp -t /usr/local/share/fonts {} +
+RUN wget https://github.com/adobe-fonts/source-han-sans/raw/release/Variable/OTF/SourceHanSans-VF.otf \
+    && cp SourceHanSans-VF.otf /usr/local/share/fonts/
 
-
-FROM mirror.gcr.io/node:22-slim AS runtime
+FROM mirror.gcr.io/node:24-slim AS runtime
 ENV NODE_ENV=production
 RUN apt-get update && apt-get install -y fontconfig \
     && rm -rf /var/lib/apt/lists/*
