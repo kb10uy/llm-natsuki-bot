@@ -20,7 +20,7 @@ use serde::Deserialize;
 static RESPONSE_JSON_SCHEMA: LazyLock<ResponseFormatJsonSchema> = LazyLock::new(|| ResponseFormatJsonSchema {
     name: "response".into(),
     description: Some("response from assistant".into()),
-    schema: Some(convert_json_schema(&ASSISTANT_RESPONSE_SCHEMA)),
+    schema: convert_json_schema(&ASSISTANT_RESPONSE_SCHEMA),
     strict: Some(true),
 });
 
