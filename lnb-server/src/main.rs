@@ -19,11 +19,10 @@ use crate::{
 
 use std::{collections::HashMap, sync::Arc};
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use clap::Parser;
-use futures::future::{join, join_all};
 use lnb_common::{
-    config::{Config, load_config, tools::ConfigTools},
+    config::{ConfigBot, load_bot_config, tools::ConfigTools},
     debug::set_debug_options,
     rate_limits::{RateLimits, RateLimitsCategory, load_rate_limits},
     user_roles::load_user_roles,
@@ -31,14 +30,14 @@ use lnb_common::{
 use lnb_core::interface::{client::LnbClient, function::ArcFunction, interception::BoxInterception};
 use lnb_discord_client::DiscordLnbClient;
 use lnb_mastodon_client::MastodonLnbClient;
-use tokio::spawn;
+use tokio::{signal, task::JoinSet};
 use tracing::info;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let args = cli::Arguments::parse();
-    let config = load_config(args.config)?;
+    let config = load_bot_config(args.config)?;
     let rate_limits = load_rate_limits(args.rate_limits)?;
     let user_roles = load_user_roles(args.user_roles)?;
 
@@ -47,7 +46,7 @@ async fn main() -> Result<()> {
 
     let (natsuki, shiyu) = initialize_natsuki(&config, &rate_limits).await?;
 
-    let mut client_tasks = vec![];
+    let mut services = JoinSet::new();
 
     // Mastodon
     if let Some(mastodon_config) = &config.client.mastodon {
@@ -55,8 +54,10 @@ async fn main() -> Result<()> {
         let mastodon_client = MastodonLnbClient::new(mastodon_config, user_roles.mastodon, natsuki.clone()).await?;
         shiyu.register_remindable(mastodon_client.clone()).await;
 
-        let mastodon_task = spawn(mastodon_client.execute());
-        client_tasks.push(Box::new(mastodon_task));
+        services.spawn(async move {
+            mastodon_client.execute().await?;
+            Err(anyhow!("Mastodon client stopped unexpectedly"))
+        });
     }
 
     // Discord
@@ -64,23 +65,51 @@ async fn main() -> Result<()> {
         info!("starting Discord client");
         let discord_client = DiscordLnbClient::new(dicsord_config, user_roles.discord, natsuki.clone()).await?;
 
-        let discord_task = spawn(discord_client.execute());
-        client_tasks.push(Box::new(discord_task));
+        services.spawn(async move {
+            discord_client.execute().await?;
+            Err(anyhow!("Discord client stopped unexpectedly"))
+        });
     }
 
-    let shiyu_task = shiyu.run(natsuki.clone());
+    services.spawn(async move {
+        shiyu.run(natsuki).await?;
+        Err(anyhow!("reminder service stopped unexpectedly"))
+    });
 
-    let (shiyu_result, client_results) = join(shiyu_task, join_all(client_tasks)).await;
-    for client_join in client_results {
-        let client_result = client_join?;
-        client_result?;
-    }
-    shiyu_result?;
+    let result = tokio::select! {
+        service = services.join_next() => match service {
+            Some(Ok(result)) => result,
+            Some(Err(join_error)) => Err(join_error.into()),
+            None => Err(anyhow!("no services were started")),
+        },
+        signal_result = shutdown_signal() => {
+            signal_result?;
+            info!("shutdown signal received");
+            Ok(())
+        },
+    };
 
-    Ok(())
+    services.shutdown().await;
+    result
 }
 
-async fn initialize_natsuki(config: &Config, rate_limits: &RateLimits) -> Result<(Natsuki, Shiyu)> {
+async fn shutdown_signal() -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{SignalKind, signal};
+
+        let mut terminate = signal(SignalKind::terminate())?;
+        tokio::select! {
+            result = signal::ctrl_c() => result,
+            _ = terminate.recv() => Ok(()),
+        }
+    }
+
+    #[cfg(not(unix))]
+    signal::ctrl_c().await
+}
+
+async fn initialize_natsuki(config: &ConfigBot, rate_limits: &RateLimits) -> Result<(Natsuki, Shiyu)> {
     // Reminder
     let shiyu = Shiyu::new(&config.reminder).await?;
     let shiyu_provider = ShiyuProvider::new(&config.reminder, shiyu.clone()).await?;

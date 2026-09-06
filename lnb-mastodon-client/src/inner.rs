@@ -33,11 +33,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use tempfile::NamedTempFile;
 use thiserror::Error as ThisError;
-use tokio::{fs::File, io::AsyncWriteExt, spawn, time::sleep};
+use tokio::{fs::File, io::AsyncWriteExt, spawn, sync::Semaphore, time::sleep};
 use tokio_tungstenite::tungstenite::{Bytes, Message as WsMessage};
 use tracing::{debug, error, info, warn};
 
 const RECONNECT_SLEEP: Duration = Duration::from_secs(120);
+const MAX_CONCURRENT_EVENTS: usize = 32;
 
 #[derive(Debug)]
 pub struct MastodonLnbClientInner<S> {
@@ -50,6 +51,7 @@ pub struct MastodonLnbClientInner<S> {
     remote_fetch_delay: Duration,
     websocket_endpoint: String,
     math_renderer: MathRendererClient,
+    event_permits: Arc<Semaphore>,
 }
 
 impl<S: LnbServer> MastodonLnbClientInner<S> {
@@ -93,6 +95,7 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
             remote_fetch_delay: Duration::from_secs(config.remote_fetch_delay_seconds as u64),
             websocket_endpoint,
             math_renderer,
+            event_permits: Arc::new(Semaphore::new(MAX_CONCURRENT_EVENTS)),
         })
     }
 
@@ -129,7 +132,17 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
 
         notification_stream
             .try_for_each(async |(e, _)| {
-                spawn(self.clone().process_event(e));
+                let permit = self
+                    .event_permits
+                    .clone()
+                    .acquire_owned()
+                    .await
+                    .expect("event semaphore should remain open");
+                let cloned_self = self.clone();
+                spawn(async move {
+                    let _permit = permit;
+                    cloned_self.process_event(e).await;
+                });
                 Ok(())
             })
             .map_err(ClientError::by_communication)
@@ -152,7 +165,17 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
                             continue;
                         };
                         let n = serde_json::from_str(payload_str).map_err(ClientError::by_communication)?;
-                        spawn(self.clone().process_event(Event::Notification(n)));
+                        let permit = self
+                            .event_permits
+                            .clone()
+                            .acquire_owned()
+                            .await
+                            .map_err(ClientError::by_external)?;
+                        let cloned_self = self.clone();
+                        spawn(async move {
+                            let _permit = permit;
+                            cloned_self.process_event(Event::Notification(n)).await;
+                        });
                     }
                 }
                 WsMessage::Ping(_) => {
