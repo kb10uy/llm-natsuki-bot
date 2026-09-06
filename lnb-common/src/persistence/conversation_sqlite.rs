@@ -88,23 +88,40 @@ impl SqliteConversationDb {
         Ok(rows.into_iter().map(|(id,)| id).collect())
     }
 
-    pub async fn upsert(&self, conversation: &Conversation, context_key: Option<&str>) -> Result<(), PersistenceError> {
+    pub async fn insert(&self, conversation: &Conversation, context_key: Option<&str>) -> Result<(), PersistenceError> {
         let id = conversation.id().0;
         let blob = serde_json::to_vec(conversation).map_err(PersistenceError::by_serialization)?;
 
-        sqlx::query(
-            r#"
-            INSERT INTO conversations (id, context_key, content) VALUES (?, ?, ?)
-            ON CONFLICT DO UPDATE SET content = excluded.content, context_key = excluded.context_key;
-        "#,
-        )
-        .bind(id)
-        .bind(context_key)
-        .bind(blob)
-        .execute(&self.pool)
-        .map_err(PersistenceError::by_backend)
-        .await?;
+        sqlx::query(r#"INSERT INTO conversations (id, context_key, content) VALUES (?, ?, ?);"#)
+            .bind(id)
+            .bind(context_key)
+            .bind(blob)
+            .execute(&self.pool)
+            .map_err(PersistenceError::by_backend)
+            .await?;
         Ok(())
+    }
+
+    pub async fn update_if_current(
+        &self,
+        expected: &Conversation,
+        updated: &Conversation,
+        context_key: &str,
+    ) -> Result<bool, PersistenceError> {
+        debug_assert_eq!(expected.id(), updated.id());
+        let expected_blob = serde_json::to_vec(expected).map_err(PersistenceError::by_serialization)?;
+        let updated_blob = serde_json::to_vec(updated).map_err(PersistenceError::by_serialization)?;
+
+        let result =
+            sqlx::query(r#"UPDATE conversations SET context_key = ?, content = ? WHERE id = ? AND content = ?;"#)
+                .bind(context_key)
+                .bind(updated_blob)
+                .bind(updated.id().0)
+                .bind(expected_blob)
+                .execute(&self.pool)
+                .map_err(PersistenceError::by_backend)
+                .await?;
+        Ok(result.rows_affected() == 1)
     }
 }
 
@@ -114,4 +131,56 @@ struct SqliteRowConversation {
     id: Uuid,
     context_key: Option<String>,
     content: Vec<u8>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use lnb_core::model::{
+        conversation::IncompleteConversation,
+        message::{AssistantMessage, Message, UserMessageContent},
+    };
+
+    async fn database() -> SqliteConversationDb {
+        let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+        sqlx::query(
+            r#"
+            CREATE TABLE conversations(
+                id TEXT NOT NULL PRIMARY KEY,
+                context_key TEXT NULL UNIQUE,
+                content BLOB NOT NULL
+            );
+            "#,
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        SqliteConversationDb { pool }
+    }
+
+    fn updated_from(original: &Conversation, text: &str) -> Conversation {
+        let mut incomplete = IncompleteConversation::start(original.clone());
+        incomplete.extend_messages([Message::new_user(
+            [UserMessageContent::Text(text.to_string())],
+            None,
+            None,
+            false,
+        )]);
+        incomplete
+            .finish(AssistantMessage::default())
+            .complete_conversation_with(original.clone())
+    }
+
+    #[tokio::test]
+    async fn stale_conversation_update_is_rejected() {
+        let db = database().await;
+        let original = Conversation::new_now(Some(Message::new_system("system")));
+        db.insert(&original, None).await.unwrap();
+
+        let first = updated_from(&original, "first");
+        let second = updated_from(&original, "second");
+        assert!(db.update_if_current(&original, &first, "first").await.unwrap());
+        assert!(!db.update_if_current(&original, &second, "second").await.unwrap());
+    }
 }

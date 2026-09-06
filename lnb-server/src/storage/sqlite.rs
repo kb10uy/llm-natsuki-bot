@@ -45,12 +45,21 @@ impl ConversationStorage for SqliteConversationStorage {
         async move { self.0.fetch_id_by_context_key(context_key).await }.boxed()
     }
 
-    fn upsert<'a>(
+    fn insert<'a>(
         &'a self,
         conversation: &'a Conversation,
         context_key: Option<&'a str>,
     ) -> BoxFuture<'a, Result<(), StorageError>> {
-        async move { self.0.upsert(conversation, context_key).await }.boxed()
+        async move { self.0.insert(conversation, context_key).await }.boxed()
+    }
+
+    fn update_if_current<'a>(
+        &'a self,
+        expected: &'a Conversation,
+        updated: &'a Conversation,
+        context_key: &'a str,
+    ) -> BoxFuture<'a, Result<bool, StorageError>> {
+        async move { self.0.update_if_current(expected, updated, context_key).await }.boxed()
     }
 }
 
@@ -85,13 +94,25 @@ impl SqliteConversationStorageInner {
             .await
     }
 
-    async fn upsert<'a>(
+    async fn insert<'a>(
         &'a self,
         conversation: &'a Conversation,
         context_key: Option<&'a str>,
     ) -> Result<(), StorageError> {
         self.db
-            .upsert(conversation, context_key)
+            .insert(conversation, context_key)
+            .map_err(StorageError::by_backend)
+            .await
+    }
+
+    async fn update_if_current<'a>(
+        &'a self,
+        expected: &'a Conversation,
+        updated: &'a Conversation,
+        context_key: &'a str,
+    ) -> Result<bool, StorageError> {
+        self.db
+            .update_if_current(expected, updated, context_key)
             .map_err(StorageError::by_backend)
             .await
     }

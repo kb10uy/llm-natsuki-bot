@@ -27,12 +27,21 @@ pub trait ConversationStorage: Send + Sync {
         context_key: &'a str,
     ) -> BoxFuture<'a, Result<Option<ConversationId>, StorageError>>;
 
-    /// `Conversation` を登録・更新する。
-    fn upsert<'a>(
+    /// 新しい `Conversation` を登録する。
+    fn insert<'a>(
         &'a self,
         conversation: &'a Conversation,
         context_key: Option<&'a str>,
     ) -> BoxFuture<'a, Result<(), StorageError>>;
+
+    /// `expected` が現在値と一致する場合に限り `updated` へ更新する。
+    /// 更新できた場合は `true`、競合した場合は `false` を返す。
+    fn update_if_current<'a>(
+        &'a self,
+        expected: &'a Conversation,
+        updated: &'a Conversation,
+        context_key: &'a str,
+    ) -> BoxFuture<'a, Result<bool, StorageError>>;
 }
 
 impl<T: ConversationStorage + 'static> From<T> for BoxConversationStorage {
