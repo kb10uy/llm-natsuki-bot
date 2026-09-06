@@ -17,6 +17,7 @@ use time::{
     macros::format_description,
 };
 use tracing::{info, warn};
+use uuid::Uuid;
 
 const DATE_FORMAT: &[BorrowedFormatItem<'static>] = format_description!("[year]-[month]-[day]");
 
@@ -149,6 +150,11 @@ impl ShiyuProvider {
     }
 
     async fn cancel(&self, cancel_id: String) -> Result<FunctionResponse, FunctionError> {
+        let id = match Uuid::parse_str(&cancel_id) {
+            Ok(id) => id,
+            Err(_) => return self.error(ReminderResponse::InvalidRequest).await,
+        };
+        self.reminder.remove(id).map_err(FunctionError::by_external).await?;
         info!("reminder cancelled: {cancel_id}");
         Ok(FunctionResponse {
             result: serde_json::to_value(ReminderResponse::Cancelled { id: cancel_id })

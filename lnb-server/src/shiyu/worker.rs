@@ -6,13 +6,22 @@ use lnb_core::error::ReminderError;
 use serde::{Serialize, de::DeserializeOwned};
 use time::UtcDateTime;
 use tokio::{
-    sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel},
+    sync::mpsc::{Receiver, Sender, channel},
     time::sleep,
 };
 use tracing::{debug, error, info};
 use uuid::Uuid;
 
 const DISCONNECTION_RETRY_INTERVAL: Duration = Duration::from_secs(5);
+const CLAIM_LEASE: time::Duration = time::Duration::minutes(30);
+const CLAIM_BATCH_SIZE: usize = 64;
+const CHANNEL_CAPACITY: usize = 64;
+
+#[derive(Debug)]
+pub(super) struct ClaimedJob<T> {
+    pub id: Uuid,
+    pub payload: T,
+}
 
 #[derive(Debug, Clone)]
 pub struct Worker {
@@ -46,11 +55,22 @@ impl Worker {
         self.db.remove_job(id).map_err(ReminderError::by_internal).await
     }
 
-    pub fn run<T>(&self) -> (BoxFuture<'static, Result<(), ReminderError>>, UnboundedReceiver<T>)
+    pub async fn acknowledge(&self, id: Uuid) -> Result<(), ReminderError> {
+        self.db.acknowledge_job(id).map_err(ReminderError::by_internal).await
+    }
+
+    pub async fn retry(&self, id: Uuid, execute_at: UtcDateTime) -> Result<(), ReminderError> {
+        self.db
+            .retry_job(id, execute_at)
+            .map_err(ReminderError::by_internal)
+            .await
+    }
+
+    pub fn run<T>(&self) -> (BoxFuture<'static, Result<(), ReminderError>>, Receiver<ClaimedJob<T>>)
     where
         T: 'static + Send + Sync + DeserializeOwned,
     {
-        let (sender, receiver) = unbounded_channel();
+        let (sender, receiver) = channel(CHANNEL_CAPACITY);
         let cloned_self = self.clone();
         let running_future = async move {
             loop {
@@ -64,20 +84,24 @@ impl Worker {
         (running_future, receiver)
     }
 
-    async fn run_connection<T>(&self, send: UnboundedSender<T>) -> Result<Infallible, ReminderError>
+    async fn run_connection<T>(&self, send: Sender<ClaimedJob<T>>) -> Result<Infallible, ReminderError>
     where
         T: Send + Sync + DeserializeOwned,
     {
         info!("connection established");
         loop {
+            let now = UtcDateTime::now();
             let target_jobs = self
                 .db
-                .pull_jobs_until::<T>(UtcDateTime::now())
+                .claim_jobs_until::<T>(now, now + CLAIM_LEASE, CLAIM_BATCH_SIZE)
                 .map_err(ReminderError::by_internal)
                 .await?;
             for (id, job) in target_jobs {
                 debug!("sending {id}");
-                send.send(job).map_err(|_| ReminderError::CannotPushAnymore)?;
+                if send.send(ClaimedJob { id, payload: job }).await.is_err() {
+                    self.retry(id, UtcDateTime::now()).await?;
+                    return Err(ReminderError::CannotPushAnymore);
+                }
             }
 
             sleep(self.polling_interval).await;

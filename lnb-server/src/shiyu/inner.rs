@@ -1,4 +1,4 @@
-use crate::shiyu::worker::Worker;
+use crate::shiyu::worker::{ClaimedJob, Worker};
 
 use std::{collections::HashMap, sync::Arc};
 
@@ -17,10 +17,13 @@ use serde::{Deserialize, Serialize};
 use time::UtcDateTime;
 use tokio::{
     spawn,
-    sync::{RwLock, mpsc::UnboundedReceiver},
+    sync::{RwLock, Semaphore, mpsc::Receiver},
 };
 use tracing::{info, warn};
 use uuid::Uuid;
+
+const DELIVERY_RETRY_DELAY: time::Duration = time::Duration::seconds(30);
+const MAX_CONCURRENT_DELIVERIES: usize = 16;
 
 pub struct ShiyuInner {
     worker: Worker,
@@ -29,7 +32,8 @@ pub struct ShiyuInner {
 }
 
 struct ShiyuDispatcher {
-    receiver: UnboundedReceiver<ShiyuJob>,
+    receiver: Receiver<ClaimedJob<ShiyuJob>>,
+    worker: Worker,
     server: Arc<dyn LnbServer>,
     remindables: Arc<RwLock<HashMap<String, Arc<dyn Remindable>>>>,
     notification_virtual_text: String,
@@ -68,6 +72,7 @@ impl ShiyuInner {
             server: Arc::new(server),
             remindables: self.remindables.clone(),
             receiver,
+            worker: self.worker.clone(),
             notification_virtual_text: self.notification_virtual_text.clone(),
         };
         let dispatcher_task = dispatcher.run();
@@ -99,27 +104,49 @@ impl ShiyuInner {
 impl ShiyuDispatcher {
     async fn run(mut self) -> Result<(), ReminderError> {
         let virtual_text: Arc<str> = self.notification_virtual_text.into();
+        let delivery_permits = Arc::new(Semaphore::new(MAX_CONCURRENT_DELIVERIES));
 
-        while let Some(job) = self.receiver.recv().await {
+        while let Some(claimed) = self.receiver.recv().await {
+            let permit = delivery_permits
+                .clone()
+                .acquire_owned()
+                .await
+                .expect("delivery semaphore should remain open");
+            let id = claimed.id;
+            let job = claimed.payload;
             info!(
-                "sending reminder: ({} / {}) {}",
-                job.context, job.remind.requester, job.remind.content
+                "sending reminder {id}: ({} / {}) {}",
+                job.context, job.remind.requester, job.remind.content,
             );
             let remindable = {
                 let locked = self.remindables.read().await;
                 let Some(remindable) = locked.get(&job.context) else {
                     warn!("unknown context: {}", job.context);
+                    self.worker.retry(id, UtcDateTime::now() + DELIVERY_RETRY_DELAY).await?;
                     continue;
                 };
                 remindable.clone()
             };
 
-            spawn(ShiyuDispatcher::send_remind(
-                self.server.clone(),
-                remindable,
-                job.remind,
-                virtual_text.clone(),
-            ));
+            let server = self.server.clone();
+            let worker = self.worker.clone();
+            let virtual_text = virtual_text.clone();
+            spawn(async move {
+                let _permit = permit;
+                match ShiyuDispatcher::send_remind(server, remindable, job.remind, virtual_text).await {
+                    Ok(()) => {
+                        if let Err(err) = worker.acknowledge(id).await {
+                            warn!("failed to acknowledge reminder {id}: {err}");
+                        }
+                    }
+                    Err(err) => {
+                        warn!("reminder {id} delivery failed: {err}");
+                        if let Err(retry_err) = worker.retry(id, UtcDateTime::now() + DELIVERY_RETRY_DELAY).await {
+                            warn!("failed to schedule reminder {id} retry: {retry_err}");
+                        }
+                    }
+                }
+            });
         }
         Ok(())
     }
