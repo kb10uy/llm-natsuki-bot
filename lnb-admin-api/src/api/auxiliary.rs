@@ -1,7 +1,5 @@
-use axum::{Extension, response::IntoResponse};
+use axum::http::StatusCode;
 
-use crate::jwt_auth::JwtClaims;
-
-pub async fn health(Extension(claims): Extension<JwtClaims>) -> impl IntoResponse {
-    format!("Authenticated. Hello, {} ! (sub: {})", claims.email, claims.sub)
+pub async fn health() -> StatusCode {
+    StatusCode::OK
 }

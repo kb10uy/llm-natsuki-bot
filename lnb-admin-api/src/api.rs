@@ -12,7 +12,6 @@ use tracing::info;
 
 pub fn routes(config_admin_api: &ConfigAdminApi) -> Router<Application> {
     let mut api_routes = Router::new()
-        .route("/health", get(auxiliary::health))
         .route("/conversations/count", get(conversations::count))
         .route("/conversations/show", get(conversations::show))
         .route("/conversations/latest_ids", get(conversations::latest_ids))
@@ -35,5 +34,6 @@ pub fn routes(config_admin_api: &ConfigAdminApi) -> Router<Application> {
         info!("CORS setting applied");
     }
 
-    Router::new().nest("/api", api_routes)
+    let public_routes = Router::new().route("/health", get(auxiliary::health));
+    Router::new().nest("/api", public_routes.merge(api_routes))
 }
