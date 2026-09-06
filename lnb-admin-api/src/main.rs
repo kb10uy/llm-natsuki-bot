@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::Parser;
 use lnb_common::{
-    config::load_config,
+    config::load_admin_api_config,
     persistence::{RedisReminderDb, SqliteConversationDb},
 };
 use tokio::net::TcpListener;
@@ -23,7 +23,7 @@ struct Arguments {
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let args = Arguments::parse();
-    let config = load_config(&args.config)?;
+    let config = load_admin_api_config(&args.config)?;
 
     let application = application::Application {
         conversation: SqliteConversationDb::connect(&config.storage.sqlite).await?,
