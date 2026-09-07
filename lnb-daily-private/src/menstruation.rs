@@ -1,4 +1,9 @@
-use crate::{DailyPrivateError, datetime::LogicalDateTime, schedule::HolidayEvent};
+use crate::{
+    DailyPrivateError,
+    datetime::{LogicalDay, LongTermCycle},
+    rng::{RngDomain, RngSource, SaltedRng},
+    schedule::HolidayEvent,
+};
 
 use std::ops::Range;
 
@@ -49,6 +54,23 @@ pub enum MenstruationAbsorbent {
     Tampon { due_to_event: String },
 }
 
+/// 長周期ぶんの生理周期の区切り。
+#[derive(Debug, Clone)]
+pub struct MenstruationCycles(Vec<Range<usize>>);
+
+/// その論理日について確定した生理の状態。時刻に依存する値を含まない。
+#[derive(Debug, Clone)]
+pub struct MenstruationPlan {
+    /// 周期内での経過日数。
+    pub cycle_days: usize,
+
+    /// 属する周期の長さ。
+    pub cycle_length: usize,
+
+    pub bleeding_days: Option<usize>,
+    pub absorbent: Option<MenstruationAbsorbent>,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MenstruationStatus {
     #[serde(skip_serializing)]
@@ -58,12 +80,29 @@ pub struct MenstruationStatus {
     pub absorbent: Option<MenstruationAbsorbent>,
 }
 
+impl MenstruationCycles {
+    pub fn ranges(&self) -> &[Range<usize>] {
+        &self.0
+    }
+
+    fn find(&self, long_term_days: usize) -> &Range<usize> {
+        self.0
+            .iter()
+            .find(|r| r.contains(&long_term_days))
+            .expect("invalid cycles")
+    }
+}
+
 impl MenstruationConfiguration {
-    pub fn calculate_cycles<R: Rng + ?Sized>(
+    /// 長周期ぶんの周期区切りを決定する。
+    pub fn plan_cycles(
         &self,
-        long_term_rng: &mut R,
-        long_term_duration: u64,
-    ) -> Result<Vec<Range<usize>>, DailyPrivateError> {
+        source: &RngSource<LongTermCycle>,
+        long_term: &LongTermCycle,
+    ) -> Result<MenstruationCycles, DailyPrivateError> {
+        let rng = &mut source.derive(RngDomain::Menstruation);
+        let long_term_duration = long_term.span_days as u64;
+
         // 長期収束のために割り切れれて正の商になる必要がある
         if !long_term_duration.is_multiple_of(self.cycle_mu_sigma.0) || long_term_duration < self.cycle_mu_sigma.0 {
             return Err(DailyPrivateError::LongTermMismatch);
@@ -76,7 +115,7 @@ impl MenstruationConfiguration {
         let mut jitters = vec![0i64; long_term_cycles];
         let mut jitter_sum = 0i64;
         for jitter in &mut jitters {
-            let jitter_candidate = jitter_distr.sample(long_term_rng).round() as i64;
+            let jitter_candidate = jitter_distr.sample(rng).round() as i64;
             let clamped_jitter = jitter_candidate.clamp(-jitter_limit - jitter_sum, jitter_limit - jitter_sum);
             *jitter = clamped_jitter;
             jitter_sum += clamped_jitter;
@@ -93,46 +132,54 @@ impl MenstruationConfiguration {
                 Some(range)
             })
             .collect();
-        Ok(cycles)
+        Ok(MenstruationCycles(cycles))
     }
 
-    pub fn construct_status<R: Rng + ?Sized>(
+    /// その論理日の生理の状態を決定する。
+    pub fn plan(
         &self,
-        rng: &mut R,
-        cycles: &[Range<usize>],
-        logical_datetime: &LogicalDateTime,
+        source: &RngSource<LogicalDay>,
+        cycles: &MenstruationCycles,
+        day: &LogicalDay,
         event: Option<&HolidayEvent>,
-    ) -> MenstruationStatus {
-        let cycle_range = cycles
-            .iter()
-            .find(|r| r.contains(&logical_datetime.long_term_days))
-            .expect("invalid cycles");
+    ) -> MenstruationPlan {
+        let rng = &mut source.derive(RngDomain::Menstruation);
+        let cycle_range = cycles.find(day.long_term_days);
         let cycle_length = cycle_range.end - cycle_range.start;
-        let cycle_days = logical_datetime.long_term_days - cycle_range.start;
-
-        let phase = if cycle_days < self.ovulation_day {
-            let phase_progress = (cycle_days as f64 + logical_datetime.day_progress) / self.ovulation_day as f64;
-            MensePhase::Follicular(phase_progress)
-        } else {
-            let phase_length = (cycle_length - self.ovulation_day).max(1) as f64;
-            let phase_progress =
-                (cycle_days as f64 + logical_datetime.day_progress - self.ovulation_day as f64) / phase_length;
-            MensePhase::Luteal(phase_progress)
-        };
+        let cycle_days = day.long_term_days - cycle_range.start;
         let bleeding_days = (cycle_days < self.bleeding_days).then_some(cycle_days + 1);
 
         let absorbent = self.choose_absorbent(rng, event);
 
-        MenstruationStatus {
-            phase,
+        MenstruationPlan {
+            cycle_days,
+            cycle_length,
             bleeding_days,
             absorbent: bleeding_days.and(absorbent),
         }
     }
 
-    fn choose_absorbent<R: Rng + ?Sized>(
+    /// 確定済みの状態に時刻を当てはめて周期の進行度を求める。
+    pub fn observe(&self, plan: &MenstruationPlan, day_progress: f64) -> MenstruationStatus {
+        let phase = if plan.cycle_days < self.ovulation_day {
+            let phase_progress = (plan.cycle_days as f64 + day_progress) / self.ovulation_day as f64;
+            MensePhase::Follicular(phase_progress)
+        } else {
+            let phase_length = (plan.cycle_length - self.ovulation_day).max(1) as f64;
+            let phase_progress = (plan.cycle_days as f64 + day_progress - self.ovulation_day as f64) / phase_length;
+            MensePhase::Luteal(phase_progress)
+        };
+
+        MenstruationStatus {
+            phase,
+            bleeding_days: plan.bleeding_days,
+            absorbent: plan.absorbent.clone(),
+        }
+    }
+
+    fn choose_absorbent(
         &self,
-        rng: &mut R,
+        rng: &mut SaltedRng<LogicalDay>,
         event: Option<&HolidayEvent>,
     ) -> Option<MenstruationAbsorbent> {
         let pad_variation = self.pad_variations.choose(rng);

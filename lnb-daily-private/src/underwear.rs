@@ -1,4 +1,9 @@
-use crate::{day_routine::DayStep, menstruation::MenstruationAbsorbent};
+use crate::{
+    datetime::LogicalDay,
+    day_routine::DayStep,
+    menstruation::MenstruationAbsorbent,
+    rng::{RngDomain, RngSource, SaltedRng},
+};
 
 use std::collections::HashSet;
 
@@ -29,6 +34,34 @@ pub enum UnwornReasonUsage {
     Naked,
     Bathtime,
     Masturbating,
+}
+
+/// その論理日について確定した下着の選択。
+#[derive(Debug, Clone)]
+pub struct UnderwearPlan {
+    /// 選ばれた下着。設定に下着がひとつもない場合は `None`。
+    choice: Option<UnderwearChoice>,
+}
+
+/// 着る下着と、脱ぐ場合の理由。
+#[derive(Debug, Clone)]
+struct UnderwearChoice {
+    bra_design: UnderwearDesign,
+    panty_design: UnderwearDesign,
+    unified: bool,
+    no_bra: bool,
+    no_panty: bool,
+    reasons: UnwornReasons,
+}
+
+/// 用途ごとに確定した「着てない理由」。
+#[derive(Debug, Clone)]
+pub struct UnwornReasons {
+    pub masturbating: String,
+    pub bathtime: String,
+    pub no_bra: String,
+    pub no_panty: String,
+    pub naked: String,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -68,76 +101,106 @@ pub struct UnderwearDesign {
 }
 
 impl UnderwearConfiguration {
-    pub fn generate_status<R: Rng + ?Sized>(
-        &self,
-        rng: &mut R,
-        day_step: DayStep,
-        absorbent: &Option<MenstruationAbsorbent>,
-        masturbation_progress: Option<f64>,
-    ) -> UnderwearStatus {
+    /// その論理日の下着と、脱ぐ場合の理由をすべて決定する。
+    pub fn plan(&self, source: &RngSource<LogicalDay>) -> UnderwearPlan {
+        let rng = &mut source.derive(RngDomain::Underwear);
         let (bra_design, panty_design) = match (self.generate_part(rng), self.generate_part(rng)) {
             (Some(c1), Some(c2)) => (c1, c2),
-            _ => {
-                return UnderwearStatus::NoBraNoPanty {
-                    reason: "下着を持ってない".to_string(),
-                };
-            }
+            _ => return UnderwearPlan { choice: None },
         };
 
         let unified = rng.random::<f64>() < self.unified_ratio;
         let no_bra = rng.random::<f64>() < self.no_bra_ratio;
         let no_panty = rng.random::<f64>() < self.no_panty_ratio;
 
-        let masturbating_reason = self.choose_unworn_reason(rng, UnwornReasonUsage::Masturbating);
-        let bathtime_reason = self.choose_unworn_reason(rng, UnwornReasonUsage::Bathtime);
-        let no_bra_reason = self.choose_unworn_reason(rng, UnwornReasonUsage::NoBra);
-        let no_panty_reason = self.choose_unworn_reason(rng, UnwornReasonUsage::NoPanty);
-        let naked_reason = self.choose_unworn_reason(rng, UnwornReasonUsage::Naked);
+        let reasons = UnwornReasons {
+            masturbating: self
+                .choose_unworn_reason(rng, UnwornReasonUsage::Masturbating)
+                .to_string(),
+            bathtime: self.choose_unworn_reason(rng, UnwornReasonUsage::Bathtime).to_string(),
+            no_bra: self.choose_unworn_reason(rng, UnwornReasonUsage::NoBra).to_string(),
+            no_panty: self.choose_unworn_reason(rng, UnwornReasonUsage::NoPanty).to_string(),
+            naked: self.choose_unworn_reason(rng, UnwornReasonUsage::Naked).to_string(),
+        };
+
+        UnderwearPlan {
+            choice: Some(UnderwearChoice {
+                bra_design,
+                panty_design,
+                unified,
+                no_bra,
+                no_panty,
+                reasons,
+            }),
+        }
+    }
+
+    /// 確定済みの選択に時刻由来の状況を当てはめて着用状態を求める。
+    pub fn observe(
+        &self,
+        plan: &UnderwearPlan,
+        day_step: DayStep,
+        absorbent: Option<&MenstruationAbsorbent>,
+        masturbation_progress: Option<f64>,
+    ) -> UnderwearStatus {
+        let Some(UnderwearChoice {
+            bra_design,
+            panty_design,
+            unified,
+            no_bra,
+            no_panty,
+            reasons,
+        }) = &plan.choice
+        else {
+            return UnderwearStatus::NoBraNoPanty {
+                reason: "下着を持ってない".to_string(),
+            };
+        };
 
         if matches!(masturbation_progress, Some(p) if p >= 0.5) {
             // オナニーの進行度が半分以上なら常に全脱ぎ
             return UnderwearStatus::NoBraNoPanty {
-                reason: masturbating_reason.to_string(),
+                reason: reasons.masturbating.clone(),
             };
         } else if day_step == DayStep::Bathtime {
             // 風呂なのでもちろん脱ぐ
             return UnderwearStatus::NoBraNoPanty {
-                reason: bathtime_reason.to_string(),
+                reason: reasons.bathtime.clone(),
             };
         }
 
         let is_sanitary = matches!(absorbent, Some(MenstruationAbsorbent::Pad { .. }));
-        match (unified, no_bra, no_panty) {
+        match (*unified, *no_bra, *no_panty) {
             // 両方セット
             (true, false, false) => UnderwearStatus::IntegratedDesignBraAndPanty {
-                design: bra_design,
+                design: bra_design.clone(),
                 is_sanitary,
             },
             // 両方別々
             (false, false, false) => UnderwearStatus::SeparateBraAndPanty {
-                bra_design,
-                panty_design,
+                bra_design: bra_design.clone(),
+                panty_design: panty_design.clone(),
                 is_sanitary,
             },
             // ノーブラ
             (_, false, true) => UnderwearStatus::BraOnly {
-                bra_design,
-                no_panty_reason: no_panty_reason.to_string(),
+                bra_design: bra_design.clone(),
+                no_panty_reason: reasons.no_panty.clone(),
             },
             // ノーパン
             (_, true, false) => UnderwearStatus::PantyOnly {
-                no_bra_reason: no_bra_reason.to_string(),
-                panty_design,
+                no_bra_reason: reasons.no_bra.clone(),
+                panty_design: panty_design.clone(),
                 is_sanitary,
             },
             // ノーブラノーパン
             (_, true, true) => UnderwearStatus::NoBraNoPanty {
-                reason: naked_reason.to_string(),
+                reason: reasons.naked.clone(),
             },
         }
     }
 
-    fn choose_unworn_reason<R: Rng + ?Sized>(&self, rng: &mut R, usage: UnwornReasonUsage) -> &str {
+    fn choose_unworn_reason(&self, rng: &mut SaltedRng<LogicalDay>, usage: UnwornReasonUsage) -> &str {
         let chosen_reason = self
             .unworn_reasons
             .iter()
@@ -146,7 +209,7 @@ impl UnderwearConfiguration {
         chosen_reason.map(|r| r.text.as_str()).unwrap_or_default()
     }
 
-    fn generate_part<R: Rng + ?Sized>(&self, rng: &mut R) -> Option<UnderwearDesign> {
+    fn generate_part(&self, rng: &mut SaltedRng<LogicalDay>) -> Option<UnderwearDesign> {
         let color = self.separate_colors.choose(rng)?;
         let design = self.separate_designs.choose(rng)?;
         Some(UnderwearDesign {

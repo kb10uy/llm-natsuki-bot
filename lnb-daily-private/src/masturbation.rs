@@ -1,11 +1,14 @@
+use crate::{
+    datetime::LogicalDay,
+    rng::{RngDomain, RngSource},
+};
+
 use std::ops::{Not, Range};
 
 use rand::prelude::*;
 use rand_distr::{Normal, Poisson, StandardUniform};
 use serde::{Deserialize, Serialize};
 use time::Weekday;
-
-use crate::datetime::LogicalDateTime;
 
 // 理論上無限回出るので上限を決める
 const TECHNO_BREAK_LIMIT: f64 = 12.0;
@@ -19,6 +22,12 @@ pub struct MasturbationConfiguration {
     pub holiday_boost_scale: f64,
 }
 
+/// その論理日について確定したオナニーの予定。
+#[derive(Debug, Clone)]
+pub struct MasturbationPlan {
+    ranges: Vec<Range<f64>>,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MasturbationStatus {
     pub completed_count: usize,
@@ -28,18 +37,26 @@ pub struct MasturbationStatus {
     pub playing_now: bool,
 }
 
+impl MasturbationPlan {
+    pub fn ranges(&self) -> &[Range<f64>] {
+        &self.ranges
+    }
+}
+
 impl MasturbationConfiguration {
-    pub fn calculate_daily_playing_ranges<R: Rng + ?Sized>(
+    /// その論理日ぶんの予定をすべて決定する。
+    pub fn plan(
         &self,
-        rng: &mut R,
+        source: &RngSource<LogicalDay>,
+        day: &LogicalDay,
         bleeding_days: Option<usize>,
-        logical_datetime: &LogicalDateTime,
-    ) -> Vec<Range<f64>> {
+    ) -> MasturbationPlan {
+        let rng = &mut source.derive(RngDomain::Masturbation);
         let total_lambda = {
             let bleeding_debuff = bleeding_days
                 .map(|days| 1.0 - (1.0 / days.max(1) as f64))
                 .unwrap_or(1.0);
-            let holiday_boost = match logical_datetime.logical_date.weekday() {
+            let holiday_boost = match day.date.weekday() {
                 Weekday::Saturday | Weekday::Sunday => self.holiday_boost_scale,
                 _ => 1.0,
             };
@@ -60,16 +77,14 @@ impl MasturbationConfiguration {
             })
             .collect();
         ranges.sort_by(|lhs, rhs| lhs.start.partial_cmp(&rhs.start).expect("total order"));
-        ranges
+        MasturbationPlan { ranges }
     }
 
-    pub fn construct_status_progress(
-        &self,
-        ranges: &[Range<f64>],
-        day_progress: f64,
-    ) -> (MasturbationStatus, Option<f64>) {
-        let completed_count = ranges.iter().filter(|mr| day_progress >= mr.end).count();
-        let current_play = ranges
+    /// 確定済みの予定に時刻を当てはめて現在の状況を求める。
+    pub fn observe(&self, plan: &MasturbationPlan, day_progress: f64) -> (MasturbationStatus, Option<f64>) {
+        let completed_count = plan.ranges.iter().filter(|mr| day_progress >= mr.end).count();
+        let current_play = plan
+            .ranges
             .iter()
             .filter_map(|mr| {
                 mr.contains(&day_progress)

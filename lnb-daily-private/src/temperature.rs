@@ -1,4 +1,8 @@
-use crate::menstruation::MensePhase;
+use crate::{
+    datetime::LogicalDay,
+    menstruation::MensePhase,
+    rng::{RngDomain, RngSource},
+};
 
 use std::f64::consts::TAU;
 
@@ -15,18 +19,30 @@ pub struct TemperatureConfiguration {
     ovulation_t: f64,
 }
 
+/// その論理日について確定した基礎体温のジッター。
+#[derive(Debug, Clone)]
+pub struct TemperaturePlan {
+    jitter: f64,
+}
+
 impl TemperatureConfiguration {
-    pub fn calculate<R: Rng + ?Sized>(&self, rng: &mut R, phase: MensePhase) -> f64 {
-        // baseline は時刻で変動するけど jitter は日替わり
+    /// 日替わりのジッターを決定する。
+    pub fn plan(&self, source: &RngSource<LogicalDay>) -> TemperaturePlan {
+        let rng = &mut source.derive(RngDomain::Temperature);
         let jitter_distr = {
             let (mu, sigma) = self.jitter_mu_sigma;
             Normal::new(mu, sigma).expect("invalid distribution")
         };
+        TemperaturePlan {
+            jitter: jitter_distr.sample(rng),
+        }
+    }
 
+    /// baseline は時刻で変動するので観測フェーズで評価する。
+    pub fn observe(&self, plan: &TemperaturePlan, phase: MensePhase) -> f64 {
         let canonical_t = self.canonicalize_t(phase);
         let base_value = self.baseline + self.scale * self.calculate_fourier(canonical_t);
-        let jitter = jitter_distr.sample(rng);
-        base_value + jitter
+        base_value + plan.jitter
     }
 
     fn canonicalize_t(&self, phase: MensePhase) -> f64 {
