@@ -20,6 +20,7 @@ use sqlx::{SqlitePool, prelude::FromRow};
 #[derive(Debug)]
 pub struct GetIllustUrl {
     pool: SqlitePool,
+    descriptor: FunctionDescriptor,
 }
 
 impl ConfigurableFunction for GetIllustUrl {
@@ -34,25 +35,22 @@ impl ConfigurableFunction for GetIllustUrl {
         let pool = SqlitePool::connect(&config.database_filepath)
             .map_err(FunctionError::by_external)
             .await?;
-        Ok(GetIllustUrl { pool })
+        let descriptor = FunctionDescriptor {
+            name: "get_illust_url".to_string(),
+            description: config.prompt.description.clone(),
+            parameters: DescribedSchema::object(
+                "parameters",
+                "引数",
+                vec![DescribedSchema::integer("count", config.prompt.parameter("count")?)],
+            ),
+        };
+        Ok(GetIllustUrl { pool, descriptor })
     }
 }
 
 impl Function for GetIllustUrl {
     fn get_descriptor(&self) -> FunctionDescriptor {
-        FunctionDescriptor {
-            name: "get_illust_url".to_string(),
-            description: r#"
-                この bot 自身をキャラクターとして描写したイラストの URL を取得する。
-                自画像・自撮りを要求された場合もこれを利用する。
-            "#
-            .to_string(),
-            parameters: DescribedSchema::object(
-                "parameters",
-                "引数",
-                vec![DescribedSchema::integer("count", "要求したいイラストの URL の数")],
-            ),
-        }
+        self.descriptor.clone()
     }
 
     fn call<'a>(

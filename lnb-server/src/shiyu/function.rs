@@ -1,4 +1,4 @@
-use crate::config::ConfigReminder;
+use crate::config::{ConfigReminder, tools::ConfigToolsShiyuProvider};
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
 use lnb_core::{
     context::Context,
@@ -24,40 +24,12 @@ const DATE_FORMAT: &[BorrowedFormatItem<'static>] = format_description!("[year]-
 pub struct ShiyuProvider {
     reminder: Box<dyn Reminder>,
     max_seconds: i64,
+    descriptor: FunctionDescriptor,
 }
 
 impl Function for ShiyuProvider {
     fn get_descriptor(&self) -> FunctionDescriptor {
-        FunctionDescriptor {
-            name: "shiyu_provider".to_string(),
-            description: r#"
-                ユーザーにリマインダー機能を提供します。
-                - 先に local_info で現在時刻の情報を取得し、ユーザーが希望した時刻になるように remind_at に指定してください。その際、タイムゾーンは保持してください。
-                - 会話の中でリマインダーのキャンセルを要求された場合、そのリマインダーの設定時のレスポンスに含まれる id を cancel に指定してください。
-            "#
-            .to_string(),
-            parameters: DescribedSchema::object(
-                "parameters",
-                "引数",
-                vec![
-                    DescribedSchema::string(
-                        "remind_at",
-                        r#"
-                            リマインドする絶対時刻(RFC3339形式)。ユーザーが明示的に時刻を指定しなかった場合は日付のみを指定してください。
-                            相対時刻指定の場合は無視してください。
-                        "#,
-                    ).as_nullable(),
-                    DescribedSchema::string(
-                        "cancel",
-                        "ユーザーがキャンセルを要求したリマインドの id。新規設定時は無視してください。",
-                    ).as_nullable(),
-                    DescribedSchema::string(
-                        "content",
-                        "ユーザーがリマインドを希望した内容。キャンセルの要求時は空にしてください。",
-                    ),
-                ],
-            ),
-        }
+        self.descriptor.clone()
     }
 
     fn call<'a>(
@@ -76,10 +48,29 @@ impl Function for ShiyuProvider {
 }
 
 impl ShiyuProvider {
-    pub async fn new(config: &ConfigReminder, reminder: impl Reminder) -> Result<ShiyuProvider, FunctionError> {
+    pub async fn new(
+        config: &ConfigReminder,
+        tool_config: &ConfigToolsShiyuProvider,
+        reminder: impl Reminder,
+    ) -> Result<ShiyuProvider, FunctionError> {
+        let prompt = &tool_config.prompt;
+        let descriptor = FunctionDescriptor {
+            name: "shiyu_provider".to_string(),
+            description: prompt.description.clone(),
+            parameters: DescribedSchema::object(
+                "parameters",
+                "引数",
+                vec![
+                    DescribedSchema::string("remind_at", prompt.parameter("remind_at")?).as_nullable(),
+                    DescribedSchema::string("cancel", prompt.parameter("cancel")?).as_nullable(),
+                    DescribedSchema::string("content", prompt.parameter("content")?),
+                ],
+            ),
+        };
         Ok(ShiyuProvider {
             reminder: Box::new(reminder),
             max_seconds: config.max_seconds,
+            descriptor,
         })
     }
 

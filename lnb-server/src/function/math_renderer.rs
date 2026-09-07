@@ -24,6 +24,7 @@ use crate::config::tools::ConfigToolsMathRenderer;
 #[derive(Debug)]
 pub struct MathRenderer {
     renderer: MathRendererClient,
+    descriptor: FunctionDescriptor,
 }
 
 impl ConfigurableFunction for MathRenderer {
@@ -36,28 +37,25 @@ impl ConfigurableFunction for MathRenderer {
         _rate_limits: Option<RateLimiter>,
     ) -> Result<MathRenderer, FunctionError> {
         let renderer = MathRendererClient::new(&config.endpoint, config.scale).map_err(FunctionError::by_external)?;
-        Ok(MathRenderer { renderer })
+        let descriptor = FunctionDescriptor {
+            name: "math_renderer".to_string(),
+            description: config.prompt.description.clone(),
+            parameters: DescribedSchema::object(
+                "parameters",
+                "引数",
+                vec![
+                    DescribedSchema::string("formula", config.prompt.parameter("formula")?),
+                    DescribedSchema::boolean("display_mode", config.prompt.parameter("display_mode")?),
+                ],
+            ),
+        };
+        Ok(MathRenderer { renderer, descriptor })
     }
 }
 
 impl Function for MathRenderer {
     fn get_descriptor(&self) -> FunctionDescriptor {
-        FunctionDescriptor {
-            name: "math_renderer".to_string(),
-            description: r#"
-                ユーザーからの要望に基づき、プロンプトの入力から LaTeX 数式をレンダリングした画像を生成します。
-                生成された画像は返答のメッセージに直接添付されます。
-            "#
-            .to_string(),
-            parameters: DescribedSchema::object(
-                "parameters",
-                "引数",
-                vec![
-                    DescribedSchema::string("formula", "LaTeX 記法の数式。\\[ \\] や $ $ で囲む必要はありません。"),
-                    DescribedSchema::boolean("display_mode", "数式をディスプレイモードでレンダリングするかどうか。"),
-                ],
-            ),
-        }
+        self.descriptor.clone()
     }
 
     fn call<'a>(

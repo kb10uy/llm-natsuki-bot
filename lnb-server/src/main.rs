@@ -124,7 +124,7 @@ async fn shutdown_signal() -> std::io::Result<()> {
 async fn initialize_natsuki(config: &ConfigBot, rate_limits: &RateLimits) -> Result<(Natsuki, Shiyu)> {
     // Reminder
     let shiyu = Shiyu::new(&config.reminder).await?;
-    let shiyu_provider = ShiyuProvider::new(&config.reminder, shiyu.clone()).await?;
+    let shiyu_provider = ShiyuProvider::new(&config.reminder, &config.tools.shiyu_provider, shiyu.clone()).await?;
 
     // Storage
     let storage = initialize_storage(&config.storage).await?;
@@ -157,17 +157,20 @@ async fn initialize_natsuki(config: &ConfigBot, rate_limits: &RateLimits) -> Res
 async fn initialize_functions(tool_config: &ConfigTools, rate_limits: &RateLimits) -> Result<Vec<ArcFunction>> {
     let mut functions: Vec<ArcFunction> = vec![];
 
-    functions.push(Arc::new(SelfInfo::new()));
-    functions.push(Arc::new(LocalInfo::new()?));
+    functions.push(configure_function::<SelfInfo>(&tool_config.self_info, None).await?);
+    functions.push(configure_function::<LocalInfo>(&tool_config.local_info, None).await?);
 
     functions.extend(
-        configure_function::<ImageGenerator>(tool_config.image_generator.as_ref(), Some(&rate_limits.image_generator))
-            .await?,
+        configure_optional_function::<ImageGenerator>(
+            tool_config.image_generator.as_ref(),
+            Some(&rate_limits.image_generator),
+        )
+        .await?,
     );
-    functions.extend(configure_function::<MathRenderer>(tool_config.math_renderer.as_ref(), None).await?);
-    functions.extend(configure_function::<ExchangeRate>(tool_config.exchange_rate.as_ref(), None).await?);
-    functions.extend(configure_function::<GetIllustUrl>(tool_config.get_illust_url.as_ref(), None).await?);
-    functions.extend(configure_function::<DailyPrivate>(tool_config.daily_private.as_ref(), None).await?);
+    functions.extend(configure_optional_function::<MathRenderer>(tool_config.math_renderer.as_ref(), None).await?);
+    functions.extend(configure_optional_function::<ExchangeRate>(tool_config.exchange_rate.as_ref(), None).await?);
+    functions.extend(configure_optional_function::<GetIllustUrl>(tool_config.get_illust_url.as_ref(), None).await?);
+    functions.extend(configure_optional_function::<DailyPrivate>(tool_config.daily_private.as_ref(), None).await?);
 
     Ok(functions)
 }
@@ -177,6 +180,20 @@ async fn initialize_interceptions() -> Result<Vec<BoxInterception>> {
 }
 
 async fn configure_function<F>(
+    config: &F::Configuration,
+    rate_limits_category: Option<&RateLimitsCategory>,
+) -> Result<ArcFunction>
+where
+    F: ConfigurableFunction + 'static,
+{
+    let rate_limiter = rate_limits_category.cloned().map(TryInto::try_into).transpose();
+
+    let simple_function = F::configure(config, rate_limiter?).await?;
+    info!("simple function configured: {}", F::NAME);
+    Ok(Arc::new(simple_function))
+}
+
+async fn configure_optional_function<F>(
     config: Option<&F::Configuration>,
     rate_limits_category: Option<&RateLimitsCategory>,
 ) -> Result<Option<ArcFunction>>
@@ -186,9 +203,5 @@ where
     let Some(config) = config else {
         return Ok(None);
     };
-    let rate_limiter = rate_limits_category.cloned().map(TryInto::try_into).transpose();
-
-    let simple_function = F::configure(config, rate_limiter?).await?;
-    info!("simple function configured: {}", F::NAME);
-    Ok(Some(Arc::new(simple_function)))
+    Ok(Some(configure_function::<F>(config, rate_limits_category).await?))
 }

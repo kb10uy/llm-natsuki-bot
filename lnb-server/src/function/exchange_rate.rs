@@ -29,6 +29,7 @@ const API_RESPONSE_DATETIME: &[BorrowedFormatItem<'static>] = format_description
 pub struct ExchangeRate {
     client: Client,
     token_endpoint: String,
+    descriptor: FunctionDescriptor,
 }
 
 impl ConfigurableFunction for ExchangeRate {
@@ -45,29 +46,35 @@ impl ConfigurableFunction for ExchangeRate {
             .build()
             .map_err(FunctionError::by_external)?;
         let token_endpoint = format!("{}/v6/{}", config.endpoint, config.token);
-        Ok(ExchangeRate { client, token_endpoint })
+
+        // TODO: 多分 [(String, String)] を受け取ってこっちで group_by した方が確実
+        let descriptor = FunctionDescriptor {
+            name: "exchange_rate".to_string(),
+            description: config.prompt.description.clone(),
+            parameters: DescribedSchema::object(
+                "parameters",
+                "引数",
+                vec![
+                    DescribedSchema::string("base_code", config.prompt.parameter("base_code")?),
+                    DescribedSchema::array(
+                        "target_codes",
+                        config.prompt.parameter("target_codes")?,
+                        DescribedSchema::string("code", config.prompt.parameter("code")?),
+                    ),
+                ],
+            ),
+        };
+        Ok(ExchangeRate {
+            client,
+            token_endpoint,
+            descriptor,
+        })
     }
 }
 
 impl Function for ExchangeRate {
     fn get_descriptor(&self) -> FunctionDescriptor {
-        // TODO: 多分 [(String, String)] を受け取ってこっちで group_by した方が確実
-        FunctionDescriptor {
-            name: "exchange_rate".to_string(),
-            description: "為替相場を取得します。同じ計算元の通貨から複数の計算先を一度に取得できます。".to_string(),
-            parameters: DescribedSchema::object(
-                "parameters",
-                "引数",
-                vec![
-                    DescribedSchema::string("base_code", "為替の計算元になる ISO 4217 通貨コード。"),
-                    DescribedSchema::array(
-                        "target_codes",
-                        "為替の計算先になる ISO 4217 通貨コードのリスト。",
-                        DescribedSchema::string("code", "通貨コード"),
-                    ),
-                ],
-            ),
-        }
+        self.descriptor.clone()
     }
 
     fn call<'a>(

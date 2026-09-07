@@ -65,21 +65,96 @@ local reminder_config = {
 };
 
 local tool_config = {
+  self_info: {
+    prompt: {
+      description: |||
+        この bot 自身に関する以下の情報を提供する。
+        - バージョン
+        - Git コミットハッシュ
+        - bot のバイナリがビルドされた日時
+      |||,
+    },
+  },
+  local_info: {
+    prompt: {
+      description: |||
+        この bot が動作している環境に関する以下の情報を提供する。
+        - 現在時刻
+        - bot が動作を開始した日時
+      |||,
+    },
+  },
+  shiyu_provider: {
+    prompt: {
+      description: |||
+        ユーザーにリマインダー機能を提供します。
+        - 先に local_info で現在時刻の情報を取得し、ユーザーが希望した時刻になるように remind_at に指定してください。その際、タイムゾーンは保持してください。
+        - 会話の中でリマインダーのキャンセルを要求された場合、そのリマインダーの設定時のレスポンスに含まれる id を cancel に指定してください。
+      |||,
+      parameters: {
+        remind_at: |||
+          リマインドする絶対時刻(RFC3339形式)。ユーザーが明示的に時刻を指定しなかった場合は日付のみを指定してください。
+          相対時刻指定の場合は無視してください。
+        |||,
+        cancel: 'ユーザーがキャンセルを要求したリマインドの id。新規設定時は無視してください。',
+        content: 'ユーザーがリマインドを希望した内容。キャンセルの要求時は空にしてください。',
+      },
+    },
+  },
   image_generator: {
     endpoint: 'https://api.openai.com/v1',
     token: '',
     model: 'dall-e-3',
+    prompt: {
+      description: |||
+        ユーザーからの要望に基づき、プロンプトの入力から AI を利用して画像を生成・または編集します。
+        生成された画像は返答のメッセージに直接添付されます。
+      |||,
+      parameters: {
+        mode: '動作モードの指定。新しい画像の生成は generate を、既存画像からの編集は edit を指定する。',
+        prompt: 'GPT-Image, DALL-E などの画像生成モデルに入力するプロンプト文。',
+        input_image_urls: 'edit mode の場合にユーザーから提供される画像の URL のリスト。 generate mode の場合は空にする。',
+        url: '提供された画像の URL。',
+      },
+    },
   },
   math_renderer: {
     endpoint: 'http://math-renderer:3000',
     scale: 2.0,
+    prompt: {
+      description: |||
+        ユーザーからの要望に基づき、プロンプトの入力から LaTeX 数式をレンダリングした画像を生成します。
+        生成された画像は返答のメッセージに直接添付されます。
+      |||,
+      parameters: {
+        formula: @'LaTeX 記法の数式。\[ \] や $ $ で囲む必要はありません。',
+        display_mode: '数式をディスプレイモードでレンダリングするかどうか。',
+      },
+    },
   },
   get_illust_url: {
     database_filepath: './data/conversations.sqlite3',
+    prompt: {
+      description: |||
+        この bot 自身をキャラクターとして描写したイラストの URL を取得する。
+        自画像・自撮りを要求された場合もこれを利用する。
+      |||,
+      parameters: {
+        count: '要求したいイラストの URL の数',
+      },
+    },
   },
   exchange_rate: {
     endpoint: 'https://v6.exchangerate-api.com',
     token: '',
+    prompt: {
+      description: '為替相場を取得します。同じ計算元の通貨から複数の計算先を一度に取得できます。',
+      parameters: {
+        base_code: '為替の計算元になる ISO 4217 通貨コード。',
+        target_codes: '為替の計算先になる ISO 4217 通貨コードのリスト。',
+        code: '通貨コード',
+      },
+    },
   },
   daily_private: {
     daily_rng_salt: 'ロングもみあげガール推進部',
@@ -135,6 +210,18 @@ local tool_config = {
     schedule: {
       holiday_events: [],
     },
+    prompt: {
+      description: |||
+        この bot 自身のその日のプライベートな事情を取得します。
+        以下のいずれかの項目についてユーザーから訊かれた場合、この function のレスポンスをもとに適切に回答してください。
+        訊かれていない項目については答えなくてかまいません。
+        - 今の行動状態
+        - 生理周期
+        - 基礎体温
+        - その日のオナニーの回数
+        - 下着の色
+      |||,
+    },
   },
 };
 
@@ -144,5 +231,5 @@ local tool_config = {
   assistant: assistant_config,
   llm: llm_config,
   reminder: reminder_config,
-  tool: tool_config,
+  tools: tool_config,
 }

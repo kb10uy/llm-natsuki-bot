@@ -1,3 +1,5 @@
+use crate::{config::tools::ConfigToolsSelfInfo, function::ConfigurableFunction};
+
 use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
     context::Context,
@@ -8,24 +10,33 @@ use lnb_core::{
     },
     model::{conversation::IncompleteConversation, message::MessageToolCalling, schema::DescribedSchema},
 };
+use lnb_rate_limiter::RateLimiter;
 use serde_json::json;
 
 #[derive(Debug)]
-pub struct SelfInfo {}
+pub struct SelfInfo {
+    descriptor: FunctionDescriptor,
+}
+
+impl ConfigurableFunction for SelfInfo {
+    const NAME: &'static str = stringify!(SelfInfo);
+
+    type Configuration = ConfigToolsSelfInfo;
+
+    async fn configure(config: &ConfigToolsSelfInfo, _: Option<RateLimiter>) -> Result<SelfInfo, FunctionError> {
+        Ok(SelfInfo {
+            descriptor: FunctionDescriptor {
+                name: "self_info".to_string(),
+                description: config.prompt.description.clone(),
+                parameters: DescribedSchema::object("parameters", "引数", vec![]),
+            },
+        })
+    }
+}
 
 impl Function for SelfInfo {
     fn get_descriptor(&self) -> FunctionDescriptor {
-        FunctionDescriptor {
-            name: "self_info".to_string(),
-            description: r#"
-                この bot 自身に関する以下の情報を提供する。
-                - バージョン
-                - Git コミットハッシュ
-                - bot のバイナリがビルドされた日時
-            "#
-            .to_string(),
-            parameters: DescribedSchema::object("parameters", "引数", vec![]),
-        }
+        self.descriptor.clone()
     }
 
     fn call<'a>(
@@ -40,10 +51,6 @@ impl Function for SelfInfo {
 }
 
 impl SelfInfo {
-    pub fn new() -> SelfInfo {
-        SelfInfo {}
-    }
-
     fn get_info(&self) -> Result<FunctionResponse, FunctionError> {
         Ok(FunctionResponse {
             result: json!({
