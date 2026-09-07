@@ -2,10 +2,6 @@ use crate::natsuki::{function_store::FunctionStore, llm_cache::LlmCache};
 
 use std::{collections::HashMap, iter::once, sync::Arc};
 
-use lnb_common::{
-    config::assistant::ConfigAssistant, debug::debug_option_parsed, text_provider::InterpolatableTextProvider,
-    time_provider::BotDateTimeProvider,
-};
 use lnb_core::{
     YMDHM_JAPANESE,
     context::Context,
@@ -26,6 +22,11 @@ use lnb_core::{
 use lnb_rate_limiter::{RateLimiter, Rated};
 use time::{Duration, UtcDateTime};
 use tracing::{debug, info, warn};
+
+use crate::{
+    config::assistant::ConfigAssistant, debug::debug_option_parsed, text_provider::InterpolatableTextProvider,
+    time_provider::BotDateTimeProvider,
+};
 
 const MAX_CONVERSATION_LOOP: usize = 8;
 
@@ -264,7 +265,7 @@ impl NatsukiInner {
 
         let system_message = Message::new_system(system_role);
         let conversation = Conversation::new_now(Some(system_message));
-        self.storage.upsert(&conversation, None).await?;
+        self.storage.insert(&conversation, None).await?;
         Ok(conversation.id())
     }
 
@@ -274,13 +275,23 @@ impl NatsukiInner {
     }
 
     pub async fn save_conversation(&self, update: ConversationUpdate, context_key: &str) -> Result<(), ServerError> {
-        let current_conversation = self
+        let conversation_id = update.id();
+        let expected_conversation = match update.base_conversation() {
+            Some(base) => base.clone(),
+            None => self
+                .storage
+                .fetch_content_by_id(conversation_id)
+                .await?
+                .ok_or(ServerError::ConversationNotFound(conversation_id))?,
+        };
+        let updated_conversation = update.complete_conversation_with(expected_conversation.clone());
+        let updated = self
             .storage
-            .fetch_content_by_id(update.id())
-            .await?
-            .ok_or_else(|| ServerError::ConversationNotFound(update.id()))?;
-        let updated_conversation = update.complete_conversation_with(current_conversation);
-        self.storage.upsert(&updated_conversation, Some(context_key)).await?;
+            .update_if_current(&expected_conversation, &updated_conversation, context_key)
+            .await?;
+        if !updated {
+            return Err(ServerError::ConversationConflict(conversation_id));
+        }
         Ok(())
     }
 }

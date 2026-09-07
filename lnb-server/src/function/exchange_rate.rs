@@ -2,8 +2,8 @@ use crate::function::ConfigurableFunction;
 
 use std::collections::HashMap;
 
+use crate::config::tools::ConfigToolsExchangeRate;
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
-use lnb_common::config::tools::ConfigToolsExchangeRate;
 use lnb_core::{
     APP_USER_AGENT, RFC3339_NUMOFFSET,
     context::Context,

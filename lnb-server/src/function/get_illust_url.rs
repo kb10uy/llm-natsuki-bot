@@ -1,7 +1,7 @@
 use crate::function::ConfigurableFunction;
 
+use crate::config::tools::ConfigToolsGetIllustUrl;
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
-use lnb_common::config::tools::ConfigToolsGetIllustUrl;
 use lnb_core::{
     context::Context,
     error::FunctionError,

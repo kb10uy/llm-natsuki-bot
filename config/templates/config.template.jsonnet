@@ -36,6 +36,7 @@ local llm_config = {
         structured: false,
         tool: true,
         max_token: 300,
+        effort: null,
       },
     },
   },

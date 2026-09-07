@@ -1,16 +1,19 @@
+mod config;
 mod inner;
 mod text;
+
+pub use config::ConfigClientDiscord;
 
 use crate::inner::DiscordLnbClientInner;
 
 use std::sync::Arc;
 
 use futures::{future::BoxFuture, prelude::*};
-use lnb_common::{config::client::ConfigClientDiscord, user_roles::UserRolesGroup};
 use lnb_core::{
     error::ClientError,
     interface::{client::LnbClient, server::LnbServer},
 };
+use lnb_user_policy::UserRolesGroup;
 use tracing::error;
 
 pub struct DiscordLnbClient<S>(Arc<inner::DiscordLnbClientInner<S>>);

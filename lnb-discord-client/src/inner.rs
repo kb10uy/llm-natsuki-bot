@@ -1,8 +1,10 @@
 use std::sync::Arc;
 
-use crate::text::{sanitize_discord_message, sanitize_markdown_for_discord};
+use crate::{
+    config::ConfigClientDiscord,
+    text::{sanitize_discord_message, sanitize_markdown_for_discord},
+};
 
-use lnb_common::{config::client::ConfigClientDiscord, user_roles::UserRolesGroup};
 use lnb_core::{
     error::ClientError,
     interface::{MessageContext as LnbContext, server::LnbServer},
@@ -11,8 +13,12 @@ use lnb_core::{
         message::{AssistantMessage, UserMessage, UserMessageContent},
     },
 };
-use tokio::{spawn, sync::RwLock};
-use tracing::{info, warn};
+use lnb_user_policy::UserRolesGroup;
+use tokio::{
+    spawn,
+    sync::{RwLock, Semaphore},
+};
+use tracing::{error, info, warn};
 use twilight_cache_inmemory::{DefaultInMemoryCache, ResourceType};
 use twilight_gateway::{Event, EventTypeFlags, Intents, Shard, ShardId, StreamExt};
 use twilight_http::Client;
@@ -22,6 +28,7 @@ use twilight_model::{
 };
 
 const CONTEXT_KEY_PREFIX: &str = "discord";
+const MAX_CONCURRENT_EVENTS: usize = 32;
 
 #[derive(Debug)]
 pub struct DiscordLnbClientInner<S> {
@@ -58,13 +65,30 @@ impl<S: LnbServer> DiscordLnbClientInner<S> {
         let cache = DefaultInMemoryCache::builder()
             .resource_types(ResourceType::MESSAGE)
             .build();
+        let event_permits = Arc::new(Semaphore::new(MAX_CONCURRENT_EVENTS));
 
         while let Some(item) = shard.next_event(EventTypeFlags::all()).await {
             match item {
                 Ok(event) => {
                     cache.update(&event);
-                    let cloned_self = self.clone();
-                    spawn(cloned_self.handle_event(event));
+                    match event {
+                        Event::Ready(ready) => self.on_ready(*ready).await?,
+                        Event::MessageCreate(message_create) => {
+                            let permit = event_permits
+                                .clone()
+                                .acquire_owned()
+                                .await
+                                .map_err(ClientError::by_external)?;
+                            let cloned_self = self.clone();
+                            spawn(async move {
+                                let _permit = permit;
+                                if let Err(err) = cloned_self.on_message_create(*message_create).await {
+                                    error!("Discord event processing failed: {err}");
+                                }
+                            });
+                        }
+                        _ => (),
+                    }
                 }
                 Err(err) => {
                     warn!("message error: {err}");
@@ -72,15 +96,6 @@ impl<S: LnbServer> DiscordLnbClientInner<S> {
             }
         }
 
-        Ok(())
-    }
-
-    async fn handle_event(self: Arc<Self>, event: Event) -> Result<(), ClientError> {
-        match event {
-            Event::Ready(ready) => self.on_ready(*ready).await?,
-            Event::MessageCreate(message_create) => self.on_message_create(*message_create).await?,
-            _ => (),
-        }
         Ok(())
     }
 

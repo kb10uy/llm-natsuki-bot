@@ -1,4 +1,5 @@
-use lnb_common::persistence::{RedisReminderDb, SqliteConversationDb};
+use lnb_persistence_sqlite::SqliteConversationDb;
+use lnb_reminder_redis::RedisReminderDb;
 
 #[derive(Debug, Clone)]
 pub struct Application {

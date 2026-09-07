@@ -1,16 +1,17 @@
 mod api;
 mod application;
+mod config;
 mod jwt_auth;
 
 use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::Parser;
-use lnb_common::{
-    config::load_config,
-    persistence::{RedisReminderDb, SqliteConversationDb},
-};
+use lnb_persistence_sqlite::SqliteConversationDb;
+use lnb_reminder_redis::RedisReminderDb;
 use tokio::net::TcpListener;
+
+use crate::config::load_admin_api_config;
 
 #[derive(Debug, Clone, Parser)]
 #[clap(author, version)]
@@ -23,7 +24,7 @@ struct Arguments {
 async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let args = Arguments::parse();
-    let config = load_config(&args.config)?;
+    let config = load_admin_api_config(&args.config)?;
 
     let application = application::Application {
         conversation: SqliteConversationDb::connect(&config.storage.sqlite).await?,

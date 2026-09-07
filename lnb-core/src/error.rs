@@ -51,6 +51,10 @@ pub enum ServerError {
     #[error("expected conversation {0:?} not found")]
     ConversationNotFound(ConversationId),
 
+    /// 会話の処理中に別の更新が保存された。
+    #[error("conversation {0:?} was updated concurrently; retry the request")]
+    ConversationConflict(ConversationId),
+
     /// finished になるまでに API 回数の呼出し上限を超えた。
     #[error("too much conversation updates found")]
     TooMuchConversationCall,
@@ -121,7 +125,7 @@ pub enum StorageError {
 
 impl StorageError {
     pub fn by_serialization(source: impl Into<ErasedError>) -> StorageError {
-        StorageError::Backend(source.into())
+        StorageError::Serialization(source.into())
     }
 
     pub fn by_backend(source: impl Into<ErasedError>) -> StorageError {

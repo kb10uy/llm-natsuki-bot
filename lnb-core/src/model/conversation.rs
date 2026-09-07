@@ -29,7 +29,7 @@ impl ConversationModel {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Conversation {
     id: ConversationId,
     messages: Vec<Message>,
@@ -154,6 +154,7 @@ impl IncompleteConversation {
 
         ConversationUpdate {
             base_conversation_id: self.base.id,
+            base_conversation: Some(self.base),
             intermediate_messages: self.pushed_messages,
             assistant_response,
             attachments: self.attachments,
@@ -165,6 +166,7 @@ impl IncompleteConversation {
 #[derive(Debug, Clone)]
 pub struct ConversationUpdate {
     base_conversation_id: ConversationId,
+    base_conversation: Option<Conversation>,
     intermediate_messages: Vec<Message>,
     assistant_response: AssistantMessage,
     attachments: Vec<ConversationAttachment>,
@@ -179,6 +181,7 @@ impl ConversationUpdate {
     ) -> ConversationUpdate {
         ConversationUpdate {
             base_conversation_id: id,
+            base_conversation: None,
             intermediate_messages: user.into_iter().collect(),
             assistant_response: assistant,
             attachments: vec![],
@@ -188,6 +191,10 @@ impl ConversationUpdate {
 
     pub fn id(&self) -> ConversationId {
         self.base_conversation_id
+    }
+
+    pub fn base_conversation(&self) -> Option<&Conversation> {
+        self.base_conversation.as_ref()
     }
 
     pub fn assistant_response(&self) -> &AssistantMessage {

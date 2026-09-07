@@ -2,8 +2,8 @@ mod function;
 mod inner;
 mod worker;
 
+use crate::config::ConfigReminder;
 pub use function::ShiyuProvider;
-use lnb_common::config::reminder::ConfigReminder;
 
 use std::sync::Arc;
 

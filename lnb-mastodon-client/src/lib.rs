@@ -1,17 +1,20 @@
+mod config;
 mod inner;
 mod text;
+
+pub use config::{ConfigClientMastodon, MastodonClientOptions};
 
 use crate::inner::MastodonLnbClientInner;
 
 use std::sync::Arc;
 
 use futures::{future::BoxFuture, prelude::*};
-use lnb_common::{config::client::ConfigClientMastodon, user_roles::UserRolesGroup};
 use lnb_core::{
     error::{ClientError, ReminderError},
     interface::{client::LnbClient, reminder::Remindable, server::LnbServer},
     model::conversation::ConversationUpdate,
 };
+use lnb_user_policy::UserRolesGroup;
 use tracing::error;
 
 const CONTEXT_KEY_PREFIX: &str = "mastodon";
@@ -24,8 +27,9 @@ impl<S: LnbServer> MastodonLnbClient<S> {
         config: &ConfigClientMastodon,
         roles_group: UserRolesGroup,
         assistant: S,
+        options: MastodonClientOptions,
     ) -> Result<MastodonLnbClient<S>, ClientError> {
-        let inner = MastodonLnbClientInner::new(config, roles_group, assistant).await?;
+        let inner = MastodonLnbClientInner::new(config, roles_group, assistant, options).await?;
         Ok(MastodonLnbClient(Arc::new(inner)))
     }
 }

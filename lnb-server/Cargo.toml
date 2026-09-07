@@ -7,7 +7,10 @@ edition.workspace = true
 
 [dependencies]
 lnb-core = { workspace = true }
-lnb-common = { workspace = true }
+lnb-persistence-sqlite = { workspace = true }
+lnb-reminder-redis = { workspace = true }
+lnb-math-renderer-client = { workspace = true }
+lnb-user-policy = { workspace = true }
 lnb-rate-limiter = { workspace = true }
 lnb-daily-private = { workspace = true }
 lnb-mastodon-client = { workspace = true }
@@ -21,6 +24,7 @@ clap = { workspace = true }
 futures = { workspace = true }
 infer = { workspace = true }
 rand = { workspace = true }
+regex = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
