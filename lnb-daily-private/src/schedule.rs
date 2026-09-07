@@ -1,4 +1,7 @@
-use crate::{datetime::LogicalDay, rng::SaltedRng};
+use crate::{
+    datetime::LogicalDay,
+    rng::{RngDomain, RngSource},
+};
 
 use std::{
     fmt::{Formatter, Result as FmtResult},
@@ -32,7 +35,8 @@ pub struct WeekRange(u8, u8);
 
 impl ScheduleConfiguration {
     /// その論理日のイベントを決定する。
-    pub fn plan(&self, rng: &mut SaltedRng<LogicalDay>, day: &LogicalDay) -> Option<&HolidayEvent> {
+    pub fn plan(&self, source: &RngSource<LogicalDay>, day: &LogicalDay) -> Option<&HolidayEvent> {
+        let rng = &mut source.derive(RngDomain::Schedule);
         self.holiday_events
             .iter()
             .filter(|he| he.week_ranges.iter().any(|wr| wr.contains(day.date)))

@@ -1,4 +1,8 @@
-use crate::{datetime::LogicalDay, menstruation::MensePhase, rng::SaltedRng};
+use crate::{
+    datetime::LogicalDay,
+    menstruation::MensePhase,
+    rng::{RngDomain, RngSource},
+};
 
 use std::f64::consts::TAU;
 
@@ -23,7 +27,8 @@ pub struct TemperaturePlan {
 
 impl TemperatureConfiguration {
     /// 日替わりのジッターを決定する。
-    pub fn plan(&self, rng: &mut SaltedRng<LogicalDay>) -> TemperaturePlan {
+    pub fn plan(&self, source: &RngSource<LogicalDay>) -> TemperaturePlan {
+        let rng = &mut source.derive(RngDomain::Temperature);
         let jitter_distr = {
             let (mu, sigma) = self.jitter_mu_sigma;
             Normal::new(mu, sigma).expect("invalid distribution")

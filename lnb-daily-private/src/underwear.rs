@@ -1,4 +1,9 @@
-use crate::{datetime::LogicalDay, day_routine::DayStep, menstruation::MenstruationAbsorbent, rng::SaltedRng};
+use crate::{
+    datetime::LogicalDay,
+    day_routine::DayStep,
+    menstruation::MenstruationAbsorbent,
+    rng::{RngDomain, RngSource, SaltedRng},
+};
 
 use std::collections::HashSet;
 
@@ -97,7 +102,8 @@ pub struct UnderwearDesign {
 
 impl UnderwearConfiguration {
     /// その論理日の下着と、脱ぐ場合の理由をすべて決定する。
-    pub fn plan(&self, rng: &mut SaltedRng<LogicalDay>) -> UnderwearPlan {
+    pub fn plan(&self, source: &RngSource<LogicalDay>) -> UnderwearPlan {
+        let rng = &mut source.derive(RngDomain::Underwear);
         let (bra_design, panty_design) = match (self.generate_part(rng), self.generate_part(rng)) {
             (Some(c1), Some(c2)) => (c1, c2),
             _ => return UnderwearPlan { choice: None },

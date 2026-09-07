@@ -4,7 +4,7 @@ use crate::{
     day_routine::{DayRoutine, DayStep},
     masturbation::{MasturbationConfiguration, MasturbationPlan, MasturbationStatus},
     menstruation::{MenstruationConfiguration, MenstruationCycles, MenstruationPlan, MenstruationStatus},
-    rng::SaltedRng,
+    rng::RngSource,
     schedule::{HolidayEvent, ScheduleConfiguration},
     temperature::{TemperatureConfiguration, TemperaturePlan},
     underwear::{UnderwearConfiguration, UnderwearPlan, UnderwearStatus},
@@ -53,18 +53,21 @@ impl DailyPrivateConfiguration {
 
     /// 計画フェーズ。乱数を引くのはこの関数の内側だけで、入力は [`LogicalDay`] しかない。
     /// したがって乱数の消費列は論理日だけの関数になり、日より細かい要素では変化しない。
+    ///
+    /// 各モジュールはドメインごとに独立した乱数列を導出するので、
+    /// あるモジュールが乱数を引く回数を変えても他のモジュールの結果は変化しない。
     pub fn plan_day(&self, day: &LogicalDay) -> Result<DayPlan, DailyPrivateError> {
-        let mut long_term_rng = SaltedRng::new(&self.rng_salt, &day.long_term);
-        let mut daily_rng = SaltedRng::new(&self.rng_salt, day);
+        let long_term_source = RngSource::new(&self.rng_salt, &day.long_term);
+        let daily_source = RngSource::new(&self.rng_salt, day);
 
-        let event = self.schedule.plan(&mut daily_rng, day).cloned();
-        let menstruation_cycles = self.menstruation.plan_cycles(&mut long_term_rng, &day.long_term)?;
+        let event = self.schedule.plan(&daily_source, day).cloned();
+        let menstruation_cycles = self.menstruation.plan_cycles(&long_term_source, &day.long_term)?;
         let menstruation = self
             .menstruation
-            .plan(&mut daily_rng, &menstruation_cycles, day, event.as_ref());
-        let temperature = self.temperature.plan(&mut daily_rng);
-        let masturbation = self.masturbation.plan(&mut daily_rng, day, menstruation.bleeding_days);
-        let underwear = self.underwear.plan(&mut daily_rng);
+            .plan(&daily_source, &menstruation_cycles, day, event.as_ref());
+        let temperature = self.temperature.plan(&daily_source);
+        let masturbation = self.masturbation.plan(&daily_source, day, menstruation.bleeding_days);
+        let underwear = self.underwear.plan(&daily_source);
 
         Ok(DayPlan {
             event,

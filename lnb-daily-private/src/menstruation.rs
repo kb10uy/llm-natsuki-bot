@@ -1,7 +1,7 @@
 use crate::{
     DailyPrivateError,
     datetime::{LogicalDay, LongTermCycle},
-    rng::SaltedRng,
+    rng::{RngDomain, RngSource, SaltedRng},
     schedule::HolidayEvent,
 };
 
@@ -97,9 +97,10 @@ impl MenstruationConfiguration {
     /// 長周期ぶんの周期区切りを決定する。
     pub fn plan_cycles(
         &self,
-        rng: &mut SaltedRng<LongTermCycle>,
+        source: &RngSource<LongTermCycle>,
         long_term: &LongTermCycle,
     ) -> Result<MenstruationCycles, DailyPrivateError> {
+        let rng = &mut source.derive(RngDomain::Menstruation);
         let long_term_duration = long_term.span_days as u64;
 
         // 長期収束のために割り切れれて正の商になる必要がある
@@ -137,11 +138,12 @@ impl MenstruationConfiguration {
     /// その論理日の生理の状態を決定する。
     pub fn plan(
         &self,
-        rng: &mut SaltedRng<LogicalDay>,
+        source: &RngSource<LogicalDay>,
         cycles: &MenstruationCycles,
         day: &LogicalDay,
         event: Option<&HolidayEvent>,
     ) -> MenstruationPlan {
+        let rng = &mut source.derive(RngDomain::Menstruation);
         let cycle_range = cycles.find(day.long_term_days);
         let cycle_length = cycle_range.end - cycle_range.start;
         let cycle_days = day.long_term_days - cycle_range.start;

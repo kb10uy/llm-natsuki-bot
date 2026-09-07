@@ -77,12 +77,16 @@ impl LogicalMoment {
 }
 
 impl RngGranularity for LongTermCycle {
+    const NAME: &'static str = "long_term_cycle";
+
     fn seed_source(&self) -> impl AsRef<[u8]> {
         self.index.to_le_bytes()
     }
 }
 
 impl RngGranularity for LogicalDay {
+    const NAME: &'static str = "logical_day";
+
     fn seed_source(&self) -> impl AsRef<[u8]> {
         self.julian_day.to_le_bytes()
     }

@@ -1,4 +1,7 @@
-use crate::{datetime::LogicalDay, rng::SaltedRng};
+use crate::{
+    datetime::LogicalDay,
+    rng::{RngDomain, RngSource},
+};
 
 use std::ops::{Not, Range};
 
@@ -44,10 +47,11 @@ impl MasturbationConfiguration {
     /// その論理日ぶんの予定をすべて決定する。
     pub fn plan(
         &self,
-        rng: &mut SaltedRng<LogicalDay>,
+        source: &RngSource<LogicalDay>,
         day: &LogicalDay,
         bleeding_days: Option<usize>,
     ) -> MasturbationPlan {
+        let rng = &mut source.derive(RngDomain::Masturbation);
         let total_lambda = {
             let bleeding_debuff = bleeding_days
                 .map(|days| 1.0 - (1.0 / days.max(1) as f64))
