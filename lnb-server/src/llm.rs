@@ -3,7 +3,7 @@ mod openai;
 
 use std::{collections::HashMap, sync::LazyLock};
 
-use lnb_common::config::llm::{ConfigLlmBackend, ConfigLlmModel};
+use crate::config::llm::{ConfigLlmBackend, ConfigLlmModel};
 use lnb_core::{
     error::LlmError,
     interface::llm::ArcLlm,

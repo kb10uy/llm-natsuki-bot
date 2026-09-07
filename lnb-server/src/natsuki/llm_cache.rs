@@ -2,7 +2,7 @@ use crate::llm::create_llm;
 
 use std::{collections::HashMap, future::Future, sync::Arc};
 
-use lnb_common::config::llm::{ConfigLlm, ConfigLlmModel};
+use crate::config::llm::{ConfigLlm, ConfigLlmModel};
 use lnb_core::{error::LlmError, interface::llm::ArcLlm, model::conversation::ConversationModel};
 use thiserror::Error as ThisError;
 use tokio::sync::OnceCell;
@@ -85,8 +85,8 @@ mod tests {
 
     use std::sync::atomic::{AtomicUsize, Ordering};
 
+    use crate::config::llm::ConfigLlmBackend;
     use futures::{FutureExt, future::BoxFuture};
-    use lnb_common::config::llm::ConfigLlmBackend;
     use lnb_core::{
         interface::{
             function::FunctionDescriptor,

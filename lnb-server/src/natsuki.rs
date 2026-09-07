@@ -2,9 +2,9 @@ mod function_store;
 mod inner;
 mod llm_cache;
 
+use crate::config::assistant::ConfigAssistant;
 pub use function_store::FunctionStore;
 pub use llm_cache::LlmCache;
-use lnb_common::config::assistant::ConfigAssistant;
 use lnb_rate_limiter::RateLimiter;
 
 use crate::natsuki::inner::NatsukiInner;

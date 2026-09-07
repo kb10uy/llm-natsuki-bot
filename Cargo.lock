@@ -1706,15 +1706,12 @@ dependencies = [
  "clap",
  "futures",
  "jsonwebtoken",
- "lnb-common",
  "lnb-core",
  "lnb-persistence-sqlite",
  "lnb-reminder-redis",
- "redis",
  "reqwest",
  "serde",
  "serde_json",
- "sqlx",
  "thiserror 2.0.18",
  "time",
  "tokio",
@@ -1732,7 +1729,6 @@ version = "0.18.2"
 dependencies = [
  "base64",
  "lnb-core",
- "lnb-daily-private",
  "lnb-rate-limiter",
  "regex",
  "serde",
@@ -1740,10 +1736,7 @@ dependencies = [
  "sha2",
  "thiserror 2.0.18",
  "time",
- "tracing",
  "upon",
- "url",
- "uuid",
 ]
 
 [[package]]
@@ -1779,7 +1772,6 @@ dependencies = [
  "clap",
  "futures",
  "infer",
- "lnb-common",
  "lnb-core",
  "lnb-user-policy",
  "markdown",
@@ -1843,8 +1835,8 @@ name = "lnb-persistence-sqlite"
 version = "0.18.2"
 dependencies = [
  "futures",
- "lnb-common",
  "lnb-core",
+ "serde",
  "serde_json",
  "sqlx",
  "thiserror 2.0.18",
@@ -1866,7 +1858,6 @@ name = "lnb-reminder-redis"
 version = "0.18.2"
 dependencies = [
  "futures",
- "lnb-common",
  "redis",
  "serde",
  "serde_json",

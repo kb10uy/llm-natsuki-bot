@@ -1,12 +1,14 @@
+mod config;
 mod inner;
 mod text;
+
+pub use config::ConfigClientMastodon;
 
 use crate::inner::MastodonLnbClientInner;
 
 use std::sync::Arc;
 
 use futures::{future::BoxFuture, prelude::*};
-use lnb_common::config::client::ConfigClientMastodon;
 use lnb_core::{
     error::{ClientError, ReminderError},
     interface::{client::LnbClient, reminder::Remindable, server::LnbServer},

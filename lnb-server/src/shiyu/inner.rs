@@ -2,8 +2,8 @@ use crate::shiyu::worker::{ClaimedJob, Worker};
 
 use std::{collections::HashMap, sync::Arc};
 
+use crate::config::ConfigReminder;
 use futures::{FutureExt, TryFutureExt, future::BoxFuture, select};
-use lnb_common::config::reminder::ConfigReminder;
 use lnb_core::{
     error::ReminderError,
     interface::{

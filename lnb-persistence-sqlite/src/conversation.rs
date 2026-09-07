@@ -1,10 +1,11 @@
 use crate::PersistenceError;
 
 use futures::TryFutureExt;
-use lnb_common::config::storage::ConfigStorageSqlite;
 use lnb_core::model::conversation::Conversation;
 use sqlx::{FromRow, SqlitePool};
 use uuid::Uuid;
+
+use crate::ConfigStorageSqlite;
 
 #[derive(Debug, Clone)]
 pub struct SqliteConversationDb {

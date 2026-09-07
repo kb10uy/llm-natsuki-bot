@@ -1,5 +1,6 @@
 mod bang_command;
 mod cli;
+mod config;
 mod function;
 mod llm;
 mod natsuki;
@@ -22,7 +23,6 @@ use std::{collections::HashMap, sync::Arc};
 use anyhow::{Result, anyhow};
 use clap::Parser;
 use lnb_common::{
-    config::{ConfigBot, load_bot_config, tools::ConfigTools},
     debug::set_debug_options,
     rate_limits::{RateLimits, RateLimitsCategory, load_rate_limits},
 };
@@ -32,6 +32,8 @@ use lnb_mastodon_client::MastodonLnbClient;
 use lnb_user_policy::load_user_roles;
 use tokio::{signal, task::JoinSet};
 use tracing::info;
+
+use crate::config::{ConfigBot, load_bot_config, tools::ConfigTools};
 
 #[tokio::main]
 async fn main() -> Result<()> {

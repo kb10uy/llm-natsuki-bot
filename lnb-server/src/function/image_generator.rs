@@ -3,7 +3,7 @@ use crate::function::ConfigurableFunction;
 use async_openai::types::images::{Image, ImagesResponse};
 use base64::prelude::*;
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
-use lnb_common::{config::tools::ConfigToolsImageGenerator, extension::ContextExt};
+use lnb_common::extension::ContextExt;
 use lnb_core::{
     APP_USER_AGENT,
     context::Context,
@@ -27,6 +27,8 @@ use thiserror::Error as ThisError;
 use time::UtcDateTime;
 use tokio::{fs::File, io::AsyncWriteExt};
 use tracing::{debug, info};
+
+use crate::config::tools::ConfigToolsImageGenerator;
 use url::Url;
 
 pub const LOW_MODERATION_SCOPE: &str = "image_generator:low_moderation";

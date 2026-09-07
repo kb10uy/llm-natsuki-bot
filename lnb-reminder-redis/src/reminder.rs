@@ -1,12 +1,13 @@
 use crate::PersistenceError;
 
 use futures::TryFutureExt;
-use lnb_common::config::reminder::ConfigReminder;
 use redis::{AsyncCommands, Client, Script, Value, aio::MultiplexedConnection};
 use serde::{Serialize, de::DeserializeOwned};
 use time::UtcDateTime;
 use tracing::{debug, trace};
 use uuid::Uuid;
+
+use crate::ConfigReminder;
 
 const JOB_TABLE_KEY: &str = "lnb_jobs";
 const QUEUE_KEY: &str = "lnb_queue";

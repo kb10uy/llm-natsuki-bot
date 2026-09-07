@@ -1,5 +1,5 @@
+use crate::config::ConfigReminder;
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
-use lnb_common::config::reminder::ConfigReminder;
 use lnb_core::{
     context::Context,
     error::FunctionError,

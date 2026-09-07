@@ -6,8 +6,6 @@ authors.workspace = true
 edition.workspace = true
 
 [dependencies]
-lnb-common = { workspace = true }
-
 futures = { workspace = true }
 redis = { workspace = true }
 serde = { workspace = true }

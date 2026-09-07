@@ -1,7 +1,7 @@
 use crate::function::ConfigurableFunction;
 
+use crate::config::tools::ConfigToolsDailyPrivate;
 use futures::{FutureExt, future::BoxFuture};
-use lnb_common::config::tools::ConfigToolsDailyPrivate;
 use lnb_core::{
     context::Context,
     error::FunctionError,

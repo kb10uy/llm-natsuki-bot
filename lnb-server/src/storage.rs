@@ -1,7 +1,7 @@
 mod memory;
 mod sqlite;
 
-use lnb_common::config::storage::{ConfigStorage, ConfigStorageBackend};
+use crate::config::storage::{ConfigStorage, ConfigStorageBackend};
 use lnb_core::{error::StorageError, interface::storage::BoxConversationStorage};
 
 pub async fn initialize_storage(config: &ConfigStorage) -> Result<BoxConversationStorage, StorageError> {

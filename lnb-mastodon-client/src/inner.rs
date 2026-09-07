@@ -1,15 +1,13 @@
 use crate::{
     CONTEXT_KEY_PREFIX,
+    config::ConfigClientMastodon,
     text::{escape_mention_html_from_mastodon, process_markdown_for_mastodon},
 };
 
 use std::{iter::once, sync::Arc, time::Duration};
 
 use futures::prelude::*;
-use lnb_common::{
-    config::client::ConfigClientMastodon,
-    debug::{debug_option_enabled, debug_option_value},
-};
+use lnb_common::debug::{debug_option_enabled, debug_option_value};
 use lnb_core::{
     APP_USER_AGENT,
     error::ClientError,

@@ -1,3 +1,4 @@
+use crate::config::ConfigAdminApiJwtAuth;
 use crate::jwt_auth::{JwtAuthError, JwtVerifier};
 
 use std::{
@@ -11,7 +12,6 @@ use axum::{
     response::Response,
 };
 use futures::FutureExt;
-use lnb_common::config::admin_api::ConfigAdminApiJwtAuth;
 use reqwest::StatusCode;
 use tower::{Layer, Service};
 

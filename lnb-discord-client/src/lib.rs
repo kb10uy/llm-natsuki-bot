@@ -1,12 +1,14 @@
+mod config;
 mod inner;
 mod text;
+
+pub use config::ConfigClientDiscord;
 
 use crate::inner::DiscordLnbClientInner;
 
 use std::sync::Arc;
 
 use futures::{future::BoxFuture, prelude::*};
-use lnb_common::config::client::ConfigClientDiscord;
 use lnb_core::{
     error::ClientError,
     interface::{client::LnbClient, server::LnbServer},

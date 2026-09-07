@@ -1,7 +1,6 @@
 use crate::function::ConfigurableFunction;
 
 use futures::{FutureExt, future::BoxFuture};
-use lnb_common::config::tools::ConfigToolsMathRenderer;
 use lnb_core::{
     context::Context,
     error::FunctionError,
@@ -19,6 +18,8 @@ use lnb_math_renderer_client::MathRendererClient;
 use lnb_rate_limiter::RateLimiter;
 use serde::Deserialize;
 use serde_json::json;
+
+use crate::config::tools::ConfigToolsMathRenderer;
 
 #[derive(Debug)]
 pub struct MathRenderer {

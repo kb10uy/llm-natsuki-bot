@@ -7,9 +7,8 @@ edition.workspace = true
 
 [dependencies]
 lnb-core = { workspace = true }
-lnb-common = { workspace = true }
-
 futures = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 sqlx = { workspace = true }
 thiserror = { workspace = true }

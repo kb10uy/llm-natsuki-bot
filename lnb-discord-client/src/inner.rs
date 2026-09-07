@@ -1,8 +1,10 @@
 use std::sync::Arc;
 
-use crate::text::{sanitize_discord_message, sanitize_markdown_for_discord};
+use crate::{
+    config::ConfigClientDiscord,
+    text::{sanitize_discord_message, sanitize_markdown_for_discord},
+};
 
-use lnb_common::config::client::ConfigClientDiscord;
 use lnb_core::{
     error::ClientError,
     interface::{MessageContext as LnbContext, server::LnbServer},

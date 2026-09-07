@@ -1,9 +1,8 @@
 use std::{convert::Infallible, time::Duration};
 
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
-use lnb_common::config::reminder::ConfigReminder;
 use lnb_core::error::ReminderError;
-use lnb_reminder_redis::RedisReminderDb;
+use lnb_reminder_redis::{ConfigReminder, RedisReminderDb};
 use serde::{Serialize, de::DeserializeOwned};
 use time::UtcDateTime;
 use tokio::{

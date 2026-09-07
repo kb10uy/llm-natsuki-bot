@@ -1,4 +1,3 @@
-pub mod config;
 pub mod debug;
 pub mod extension;
 pub mod rate_limits;
