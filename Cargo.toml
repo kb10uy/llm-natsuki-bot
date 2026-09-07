@@ -3,6 +3,8 @@ resolver = "2"
 members = [
   "lnb-core",
   "lnb-common",
+  "lnb-persistence-sqlite",
+  "lnb-reminder-redis",
   "lnb-rate-limiter",
   "lnb-daily-private",
   "lnb-server",
@@ -21,6 +23,8 @@ edition = "2024"
 [workspace.dependencies]
 lnb-core = { path = "./lnb-core" }
 lnb-common = { path = "./lnb-common" }
+lnb-persistence-sqlite = { path = "./lnb-persistence-sqlite" }
+lnb-reminder-redis = { path = "./lnb-reminder-redis" }
 lnb-rate-limiter = { path = "./lnb-rate-limiter" }
 lnb-daily-private = { path = "./lnb-daily-private" }
 lnb-mastodon-client = { path = "./lnb-mastodon-client" }

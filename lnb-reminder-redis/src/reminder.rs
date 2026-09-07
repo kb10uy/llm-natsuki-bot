@@ -1,6 +1,7 @@
-use crate::{config::reminder::ConfigReminder, persistence::PersistenceError};
+use crate::PersistenceError;
 
 use futures::TryFutureExt;
+use lnb_common::config::reminder::ConfigReminder;
 use redis::{AsyncCommands, Client, Script, Value, aio::MultiplexedConnection};
 use serde::{Serialize, de::DeserializeOwned};
 use time::UtcDateTime;

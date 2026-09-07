@@ -4,8 +4,8 @@ use axum::{
     Json,
     extract::{Query, State},
 };
-use lnb_common::persistence::PersistenceError;
 use lnb_core::model::conversation::Conversation;
+use lnb_persistence_sqlite::PersistenceError;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use uuid::Uuid;

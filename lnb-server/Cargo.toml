@@ -8,6 +8,8 @@ edition.workspace = true
 [dependencies]
 lnb-core = { workspace = true }
 lnb-common = { workspace = true }
+lnb-persistence-sqlite = { workspace = true }
+lnb-reminder-redis = { workspace = true }
 lnb-rate-limiter = { workspace = true }
 lnb-daily-private = { workspace = true }
 lnb-mastodon-client = { workspace = true }

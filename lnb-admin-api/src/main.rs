@@ -6,10 +6,9 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::Parser;
-use lnb_common::{
-    config::load_admin_api_config,
-    persistence::{RedisReminderDb, SqliteConversationDb},
-};
+use lnb_common::config::load_admin_api_config;
+use lnb_persistence_sqlite::SqliteConversationDb;
+use lnb_reminder_redis::RedisReminderDb;
 use tokio::net::TcpListener;
 
 #[derive(Debug, Clone, Parser)]

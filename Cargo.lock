@@ -1708,6 +1708,8 @@ dependencies = [
  "jsonwebtoken",
  "lnb-common",
  "lnb-core",
+ "lnb-persistence-sqlite",
+ "lnb-reminder-redis",
  "redis",
  "reqwest",
  "serde",
@@ -1729,20 +1731,16 @@ name = "lnb-common"
 version = "0.18.2"
 dependencies = [
  "base64",
- "futures",
  "lnb-core",
  "lnb-daily-private",
  "lnb-rate-limiter",
- "redis",
  "regex",
  "reqwest",
  "serde",
  "serde_json",
  "sha2",
- "sqlx",
  "thiserror 2.0.18",
  "time",
- "tokio",
  "tracing",
  "upon",
  "url",
@@ -1828,12 +1826,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "lnb-persistence-sqlite"
+version = "0.18.2"
+dependencies = [
+ "futures",
+ "lnb-common",
+ "lnb-core",
+ "serde_json",
+ "sqlx",
+ "thiserror 2.0.18",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "lnb-rate-limiter"
 version = "0.18.2"
 dependencies = [
  "regex",
  "time",
  "tokio",
+]
+
+[[package]]
+name = "lnb-reminder-redis"
+version = "0.18.2"
+dependencies = [
+ "futures",
+ "lnb-common",
+ "redis",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "time",
+ "tokio",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -1852,7 +1880,9 @@ dependencies = [
  "lnb-daily-private",
  "lnb-discord-client",
  "lnb-mastodon-client",
+ "lnb-persistence-sqlite",
  "lnb-rate-limiter",
+ "lnb-reminder-redis",
  "rand 0.10.1",
  "reqwest",
  "serde",

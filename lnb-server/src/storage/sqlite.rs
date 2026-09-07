@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
 use futures::{FutureExt, TryFutureExt, future::BoxFuture};
-use lnb_common::{config::storage::ConfigStorageSqlite, persistence::SqliteConversationDb};
+use lnb_common::config::storage::ConfigStorageSqlite;
 use lnb_core::{
     error::StorageError,
     interface::storage::ConversationStorage,
     model::conversation::{Conversation, ConversationId},
 };
+use lnb_persistence_sqlite::SqliteConversationDb;
 
 #[derive(Debug, Clone)]
 pub struct SqliteConversationStorage(Arc<SqliteConversationStorageInner>);
