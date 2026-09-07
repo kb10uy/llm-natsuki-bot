@@ -1,7 +1,7 @@
+use crate::datetime::LogicalMoment;
+
 use serde::{Deserialize, Serialize};
 use time::Duration;
-
-use crate::datetime::LogicalDateTime;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DayRoutine {
@@ -24,15 +24,16 @@ impl DayRoutine {
         }
     }
 
-    pub fn calculate_day_step(&self, logical_datetime: &LogicalDateTime) -> DayStep {
-        if logical_datetime.day_elapsed < self.daytime_duration {
-            if logical_datetime.day_elapsed < self.morning_preparation {
+    /// 時刻から行動状態を求める。乱数を使わないので観測フェーズで呼べる。
+    pub fn observe(&self, moment: &LogicalMoment) -> DayStep {
+        if moment.day_elapsed < self.daytime_duration {
+            if moment.day_elapsed < self.morning_preparation {
                 DayStep::Morning
             } else {
                 DayStep::Daytime
             }
         } else {
-            let night_elapsed = logical_datetime.day_elapsed - self.daytime_duration;
+            let night_elapsed = moment.day_elapsed - self.daytime_duration;
             if night_elapsed < self.bathtime_duration {
                 DayStep::Bathtime
             } else {

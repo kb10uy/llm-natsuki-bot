@@ -1,9 +1,11 @@
+use crate::{datetime::LogicalDay, rng::SaltedRng};
+
 use std::{
     fmt::{Formatter, Result as FmtResult},
     ops::RangeInclusive,
 };
 
-use rand::{Rng, seq::IteratorRandom};
+use rand::seq::IteratorRandom;
 use serde::{
     Deserialize, Serialize,
     de::{Error as _, SeqAccess, Visitor},
@@ -29,10 +31,11 @@ pub struct HolidayEvent {
 pub struct WeekRange(u8, u8);
 
 impl ScheduleConfiguration {
-    pub fn choose_event<R: Rng + ?Sized>(&self, rng: &mut R, logical_date: Date) -> Option<&HolidayEvent> {
+    /// その論理日のイベントを決定する。
+    pub fn plan(&self, rng: &mut SaltedRng<LogicalDay>, day: &LogicalDay) -> Option<&HolidayEvent> {
         self.holiday_events
             .iter()
-            .filter(|he| he.week_ranges.iter().any(|wr| wr.contains(logical_date)))
+            .filter(|he| he.week_ranges.iter().any(|wr| wr.contains(day.date)))
             .choose(rng)
     }
 }
