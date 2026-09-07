@@ -2,9 +2,6 @@ use crate::natsuki::{function_store::FunctionStore, llm_cache::LlmCache};
 
 use std::{collections::HashMap, iter::once, sync::Arc};
 
-use lnb_common::{
-    debug::debug_option_parsed, text_provider::InterpolatableTextProvider, time_provider::BotDateTimeProvider,
-};
 use lnb_core::{
     YMDHM_JAPANESE,
     context::Context,
@@ -26,7 +23,10 @@ use lnb_rate_limiter::{RateLimiter, Rated};
 use time::{Duration, UtcDateTime};
 use tracing::{debug, info, warn};
 
-use crate::config::assistant::ConfigAssistant;
+use crate::{
+    config::assistant::ConfigAssistant, debug::debug_option_parsed, text_provider::InterpolatableTextProvider,
+    time_provider::BotDateTimeProvider,
+};
 
 const MAX_CONVERSATION_LOOP: usize = 8;
 

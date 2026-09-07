@@ -1724,22 +1724,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lnb-common"
-version = "0.18.2"
-dependencies = [
- "base64",
- "lnb-core",
- "lnb-rate-limiter",
- "regex",
- "serde",
- "serde_json",
- "sha2",
- "thiserror 2.0.18",
- "time",
- "upon",
-]
-
-[[package]]
 name = "lnb-core"
 version = "0.18.2"
 dependencies = [
@@ -1799,7 +1783,6 @@ dependencies = [
  "futures",
  "html2md",
  "infer",
- "lnb-common",
  "lnb-core",
  "lnb-math-renderer-client",
  "lnb-user-policy",
@@ -1879,7 +1862,6 @@ dependencies = [
  "clap",
  "futures",
  "infer",
- "lnb-common",
  "lnb-core",
  "lnb-daily-private",
  "lnb-discord-client",
@@ -1890,6 +1872,7 @@ dependencies = [
  "lnb-reminder-redis",
  "lnb-user-policy",
  "rand 0.10.1",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",

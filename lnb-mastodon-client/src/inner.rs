@@ -1,13 +1,12 @@
 use crate::{
     CONTEXT_KEY_PREFIX,
-    config::ConfigClientMastodon,
+    config::{ConfigClientMastodon, MastodonClientOptions},
     text::{escape_mention_html_from_mastodon, process_markdown_for_mastodon},
 };
 
 use std::{iter::once, sync::Arc, time::Duration};
 
 use futures::prelude::*;
-use lnb_common::debug::{debug_option_enabled, debug_option_value};
 use lnb_core::{
     APP_USER_AGENT,
     error::ClientError,
@@ -50,6 +49,7 @@ pub struct MastodonLnbClientInner<S> {
     websocket_endpoint: String,
     math_renderer: MathRendererClient,
     event_permits: Arc<Semaphore>,
+    use_sse: bool,
 }
 
 impl<S: LnbServer> MastodonLnbClientInner<S> {
@@ -57,11 +57,12 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
         config: &ConfigClientMastodon,
         roles_group: UserRolesGroup,
         assistant: S,
+        options: MastodonClientOptions,
     ) -> Result<MastodonLnbClientInner<S>, ClientError> {
         // Mastodon クライアントと自己アカウント情報
         let http_client = reqwest::ClientBuilder::new()
             .user_agent(APP_USER_AGENT)
-            .default_headers(get_default_headers())
+            .default_headers(get_default_headers(options.disconnect_after.as_deref()))
             .build()
             .map_err(ClientError::by_communication)?;
         let mastodon_data = mastodon_async::Data {
@@ -94,14 +95,14 @@ impl<S: LnbServer> MastodonLnbClientInner<S> {
             websocket_endpoint,
             math_renderer,
             event_permits: Arc::new(Semaphore::new(MAX_CONCURRENT_EVENTS)),
+            use_sse: options.use_sse,
         })
     }
 
     pub async fn execute(self: Arc<Self>) -> Result<(), ClientError> {
-        let use_sse = debug_option_enabled("mastodon_sse").unwrap_or(false);
         loop {
             let this = self.clone();
-            let closed_status = if use_sse {
+            let closed_status = if self.use_sse {
                 this.execute_sse().await
             } else {
                 this.execute_websocket().await
@@ -601,10 +602,10 @@ pub enum MastodonClientError {
     UnsupportedImageType(String),
 }
 
-fn get_default_headers() -> HeaderMap {
+fn get_default_headers(disconnect_after: Option<&str>) -> HeaderMap {
     let mut headers = HeaderMap::new();
 
-    if let Some(secs) = debug_option_value("mastodon_disconnect") {
+    if let Some(secs) = disconnect_after {
         warn!("force disconnection enabled; duration is {secs}");
         headers.append("X-Disconnect-After", secs.parse().expect("must parse"));
     }

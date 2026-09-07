@@ -20,12 +20,6 @@ pub fn debug_option_enabled(name: &str) -> Option<bool> {
     value.map(DebugOptionValue::is_enabled)
 }
 
-pub fn debug_option_disabled(name: &str) -> Option<bool> {
-    let debug_options = DEBUG_OPTIONS.read().expect("poisoned");
-    let value = debug_options.get(name);
-    value.map(DebugOptionValue::is_disabled)
-}
-
 pub fn debug_option_value(name: &str) -> Option<String> {
     let debug_options = DEBUG_OPTIONS.read().expect("poisoned");
     Some(debug_options.get(name).and_then(DebugOptionValue::value)?.to_string())
@@ -59,10 +53,6 @@ impl DebugOptionValue {
 
     pub fn is_enabled(&self) -> bool {
         matches!(self, DebugOptionValue::Enabled)
-    }
-
-    pub fn is_disabled(&self) -> bool {
-        matches!(self, DebugOptionValue::Disabled)
     }
 }
 

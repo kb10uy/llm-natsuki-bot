@@ -1,11 +1,16 @@
 mod bang_command;
 mod cli;
 mod config;
+mod debug;
+mod extension;
 mod function;
 mod llm;
 mod natsuki;
+mod rate_limits;
 mod shiyu;
 mod storage;
+mod text_provider;
+mod time_provider;
 
 use crate::{
     bang_command::initialize_bang_command,
@@ -22,18 +27,18 @@ use std::{collections::HashMap, sync::Arc};
 
 use anyhow::{Result, anyhow};
 use clap::Parser;
-use lnb_common::{
-    debug::set_debug_options,
-    rate_limits::{RateLimits, RateLimitsCategory, load_rate_limits},
-};
 use lnb_core::interface::{client::LnbClient, function::ArcFunction, interception::BoxInterception};
 use lnb_discord_client::DiscordLnbClient;
-use lnb_mastodon_client::MastodonLnbClient;
+use lnb_mastodon_client::{MastodonClientOptions, MastodonLnbClient};
 use lnb_user_policy::load_user_roles;
 use tokio::{signal, task::JoinSet};
 use tracing::info;
 
-use crate::config::{ConfigBot, load_bot_config, tools::ConfigTools};
+use crate::{
+    config::{ConfigBot, load_bot_config, tools::ConfigTools},
+    debug::{debug_option_enabled, debug_option_value, set_debug_options},
+    rate_limits::{RateLimits, RateLimitsCategory, load_rate_limits},
+};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -45,6 +50,10 @@ async fn main() -> Result<()> {
 
     let debug_options: HashMap<_, _> = args.debug_options.into_iter().collect();
     set_debug_options(debug_options);
+    let mastodon_options = MastodonClientOptions {
+        use_sse: debug_option_enabled("mastodon_sse").unwrap_or(false),
+        disconnect_after: debug_option_value("mastodon_disconnect"),
+    };
 
     let (natsuki, shiyu) = initialize_natsuki(&config, &rate_limits).await?;
 
@@ -53,7 +62,8 @@ async fn main() -> Result<()> {
     // Mastodon
     if let Some(mastodon_config) = &config.client.mastodon {
         info!("starting Mastodon client");
-        let mastodon_client = MastodonLnbClient::new(mastodon_config, user_roles.mastodon, natsuki.clone()).await?;
+        let mastodon_client =
+            MastodonLnbClient::new(mastodon_config, user_roles.mastodon, natsuki.clone(), mastodon_options).await?;
         shiyu.register_remindable(mastodon_client.clone()).await;
 
         services.spawn(async move {

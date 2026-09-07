@@ -15,3 +15,9 @@ pub struct ConfigClientMathRenderer {
     pub endpoint: String,
     pub scale: f64,
 }
+
+#[derive(Debug, Clone, Default)]
+pub struct MastodonClientOptions {
+    pub use_sse: bool,
+    pub disconnect_after: Option<String>,
+}

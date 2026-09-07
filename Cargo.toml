@@ -2,7 +2,6 @@
 resolver = "2"
 members = [
   "lnb-core",
-  "lnb-common",
   "lnb-persistence-sqlite",
   "lnb-reminder-redis",
   "lnb-math-renderer-client",
@@ -24,7 +23,6 @@ edition = "2024"
 
 [workspace.dependencies]
 lnb-core = { path = "./lnb-core" }
-lnb-common = { path = "./lnb-common" }
 lnb-persistence-sqlite = { path = "./lnb-persistence-sqlite" }
 lnb-reminder-redis = { path = "./lnb-reminder-redis" }
 lnb-math-renderer-client = { path = "./lnb-math-renderer-client" }

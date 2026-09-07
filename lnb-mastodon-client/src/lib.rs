@@ -2,7 +2,7 @@ mod config;
 mod inner;
 mod text;
 
-pub use config::ConfigClientMastodon;
+pub use config::{ConfigClientMastodon, MastodonClientOptions};
 
 use crate::inner::MastodonLnbClientInner;
 
@@ -27,8 +27,9 @@ impl<S: LnbServer> MastodonLnbClient<S> {
         config: &ConfigClientMastodon,
         roles_group: UserRolesGroup,
         assistant: S,
+        options: MastodonClientOptions,
     ) -> Result<MastodonLnbClient<S>, ClientError> {
-        let inner = MastodonLnbClientInner::new(config, roles_group, assistant).await?;
+        let inner = MastodonLnbClientInner::new(config, roles_group, assistant, options).await?;
         Ok(MastodonLnbClient(Arc::new(inner)))
     }
 }
