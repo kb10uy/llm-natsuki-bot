@@ -9,8 +9,6 @@ use futures::prelude::*;
 use lnb_common::{
     config::client::ConfigClientMastodon,
     debug::{debug_option_enabled, debug_option_value},
-    math_renderer::MathRendererClient,
-    user_roles::UserRolesGroup,
 };
 use lnb_core::{
     APP_USER_AGENT,
@@ -21,6 +19,8 @@ use lnb_core::{
         message::{AssistantMessage, Message, UserMessage, UserMessageContent},
     },
 };
+use lnb_math_renderer_client::MathRendererClient;
+use lnb_user_policy::UserRolesGroup;
 use mastodon_async::{
     Mastodon, NewStatus, Visibility,
     entities::{

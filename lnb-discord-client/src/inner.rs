@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::text::{sanitize_discord_message, sanitize_markdown_for_discord};
 
-use lnb_common::{config::client::ConfigClientDiscord, user_roles::UserRolesGroup};
+use lnb_common::config::client::ConfigClientDiscord;
 use lnb_core::{
     error::ClientError,
     interface::{MessageContext as LnbContext, server::LnbServer},
@@ -11,6 +11,7 @@ use lnb_core::{
         message::{AssistantMessage, UserMessage, UserMessageContent},
     },
 };
+use lnb_user_policy::UserRolesGroup;
 use tokio::{
     spawn,
     sync::{RwLock, Semaphore},

@@ -8,6 +8,8 @@ edition.workspace = true
 [dependencies]
 lnb-core = { workspace = true }
 lnb-common = { workspace = true }
+lnb-math-renderer-client = { workspace = true }
+lnb-user-policy = { workspace = true }
 
 anyhow = { workspace = true }
 clap = { workspace = true }

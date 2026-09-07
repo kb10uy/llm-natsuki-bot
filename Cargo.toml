@@ -5,6 +5,8 @@ members = [
   "lnb-common",
   "lnb-persistence-sqlite",
   "lnb-reminder-redis",
+  "lnb-math-renderer-client",
+  "lnb-user-policy",
   "lnb-rate-limiter",
   "lnb-daily-private",
   "lnb-server",
@@ -25,6 +27,8 @@ lnb-core = { path = "./lnb-core" }
 lnb-common = { path = "./lnb-common" }
 lnb-persistence-sqlite = { path = "./lnb-persistence-sqlite" }
 lnb-reminder-redis = { path = "./lnb-reminder-redis" }
+lnb-math-renderer-client = { path = "./lnb-math-renderer-client" }
+lnb-user-policy = { path = "./lnb-user-policy" }
 lnb-rate-limiter = { path = "./lnb-rate-limiter" }
 lnb-daily-private = { path = "./lnb-daily-private" }
 lnb-mastodon-client = { path = "./lnb-mastodon-client" }

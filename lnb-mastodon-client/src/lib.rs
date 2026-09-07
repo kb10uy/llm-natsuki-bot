@@ -6,12 +6,13 @@ use crate::inner::MastodonLnbClientInner;
 use std::sync::Arc;
 
 use futures::{future::BoxFuture, prelude::*};
-use lnb_common::{config::client::ConfigClientMastodon, user_roles::UserRolesGroup};
+use lnb_common::config::client::ConfigClientMastodon;
 use lnb_core::{
     error::{ClientError, ReminderError},
     interface::{client::LnbClient, reminder::Remindable, server::LnbServer},
     model::conversation::ConversationUpdate,
 };
+use lnb_user_policy::UserRolesGroup;
 use tracing::error;
 
 const CONTEXT_KEY_PREFIX: &str = "mastodon";

@@ -25,11 +25,11 @@ use lnb_common::{
     config::{ConfigBot, load_bot_config, tools::ConfigTools},
     debug::set_debug_options,
     rate_limits::{RateLimits, RateLimitsCategory, load_rate_limits},
-    user_roles::load_user_roles,
 };
 use lnb_core::interface::{client::LnbClient, function::ArcFunction, interception::BoxInterception};
 use lnb_discord_client::DiscordLnbClient;
 use lnb_mastodon_client::MastodonLnbClient;
+use lnb_user_policy::load_user_roles;
 use tokio::{signal, task::JoinSet};
 use tracing::info;
 
