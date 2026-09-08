@@ -42,6 +42,7 @@ struct DailyPrivateInfo {
 #[derive(Debug)]
 pub struct DailyPrivate {
     configuration: DailyPrivateConfiguration,
+    descriptor: FunctionDescriptor,
 }
 
 impl ConfigurableFunction for DailyPrivate {
@@ -69,27 +70,18 @@ impl ConfigurableFunction for DailyPrivate {
                 masturbation: config.masturbation.clone(),
                 underwear: config.underwear.clone(),
             },
+            descriptor: FunctionDescriptor {
+                name: "daily_private".to_string(),
+                description: config.prompt.description.clone(),
+                parameters: DescribedSchema::object("parameters", "引数", vec![]),
+            },
         })
     }
 }
 
 impl Function for DailyPrivate {
     fn get_descriptor(&self) -> FunctionDescriptor {
-        FunctionDescriptor {
-            name: "daily_private".to_string(),
-            description: r#"
-                この bot 自身のその日のプライベートな事情を取得します。
-                以下のいずれかの項目についてユーザーから訊かれた場合、この function のレスポンスをもとに適切に回答してください。
-                訊かれていない項目については答えなくてかまいません。
-                - 今の行動状態
-                - 生理周期
-                - 基礎体温
-                - その日のオナニーの回数
-                - 下着の色
-            "#
-            .to_string(),
-            parameters: DescribedSchema::object("parameters", "引数", vec![]),
-        }
+        self.descriptor.clone()
     }
 
     fn call<'a>(

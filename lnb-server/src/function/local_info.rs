@@ -1,3 +1,5 @@
+use crate::{config::tools::ConfigToolsLocalInfo, function::ConfigurableFunction};
+
 use futures::{FutureExt, future::BoxFuture};
 use lnb_core::{
     RFC3339_NUMOFFSET,
@@ -9,26 +11,36 @@ use lnb_core::{
     },
     model::{conversation::IncompleteConversation, message::MessageToolCalling, schema::DescribedSchema},
 };
+use lnb_rate_limiter::RateLimiter;
 use serde_json::json;
 use time::OffsetDateTime;
 
 #[derive(Debug)]
 pub struct LocalInfo {
     started_at: OffsetDateTime,
+    descriptor: FunctionDescriptor,
+}
+
+impl ConfigurableFunction for LocalInfo {
+    const NAME: &'static str = stringify!(LocalInfo);
+
+    type Configuration = ConfigToolsLocalInfo;
+
+    async fn configure(config: &ConfigToolsLocalInfo, _: Option<RateLimiter>) -> Result<LocalInfo, FunctionError> {
+        Ok(LocalInfo {
+            started_at: OffsetDateTime::now_local().map_err(FunctionError::by_external)?,
+            descriptor: FunctionDescriptor {
+                name: "local_info".to_string(),
+                description: config.prompt.description.clone(),
+                parameters: DescribedSchema::object("parameters", "引数", vec![]),
+            },
+        })
+    }
 }
 
 impl Function for LocalInfo {
     fn get_descriptor(&self) -> FunctionDescriptor {
-        FunctionDescriptor {
-            name: "local_info".to_string(),
-            description: r#"
-                この bot が動作している環境に関する以下の情報を提供する。
-                - 現在時刻
-                - bot が動作を開始した日時
-            "#
-            .to_string(),
-            parameters: DescribedSchema::object("parameters", "引数", vec![]),
-        }
+        self.descriptor.clone()
     }
 
     fn call<'a>(
@@ -43,12 +55,6 @@ impl Function for LocalInfo {
 }
 
 impl LocalInfo {
-    pub fn new() -> Result<LocalInfo, FunctionError> {
-        Ok(LocalInfo {
-            started_at: OffsetDateTime::now_local().map_err(FunctionError::by_external)?,
-        })
-    }
-
     fn get_info(&self, now: OffsetDateTime) -> Result<FunctionResponse, FunctionError> {
         Ok(FunctionResponse {
             result: json!({

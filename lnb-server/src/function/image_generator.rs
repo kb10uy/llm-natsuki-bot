@@ -39,6 +39,7 @@ pub struct ImageGenerator {
     edit_endpoint: Url,
     model: String,
     rate_limiter: Option<RateLimiter>,
+    descriptor: FunctionDescriptor,
 }
 
 impl ConfigurableFunction for ImageGenerator {
@@ -67,46 +68,38 @@ impl ConfigurableFunction for ImageGenerator {
         let edit_endpoint =
             Url::parse(&format!("{}/images/edits", config.endpoint)).map_err(FunctionError::by_serialization)?;
 
+        let descriptor = FunctionDescriptor {
+            name: "image_generator".to_string(),
+            description: config.prompt.description.clone(),
+            parameters: DescribedSchema::object(
+                "parameters",
+                "引数",
+                vec![
+                    DescribedSchema::string_enum("mode", config.prompt.parameter("mode")?, ["generate", "edit"]),
+                    DescribedSchema::string("prompt", config.prompt.parameter("prompt")?),
+                    DescribedSchema::array(
+                        "input_image_urls",
+                        config.prompt.parameter("input_image_urls")?,
+                        DescribedSchema::string("url", config.prompt.parameter("url")?),
+                    ),
+                ],
+            ),
+        };
+
         Ok(ImageGenerator {
             http_client,
             generate_endpoint,
             edit_endpoint,
             model: config.model.to_string(),
             rate_limiter,
+            descriptor,
         })
     }
 }
 
 impl Function for ImageGenerator {
     fn get_descriptor(&self) -> FunctionDescriptor {
-        FunctionDescriptor {
-            name: "image_generator".to_string(),
-            description: r#"
-                ユーザーからの要望に基づき、プロンプトの入力から AI を利用して画像を生成・または編集します。
-                生成された画像は返答のメッセージに直接添付されます。
-            "#
-            .to_string(),
-            parameters: DescribedSchema::object(
-                "parameters",
-                "引数",
-                vec![
-                    DescribedSchema::string_enum(
-                        "mode",
-                        "動作モードの指定。新しい画像の生成は generate を、既存画像からの編集は edit を指定する。",
-                        ["generate", "edit"],
-                    ),
-                    DescribedSchema::string(
-                        "prompt",
-                        "GPT-Image, DALL-E などの画像生成モデルに入力するプロンプト文。",
-                    ),
-                    DescribedSchema::array(
-                        "input_image_urls",
-                        "edit mode の場合にユーザーから提供される画像の URL のリスト。 generate mode の場合は空にする。",
-                        DescribedSchema::string("url", "提供された画像の URL。"),
-                    ),
-                ],
-            ),
-        }
+        self.descriptor.clone()
     }
 
     fn call<'a>(
