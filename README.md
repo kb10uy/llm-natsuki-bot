@@ -32,3 +32,5 @@ AI-powered chatbot implementation in Rust; it comes with various *humorous* feat
 ## 開発
 
 `cargo xtask` して掴んでください
+
+全体の構成は [docs/architecture.md](./docs/architecture.md) にアーキテクチャ図としてまとめています。
