@@ -1,4 +1,4 @@
-FROM mirror.gcr.io/node:22 AS builder
+FROM mirror.gcr.io/node:26 AS builder
 ENV NODE_ENV=development
 WORKDIR /build
 COPY lnb-math-renderer/package*.json ./
@@ -8,13 +8,13 @@ COPY lnb-math-renderer/src ./src
 RUN npm run build
 WORKDIR /font
 RUN mkdir -p /usr/local/share/fonts \
-    && wget https://github.com/githubnext/monaspace/releases/download/v1.301/monaspace-static-v1.301.zip \
-    && unzip monaspace-static-v1.301.zip \
+    && wget https://github.com/githubnext/monaspace/releases/download/v1.400/monaspace-static-v1.400.zip \
+    && unzip monaspace-static-v1.400.zip \
     && find -name '*.otf' -exec cp -t /usr/local/share/fonts {} +
 RUN wget https://github.com/adobe-fonts/source-han-sans/raw/release/Variable/OTF/SourceHanSans-VF.otf \
     && cp SourceHanSans-VF.otf /usr/local/share/fonts/
 
-FROM mirror.gcr.io/node:24-slim AS runtime
+FROM mirror.gcr.io/node:26-slim AS runtime
 ENV NODE_ENV=production
 RUN apt-get update && apt-get install -y fontconfig \
     && rm -rf /var/lib/apt/lists/*
