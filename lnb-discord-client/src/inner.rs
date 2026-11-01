@@ -72,7 +72,7 @@ impl<S: LnbServer> DiscordLnbClientInner<S> {
                 Ok(event) => {
                     cache.update(&event);
                     match event {
-                        Event::Ready(ready) => self.on_ready(*ready).await?,
+                        Event::Ready(ready) => self.on_ready(ready).await?,
                         Event::MessageCreate(message_create) => {
                             let permit = event_permits
                                 .clone()
