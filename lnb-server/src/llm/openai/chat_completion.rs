@@ -222,24 +222,27 @@ fn transform_message(message: &Message) -> Result<ChatCompletionRequestMessage, 
     let message = match message {
         Message::System(system_message) => ChatCompletionRequestMessage::System(system_message.0.clone().into()),
         Message::User(user_message) => {
-            let contents =
-                user_message
-                    .contents
-                    .iter()
-                    .map(|umc| match umc {
-                        UserMessageContent::Text(text) => ChatCompletionRequestUserMessageContentPart::Text(
-                            ChatCompletionRequestMessageContentPartText { text: text.to_string() },
-                        ),
-                        UserMessageContent::ImageUrl(url) => ChatCompletionRequestUserMessageContentPart::ImageUrl(
-                            ChatCompletionRequestMessageContentPartImage {
-                                image_url: ImageUrl {
-                                    url: url.to_string(),
-                                    ..Default::default()
-                                },
+            let contents = user_message
+                .contents
+                .iter()
+                .map(|umc| match umc {
+                    UserMessageContent::Text(text) => {
+                        ChatCompletionRequestUserMessageContentPart::Text(ChatCompletionRequestMessageContentPartText {
+                            text: text.to_string(),
+                            prompt_cache_breakpoint: None,
+                        })
+                    }
+                    UserMessageContent::ImageUrl(url) => ChatCompletionRequestUserMessageContentPart::ImageUrl(
+                        ChatCompletionRequestMessageContentPartImage {
+                            image_url: ImageUrl {
+                                url: url.to_string(),
+                                ..Default::default()
                             },
-                        ),
-                    })
-                    .collect();
+                            prompt_cache_breakpoint: None,
+                        },
+                    ),
+                })
+                .collect();
             ChatCompletionRequestMessage::User(ChatCompletionRequestUserMessage {
                 content: ChatCompletionRequestUserMessageContent::Array(contents),
                 name: user_message.name.clone(),

@@ -4,68 +4,62 @@
 version: 'v0.0.3'
 workflows:
     '.github/workflows/build-docker-image.yml':
-        - 'actions/attest-build-provenance@v2.4.0'
-        - 'actions/checkout@v4.4.0'
-        - 'docker/build-push-action@84ad562665bb303b549fec655d1b64f9945f3f91'
-        - 'docker/login-action@v3.4.0'
-        - 'docker/metadata-action@v5.7.0'
+        - 'actions/attest-build-provenance@v4.2.2'
+        - 'actions/checkout@v7.0.1'
+        - 'docker/build-push-action@v7.4.0'
+        - 'docker/login-action@v4.7.0'
+        - 'docker/metadata-action@v6.2.0'
     '.github/workflows/check-rust-code.yml':
         - 'actions-rust-lang/rustfmt@v1.1.2'
-        - 'actions-rust-lang/setup-rust-toolchain@v1.17.0'
-        - 'actions/checkout@v4.4.0'
+        - 'actions-rust-lang/setup-rust-toolchain@v2.0.0'
+        - 'actions/checkout@v7.0.1'
 dependencies:
     'actions-rust-lang/rustfmt@v1.1.2':
         ref: 'v1.1.2'
         commit: 'sha1-4066006ec54a31931b9b1fddfd38f2fdf2d27143'
         owner_id: 103899579
         repo_id: 490850718
-    'actions-rust-lang/setup-rust-toolchain@v1.17.0':
-        ref: 'v1.17.0'
-        commit: 'sha1-166cdcfd11aee3cb47222f9ddb555ce30ddb9659'
+    'actions-rust-lang/setup-rust-toolchain@v2.0.0':
+        ref: 'v2.0.0'
+        commit: 'sha1-ecabd13d1c56bd1345c230e542e9144811ad706f'
         owner_id: 103899579
         repo_id: 482610590
         uses:
-            - 'swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4'
-    'actions/attest-build-provenance@1176ef556905f349f669722abf30bce1a6e16e01':
-        ref: 'predicate@1.1.5'
-        commit: 'sha1-1176ef556905f349f669722abf30bce1a6e16e01'
-        owner_id: 44036562
-        repo_id: 760702757
-    'actions/attest-build-provenance@v2.4.0':
-        ref: 'v2.4.0'
-        commit: 'sha1-e8998f949152b193b063cb0ec769d69d929409be'
+            - 'swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6'
+    'actions/attest-build-provenance@v4.2.2':
+        ref: 'v4.2.2'
+        commit: 'sha1-4d101475d8b20a2381f78447822ac1eab6504dd8'
         owner_id: 44036562
         repo_id: 760702757
         uses:
-            - 'actions/attest-build-provenance@1176ef556905f349f669722abf30bce1a6e16e01'
-            - 'actions/attest@ce27ba3b4a9a139d9a20a4a07d69fabb52f1e5bc'
-    'actions/attest@ce27ba3b4a9a139d9a20a4a07d69fabb52f1e5bc':
-        ref: 'v2.4.0'
-        commit: 'sha1-ce27ba3b4a9a139d9a20a4a07d69fabb52f1e5bc'
+            - 'actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d'
+    'actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d':
+        ref: 'v4.2.1'
+        commit: 'sha1-508db95dd578ae2727ebd6217d5ba78e4fbda05d'
         owner_id: 44036562
         repo_id: 760701061
-    'actions/checkout@v4.4.0':
-        ref: 'v4.4.0'
-        commit: 'sha1-11d5960a326750d5838078e36cf38b85af677262'
+    'actions/checkout@v7.0.1':
+        ref: 'v7.0.1'
+        commit: 'sha1-3d3c42e5aac5ba805825da76410c181273ba90b1'
         owner_id: 44036562
         repo_id: 197814629
-    'docker/build-push-action@84ad562665bb303b549fec655d1b64f9945f3f91':
-        ref: 'master'
-        commit: 'sha1-84ad562665bb303b549fec655d1b64f9945f3f91'
+    'docker/build-push-action@v7.4.0':
+        ref: 'v7.4.0'
+        commit: 'sha1-c3c9e263c25d99ce0380d002d59b67737d91b0dc'
         owner_id: 5429470
         repo_id: 241092383
-    'docker/login-action@v3.4.0':
-        ref: 'v3.4.0'
-        commit: 'sha1-74a5d142397b4f367a81961eba4e8cd7edddf772'
+    'docker/login-action@v4.7.0':
+        ref: 'v4.7.0'
+        commit: 'sha1-81c6f93d4bc991e510b342a00b419b3bb4efc5c6'
         owner_id: 5429470
         repo_id: 287743349
-    'docker/metadata-action@v5.7.0':
-        ref: 'v5.7.0'
-        commit: 'sha1-902fa8ec7d6ecbf8d84d538b9b233a880e428804'
+    'docker/metadata-action@v6.2.0':
+        ref: 'v6.2.0'
+        commit: 'sha1-dc802804100637a589fabce1cb79ff13a1411302'
         owner_id: 5429470
         repo_id: 306769011
-    'swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4':
-        ref: 'v2.9.1'
-        commit: 'sha1-c19371144df3bb44fab255c43d04cbc2ab54d1c4'
+    'swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6':
+        ref: 'v2.9.2'
+        commit: 'sha1-6323deb102c322ba6fcbdcafc7e3dddab59af2b6'
         owner_id: 580492
         repo_id: 298565987
