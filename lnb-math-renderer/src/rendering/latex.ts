@@ -1,5 +1,5 @@
 import MathJax from "mathjax";
-import sharp from "sharp";
+import sharp, { type OverlayOptions } from "sharp";
 
 const RENDERING_EX_SIZE = 32;
 const RASTERIZE_DENSITY = 96;
@@ -118,7 +118,7 @@ export async function renderMultipleToPng(
     let totalFormulaHeight = 0;
     let index = 1;
     let y = 0;
-    const compositeInputs: sharp.OverlayOptions[] = [];
+    const compositeInputs: OverlayOptions[] = [];
     for (const formula of formulae) {
         // Formula
         let svg;
@@ -177,7 +177,7 @@ export async function renderMultipleToPng(
         ++index;
     }
 
-    let compositeImage = await sharp({
+    let compositeImage: Buffer = await sharp({
         create: {
             width: maxFormulaWidth + LABEL_MARGIN + LABEL_WIDTH,
             height: totalFormulaHeight + FORMULA_GAP * (formulae.length - 1),
