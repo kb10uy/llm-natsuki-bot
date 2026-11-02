@@ -353,9 +353,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.10.0"
+version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86e055fa6e3e40ad6187ba25b6855eeb635d5271f8e0f0e1e9a5826b8d75bea0"
+checksum = "375989decec1a0fa424442bed520fa12ede43a48475ce8c7417d2c69b32b5f6b"
 dependencies = [
  "find-msvc-tools",
  "jobserver",
@@ -1612,7 +1612,7 @@ checksum = "47d9d19d1d6efa0109d2f65ff4c85cddd50bd572e5a00127ab10987290bcefae"
 
 [[package]]
 name = "lnb-admin-api"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "anyhow",
  "axum",
@@ -1638,7 +1638,7 @@ dependencies = [
 
 [[package]]
 name = "lnb-core"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "futures",
  "serde",
@@ -1652,7 +1652,7 @@ dependencies = [
 
 [[package]]
 name = "lnb-daily-private"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "rand 0.10.3",
  "rand_distr",
@@ -1664,7 +1664,7 @@ dependencies = [
 
 [[package]]
 name = "lnb-discord-client"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -1690,7 +1690,7 @@ dependencies = [
 
 [[package]]
 name = "lnb-mastodon-client"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -1718,7 +1718,7 @@ dependencies = [
 
 [[package]]
 name = "lnb-math-renderer-client"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "lnb-core",
  "reqwest",
@@ -1729,7 +1729,7 @@ dependencies = [
 
 [[package]]
 name = "lnb-persistence-sqlite"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "futures",
  "lnb-core",
@@ -1743,7 +1743,7 @@ dependencies = [
 
 [[package]]
 name = "lnb-rate-limiter"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "regex",
  "time",
@@ -1752,7 +1752,7 @@ dependencies = [
 
 [[package]]
 name = "lnb-reminder-redis"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "futures",
  "redis",
@@ -1767,7 +1767,7 @@ dependencies = [
 
 [[package]]
 name = "lnb-server"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "anyhow",
  "async-openai",
@@ -1805,7 +1805,7 @@ dependencies = [
 
 [[package]]
 name = "lnb-user-policy"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "lnb-core",
  "regex",
@@ -2089,9 +2089,9 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
 name = "openssl"
-version = "0.10.81"
+version = "0.10.82"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77823a27f0babb03091cb9ed9ef80af3b39dbc82f97e8fa530374b7dafd87a45"
+checksum = "4de8111e94a56adca7ebfe6c365b6d42f99deb69b74b6becacd4204e2f193aa2"
 dependencies = [
  "bitflags",
  "cfg-if",
@@ -2120,9 +2120,9 @@ checksum = "7e036b411754132fd6b74e94b74e9a13c5cf606fa93d1885c35860d3060820b1"
 
 [[package]]
 name = "openssl-sys"
-version = "0.9.117"
+version = "0.9.118"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b47e7e6bb2c38cd930d25a23b40fa52e068c10e85f3e03a7f5ba5aaca5713695"
+checksum = "19c413d6ec9ebaf5e1c829d355cb3e9f783778d700f135be0921d52fce3c60ae"
 dependencies = [
  "cc",
  "libc",
@@ -4415,7 +4415,7 @@ dependencies = [
 
 [[package]]
 name = "xtask"
-version = "0.19.0"
+version = "0.19.1"
 dependencies = [
  "anyhow",
  "clap",
