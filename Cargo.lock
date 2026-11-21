@@ -1685,7 +1685,6 @@ dependencies = [
  "twilight-gateway",
  "twilight-http",
  "twilight-model",
- "url",
 ]
 
 [[package]]
@@ -1713,7 +1712,6 @@ dependencies = [
  "tokio-tungstenite",
  "tracing",
  "tracing-subscriber",
- "url",
 ]
 
 [[package]]
