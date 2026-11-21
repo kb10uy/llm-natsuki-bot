@@ -9,19 +9,13 @@ edition.workspace = true
 lnb-core = { workspace = true }
 lnb-user-policy = { workspace = true }
 
-anyhow = { workspace = true }
-clap = { workspace = true }
 futures = { workspace = true }
-infer = { workspace = true }
 markdown = { workspace = true }
 regex = { workspace = true }
-reqwest = { workspace = true }
 serde = { workspace = true }
-tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
 
 twilight-cache-inmemory = "0.18.0"
 twilight-gateway = "0.18.0"

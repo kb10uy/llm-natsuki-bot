@@ -1666,21 +1666,15 @@ dependencies = [
 name = "lnb-discord-client"
 version = "0.19.1"
 dependencies = [
- "anyhow",
- "clap",
  "futures",
- "infer",
  "lnb-core",
  "lnb-user-policy",
  "markdown",
  "regex",
- "reqwest",
  "serde",
- "tempfile",
  "thiserror 2.0.21",
  "tokio",
  "tracing",
- "tracing-subscriber",
  "twilight-cache-inmemory",
  "twilight-gateway",
  "twilight-http",
@@ -1691,8 +1685,6 @@ dependencies = [
 name = "lnb-mastodon-client"
 version = "0.19.1"
 dependencies = [
- "anyhow",
- "clap",
  "futures",
  "html2md",
  "infer",
@@ -1711,7 +1703,6 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
