@@ -6,7 +6,6 @@ use std::{
 use html2md::parse_html;
 use markdown::{Constructs, ParseOptions, mdast::Node};
 use regex::Regex;
-use url::Url;
 
 static RE_HEAD_MENTION: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"^\s*(\[@.+?\]\(.+?\)\s*)+"#).expect("invalid regex"));
@@ -54,7 +53,7 @@ fn walk_mastodon(writer: &mut impl Write, math_formulae: &mut Vec<String>, child
             Node::Emphasis(emphasis) => walk_mastodon(writer, math_formulae, emphasis.children)?,
             Node::Delete(delete) => walk_mastodon(writer, math_formulae, delete.children)?,
             Node::InlineCode(inline_code) => write_text_element(writer, &inline_code.value)?,
-            Node::Link(link) => write!(writer, "{}", strip_utm_source(&link.url))?,
+            Node::Link(link) => write!(writer, "{}", lnb_core::link::strip_utm_source(&link.url))?,
 
             Node::Paragraph(paragraph) => {
                 walk_mastodon(writer, math_formulae, paragraph.children)?;
@@ -114,28 +113,4 @@ fn write_text_element(writer: &mut impl Write, original: &str) -> FmtResult {
     let escaped = RE_ESCAPING_MENTION.replace_all(original, "$1(at)$2");
     write!(writer, "{escaped}")?;
     Ok(())
-}
-
-fn strip_utm_source(url: &str) -> String {
-    let Ok(parsed_url) = Url::parse(url) else {
-        return url.to_string();
-    };
-
-    let stripped_url = if parsed_url.query().is_some() {
-        let mut stripped = parsed_url.clone();
-        let mut stripped_query = stripped.query_pairs_mut();
-        stripped_query.clear();
-        for (key, value) in parsed_url.query_pairs() {
-            if key == "utm_source" {
-                continue;
-            }
-            stripped_query.append_pair(&key, &value);
-        }
-        drop(stripped_query);
-        stripped
-    } else {
-        parsed_url
-    };
-
-    stripped_url.to_string()
 }

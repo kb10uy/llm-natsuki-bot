@@ -5,7 +5,6 @@ use std::{
 
 use markdown::{ParseOptions, mdast::Node};
 use regex::Regex;
-use url::Url;
 
 static RE_HEAD_MENTION: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"^\s*<@\d+?>\s*"#).expect("invalid regex"));
 
@@ -40,7 +39,7 @@ fn walk_discord(writer: &mut impl Write, children: Vec<Node>) -> FmtResult {
             Node::Link(link) => {
                 write!(writer, "[")?;
                 walk_discord(writer, link.children)?;
-                write!(writer, "]({})", strip_utm_source(&link.url))?;
+                write!(writer, "]({})", lnb_core::link::strip_utm_source(&link.url))?;
             }
 
             Node::Paragraph(paragraph) => {
@@ -78,28 +77,4 @@ fn walk_discord(writer: &mut impl Write, children: Vec<Node>) -> FmtResult {
         }
     }
     Ok(())
-}
-
-fn strip_utm_source(url: &str) -> String {
-    let Ok(parsed_url) = Url::parse(url) else {
-        return url.to_string();
-    };
-
-    let stripped_url = if parsed_url.query().is_some() {
-        let mut stripped = parsed_url.clone();
-        let mut stripped_query = stripped.query_pairs_mut();
-        stripped_query.clear();
-        for (key, value) in parsed_url.query_pairs() {
-            if key == "utm_source" {
-                continue;
-            }
-            stripped_query.append_pair(&key, &value);
-        }
-        drop(stripped_query);
-        stripped
-    } else {
-        parsed_url
-    };
-
-    stripped_url.to_string()
 }

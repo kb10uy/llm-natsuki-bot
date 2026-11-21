@@ -1,6 +1,7 @@
 pub mod context;
 pub mod error;
 pub mod interface;
+pub mod link;
 pub mod model;
 
 use time::{format_description::BorrowedFormatItem, macros::format_description};
